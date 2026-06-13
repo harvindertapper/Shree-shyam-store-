@@ -20,7 +20,10 @@ data class StoreSettings(
     val ownerPhone: String,
     val staticPaytmQrImageUri: String,
     val welcomeChantEnabled: Boolean,
-    val firstLaunchCompleted: Boolean
+    val firstLaunchCompleted: Boolean,
+    val loggedInUsername: String,
+    val loggedInEmail: String,
+    val isUserLoggedIn: Boolean
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -30,6 +33,9 @@ class SettingsDataStore(private val context: Context) {
         private val STATIC_PAYTM_QR_IMAGE_URI = stringPreferencesKey("static_paytm_qr_image_uri")
         private val WELCOME_CHANT_ENABLED = booleanPreferencesKey("welcome_chant_enabled")
         private val FIRST_LAUNCH_COMPLETED = booleanPreferencesKey("first_launch_completed")
+        private val LOGGED_IN_USERNAME = stringPreferencesKey("logged_in_username")
+        private val LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
+        private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
     }
 
     val settingsFlow: Flow<StoreSettings> = context.dataStore.data
@@ -46,7 +52,10 @@ class SettingsDataStore(private val context: Context) {
                 ownerPhone = preferences[OWNER_PHONE] ?: "",
                 staticPaytmQrImageUri = preferences[STATIC_PAYTM_QR_IMAGE_URI] ?: "",
                 welcomeChantEnabled = preferences[WELCOME_CHANT_ENABLED] ?: true,
-                firstLaunchCompleted = preferences[FIRST_LAUNCH_COMPLETED] ?: false
+                firstLaunchCompleted = preferences[FIRST_LAUNCH_COMPLETED] ?: false,
+                loggedInUsername = preferences[LOGGED_IN_USERNAME] ?: "",
+                loggedInEmail = preferences[LOGGED_IN_EMAIL] ?: "",
+                isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false
             )
         }
 
@@ -77,6 +86,22 @@ class SettingsDataStore(private val context: Context) {
     suspend fun setFirstLaunchCompleted(completed: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[FIRST_LAUNCH_COMPLETED] = completed
+        }
+    }
+
+    suspend fun saveSession(username: String, email: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LOGGED_IN_USERNAME] = username
+            preferences[LOGGED_IN_EMAIL] = email
+            preferences[IS_USER_LOGGED_IN] = true
+        }
+    }
+
+    suspend fun clearSession() {
+        context.dataStore.edit { preferences ->
+            preferences[LOGGED_IN_USERNAME] = ""
+            preferences[LOGGED_IN_EMAIL] = ""
+            preferences[IS_USER_LOGGED_IN] = false
         }
     }
 }

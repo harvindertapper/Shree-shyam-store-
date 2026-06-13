@@ -14,7 +14,8 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SaleItem::class,
         Customer::class,
         UdhaarTransaction::class,
-        StockAdjustment::class
+        StockAdjustment::class,
+        User::class
     ],
     version = 1,
     exportSchema = false
@@ -26,6 +27,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun customerDao(): CustomerDao
     abstract fun udhaarDao(): UdhaarDao
     abstract fun stockAdjustmentDao(): StockAdjustmentDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile

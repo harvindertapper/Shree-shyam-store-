@@ -83,6 +83,68 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Session Profile display card
+            if (settings.isUserLoggedIn) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = SaffronLight),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, SaffronDark),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                    modifier = Modifier.fillMaxWidth().testTag("session_profile_card")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                Icon(
+                                    imageVector = Icons.Default.AccountCircle,
+                                    contentDescription = "User avatar",
+                                    tint = SaffronDark,
+                                    modifier = Modifier.size(32.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "एक्टिव ओनर (Active Owner):",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SaffronDark
+                                    )
+                                    Text(
+                                        text = settings.loggedInUsername,
+                                        fontSize = 17.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = TextNearBlack
+                                    )
+                                    Text(
+                                        text = settings.loggedInEmail,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextMediumGray
+                                    )
+                                }
+                            }
+                            Button(
+                                onClick = { viewModel.logoutUser() },
+                                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.testTag("logout_button").heightIn(min = 40.dp)
+                            ) {
+                                Icon(Icons.Default.Logout, contentDescription = "Log out", modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Logout", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Card 1: Shop details info
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),

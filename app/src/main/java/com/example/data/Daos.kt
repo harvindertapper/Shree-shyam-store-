@@ -124,3 +124,22 @@ interface StockAdjustmentDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAdjustment(adjustment: StockAdjustment): Long
 }
+
+@Dao
+interface UserDao {
+    @Query("SELECT * FROM users WHERE username = :username OR email = :email LIMIT 1")
+    suspend fun getUserByUsernameOrEmail(username: String, email: String): User?
+
+    @Query("SELECT * FROM users WHERE email = :email LIMIT 1")
+    suspend fun getUserByEmail(email: String): User?
+
+    @Query("SELECT * FROM users WHERE username = :username LIMIT 1")
+    suspend fun getUserByUsername(username: String): User?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertUser(user: User): Long
+
+    @Query("SELECT * FROM users WHERE id = :userId LIMIT 1")
+    suspend fun getUserById(userId: Long): User?
+}
+

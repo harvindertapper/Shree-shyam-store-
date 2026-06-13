@@ -9,9 +9,12 @@ import com.example.data.*
 import com.example.utils.CurrencyUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.security.MessageDigest
 
 sealed class Screen {
     object Welcome : Screen()
+    object Login : Screen()       // Auth screens
+    object Register : Screen()    // Auth screens
     object Setup : Screen()
     object Home : Screen()
     object Billing : Screen()
@@ -25,6 +28,12 @@ sealed class Screen {
     data class CustomerDetail(val customerId: Long) : Screen()
     object Reports : Screen()
     object Settings : Screen()
+}
+
+fun sha256(input: String): String {
+    val md = MessageDigest.getInstance("SHA-256")
+    val digest = md.digest(input.toByteArray(Charsets.UTF_8))
+    return digest.fold("") { str, it -> str + "%02x".format(it) }
 }
 
 class ShopViewModel(
@@ -45,7 +54,16 @@ class ShopViewModel(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = StoreSettings("Shree Shyam General Store", "", "", welcomeChantEnabled = true, firstLaunchCompleted = false)
+            initialValue = StoreSettings(
+                shopName = "Shree Shyam General Store",
+                ownerPhone = "",
+                staticPaytmQrImageUri = "",
+                welcomeChantEnabled = true,
+                firstLaunchCompleted = false,
+                loggedInUsername = "",
+                loggedInEmail = "",
+                isUserLoggedIn = false
+            )
         )
 
     fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String) {
@@ -61,6 +79,111 @@ class ShopViewModel(
         viewModelScope.launch {
             settingsDataStore.setFirstLaunchCompleted(true)
             navigateTo(Screen.Home)
+        }
+    }
+
+    // --- User Authentication & Session Management Functions ---
+    fun registerUser(
+        username: String,
+        email: String,
+        password: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val trimmedUsername = username.trim()
+            val trimmedEmail = email.trim()
+            if (trimmedUsername.length < 3) {
+                onError("Username must be at least 3 characters!")
+                return@launch
+            }
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
+                onError("Please enter a valid email address!")
+                return@launch
+            }
+            if (password.length < 6) {
+                onError("Password must be at least 6 characters!")
+                return@launch
+            }
+
+            try {
+                // Check if user already exists
+                val existingUser = repository.getUserByUsernameOrEmail(trimmedUsername, trimmedEmail)
+                if (existingUser != null) {
+                    if (existingUser.username.equals(trimmedUsername, ignoreCase = true)) {
+                        onError("Username is already taken!")
+                    } else {
+                        onError("Email is already registered!")
+                    }
+                    return@launch
+                }
+
+                // Insert User
+                val user = User(
+                    username = trimmedUsername,
+                    email = trimmedEmail,
+                    passwordHash = sha256(password)
+                )
+                repository.insertUser(user)
+
+                // Save active session
+                settingsDataStore.saveSession(trimmedUsername, trimmedEmail)
+
+                onSuccess()
+            } catch (e: Exception) {
+                onError("Registration failed: ${e.message}")
+            }
+        }
+    }
+
+    fun loginUser(
+        usernameOrEmail: String,
+        password: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val key = usernameOrEmail.trim()
+            if (key.isEmpty()) {
+                onError("Please enter Username or Email!")
+                return@launch
+            }
+            if (password.isEmpty()) {
+                onError("Please type your Password!")
+                return@launch
+            }
+
+            try {
+                // Check username or email matching
+                val user = if (key.contains("@")) {
+                    repository.getUserByEmail(key)
+                } else {
+                    repository.getUserByUsername(key)
+                }
+
+                if (user == null) {
+                    onError("User not found!")
+                    return@launch
+                }
+
+                val hashedPass = sha256(password)
+                if (user.passwordHash == hashedPass) {
+                    // Save active session
+                    settingsDataStore.saveSession(user.username, user.email)
+                    onSuccess()
+                } else {
+                    onError("Incorrect password! Change and retry.")
+                }
+            } catch (e: Exception) {
+                onError("Login failed: ${e.message}")
+            }
+        }
+    }
+
+    fun logoutUser() {
+        viewModelScope.launch {
+            settingsDataStore.clearSession()
+            navigateTo(Screen.Login)
         }
     }
 

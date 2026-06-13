@@ -37,7 +37,8 @@ class MainActivity : ComponentActivity() {
             saleDao = database.saleDao(),
             customerDao = database.customerDao(),
             udhaarDao = database.udhaarDao(),
-            stockAdjustmentDao = database.stockAdjustmentDao()
+            stockAdjustmentDao = database.stockAdjustmentDao(),
+            userDao = database.userDao()
         )
         val settingsStore = SettingsDataStore(applicationContext)
 
@@ -54,8 +55,8 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        // Do not show bottom nav drawer in welcome/splash or onboarding setup flows
-                        if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Setup) {
+                        // Do not show bottom nav drawer in welcome, login, register, or onboarding setup flows
+                        if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Register && currentScreen !is Screen.Setup) {
                             NavigationBar(
                                 modifier = Modifier.testTag("bottom_nav")
                             ) {
@@ -113,6 +114,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         when (val screen = currentScreen) {
                             is Screen.Welcome -> WelcomeScreen(viewModel)
+                            is Screen.Login -> LoginScreen(viewModel)
+                            is Screen.Register -> RegisterScreen(viewModel)
                             is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
                             is Screen.Home -> HomeScreen(viewModel)
                             is Screen.Billing -> BillingScreen(viewModel)

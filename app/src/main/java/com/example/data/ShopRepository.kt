@@ -10,7 +10,8 @@ class ShopRepository(
     private val saleDao: SaleDao,
     private val customerDao: CustomerDao,
     private val udhaarDao: UdhaarDao,
-    private val stockAdjustmentDao: StockAdjustmentDao
+    private val stockAdjustmentDao: StockAdjustmentDao,
+    private val userDao: UserDao
 ) {
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
@@ -162,4 +163,12 @@ class ShopRepository(
         )
         stockAdjustmentDao.insertAdjustment(adjustment)
     }
+
+    // --- User Authentication / Session Management Functions ---
+    suspend fun getUserByUsernameOrEmail(username: String, email: String): User? = userDao.getUserByUsernameOrEmail(username, email)
+    suspend fun getUserByEmail(email: String): User? = userDao.getUserByEmail(email)
+    suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
+    suspend fun insertUser(user: User): Long = userDao.insertUser(user)
+    suspend fun getUserById(userId: Long): User? = userDao.getUserById(userId)
 }
+

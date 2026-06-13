@@ -83,3 +83,13 @@ data class StockAdjustment(
     val reason: String, // e.g. "Opening stock entry", "Purchase added", "Manual correction", "Damaged/expired", etc.
     val createdAt: Long = System.currentTimeMillis()
 )
+
+@Entity(tableName = "users")
+data class User(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val username: String,
+    val email: String,
+    val passwordHash: String, // Plaintext or Cipher text representation
+    val createdAt: Long = System.currentTimeMillis()
+)
+

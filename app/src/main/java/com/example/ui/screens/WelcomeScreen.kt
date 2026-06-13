@@ -80,7 +80,9 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
             mediaPlayer = null
         }
 
-        if (settings.firstLaunchCompleted) {
+        if (!settings.isUserLoggedIn) {
+            viewModel.navigateTo(Screen.Login)
+        } else if (settings.firstLaunchCompleted) {
             viewModel.navigateTo(Screen.Home)
         } else {
             viewModel.navigateTo(Screen.Setup)
@@ -208,7 +210,9 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                             } catch (e: Exception) { /* ... */ }
                             mediaPlayer = null
                         }
-                        if (settings.firstLaunchCompleted) {
+                        if (!settings.isUserLoggedIn) {
+                            viewModel.navigateTo(Screen.Login)
+                        } else if (settings.firstLaunchCompleted) {
                             viewModel.navigateTo(Screen.Home)
                         } else {
                             viewModel.navigateTo(Screen.Setup)
