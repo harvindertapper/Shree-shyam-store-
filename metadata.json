@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Shree Shyam General Store",
+  "description": "An elegant, completely offline digital shop book for Shree Shyam General Store, featuring full inventory tracking, udhaar ledger, billing cart, and reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
