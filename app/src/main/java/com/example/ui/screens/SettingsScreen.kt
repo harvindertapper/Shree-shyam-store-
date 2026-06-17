@@ -23,11 +23,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.R
 import com.example.ui.components.AppOutlinedTextField
 import com.example.ui.components.AppPrimaryButton
 import com.example.viewmodel.Screen
@@ -44,12 +46,17 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     var ownerPhone by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
     var qrUriString by remember { mutableStateOf("") }
+    var selectedLanguage by remember { mutableStateOf("en") }
+    val qrSelectedToast = stringResource(R.string.settings_qr_selected_toast)
+    val shopNameRequiredToast = stringResource(R.string.shop_name_required)
+    val settingsSavedToast = stringResource(R.string.settings_saved_toast)
 
     LaunchedEffect(settings) {
         shopName = settings.shopName
         ownerPhone = settings.ownerPhone
         welcomeChantEnabled = settings.welcomeChantEnabled
         qrUriString = settings.staticPaytmQrImageUri
+        selectedLanguage = settings.selectedLanguage
     }
 
     // Modern Secure Gallery Photo Picker launcher
@@ -58,17 +65,17 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     ) { uri ->
         if (uri != null) {
             qrUriString = uri.toString()
-            Toast.makeText(context, "QR code image selected! सुरक्षित करें पर टैप करें।", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, qrSelectedToast, Toast.LENGTH_SHORT).show()
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("ऐप सेटिंग्स (Settings) ⚙️", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.settings_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -104,14 +111,14 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Icon(
                                     imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = "User avatar",
+                                    contentDescription = stringResource(R.string.content_description_user_avatar),
                                     tint = SaffronDark,
                                     modifier = Modifier.size(32.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
                                     Text(
-                                        text = "एक्टिव ओनर (Active Owner):",
+                                        text = stringResource(R.string.settings_active_owner),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = SaffronDark
@@ -136,9 +143,9 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.testTag("logout_button").heightIn(min = 40.dp)
                             ) {
-                                Icon(Icons.Default.Logout, contentDescription = "Log out", modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Logout, contentDescription = stringResource(R.string.content_description_log_out), modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Logout", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.settings_logout), fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -158,7 +165,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "दुकान की जानकारी (Shop Profile)",
+                        text = stringResource(R.string.settings_shop_profile),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Black,
                         color = SaffronDark
@@ -167,7 +174,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     AppOutlinedTextField(
                         value = shopName,
                         onValueChange = { shopName = it },
-                        label = "Shop Name (दुकान का नाम) *",
+                        label = stringResource(R.string.shop_name_label),
                         leadingIcon = { 
                             Icon(
                                 imageVector = Icons.Default.Business, 
@@ -183,7 +190,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     AppOutlinedTextField(
                         value = ownerPhone,
                         onValueChange = { ownerPhone = it },
-                        label = "Owner Phone Number (ओनर का नंबर)",
+                        label = stringResource(R.string.settings_owner_phone_label),
                         leadingIcon = { 
                             Icon(
                                 imageVector = Icons.Default.Phone, 
@@ -191,12 +198,67 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 tint = MaterialTheme.colorScheme.primary
                             ) 
                         },
-                        placeholder = "e.g. 9876543210",
+                        placeholder = stringResource(R.string.phone_placeholder),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("settings_owner_phone_field")
                     )
+                }
+            }
+
+            // Card 2: Language selection
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_language_title),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = TextNearBlack
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_language_description),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedGray
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        FilterChip(
+                            selected = selectedLanguage == "en",
+                            onClick = {
+                                selectedLanguage = "en"
+                                viewModel.updateSelectedLanguage("en")
+                            },
+                            label = { Text(stringResource(R.string.settings_language_english), fontWeight = FontWeight.Bold) },
+                            leadingIcon = if (selectedLanguage == "en") {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            } else {
+                                null
+                            }
+                        )
+                        FilterChip(
+                            selected = selectedLanguage == "hi",
+                            onClick = {
+                                selectedLanguage = "hi"
+                                viewModel.updateSelectedLanguage("hi")
+                            },
+                            label = { Text(stringResource(R.string.settings_language_hindi), fontWeight = FontWeight.Bold) },
+                            leadingIcon = if (selectedLanguage == "hi") {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                            } else {
+                                null
+                            }
+                        )
+                    }
                 }
             }
 
@@ -217,13 +279,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Welcome Chanting 🔔",
+                            text = stringResource(R.string.welcome_chant_title),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             color = TextNearBlack
                         )
                         Text(
-                            text = "ऐप शुरू होने पर 'जय श्री श्याम' भजन बजाएं।",
+                            text = stringResource(R.string.welcome_chant_description),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextMutedGray,
@@ -257,7 +319,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Paytm Business QR Code 📲",
+                        text = stringResource(R.string.settings_paytm_qr_title),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Black,
                         color = SaffronDark,
@@ -265,7 +327,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     )
 
                     Text(
-                        text = "यहाँ दुकान का static Paytm QR कोड फोटो अपलोड करें ताकि हिसाब करते समय कस्टमर इसे देख सकें।",
+                        text = stringResource(R.string.settings_paytm_qr_description),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextMutedGray,
@@ -284,7 +346,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             AsyncImage(
                                 model = qrUriString,
-                                contentDescription = "Uploaded QR Preview",
+                                contentDescription = stringResource(R.string.content_description_uploaded_qr_preview),
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
@@ -302,7 +364,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Change QR Photo", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.settings_change_qr_photo), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         // Empty QR state
@@ -316,7 +378,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.QrCode, null, modifier = Modifier.size(56.dp), tint = BorderStrong)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("No QR Selected", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                                Text(stringResource(R.string.settings_no_qr_selected), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                             }
                         }
 
@@ -334,7 +396,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.AddPhotoAlternate, null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Upload QR Code Photo", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.settings_upload_qr_photo), fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -344,10 +406,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
 
             // Save configuration button
             AppPrimaryButton(
-                text = "सुरक्षित करें (Save Settings) 💾",
+                text = stringResource(R.string.settings_save),
                 onClick = {
                     if (shopName.trim().isEmpty()) {
-                        Toast.makeText(context, "Shop name is required!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, shopNameRequiredToast, Toast.LENGTH_SHORT).show()
                     } else {
                         viewModel.updateSettings(
                             shopName = shopName.trim(),
@@ -355,7 +417,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             welcomeChantEnabled = welcomeChantEnabled,
                             qrImageUri = qrUriString
                         )
-                        Toast.makeText(context, "Settings saved successfully! 👍", Toast.LENGTH_SHORT).show()
+                        viewModel.updateSelectedLanguage(selectedLanguage)
+                        Toast.makeText(context, settingsSavedToast, Toast.LENGTH_SHORT).show()
                         viewModel.navigateTo(Screen.Home)
                     }
                 },

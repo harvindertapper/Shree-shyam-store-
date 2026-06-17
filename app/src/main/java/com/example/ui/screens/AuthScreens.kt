@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.AppOutlinedTextField
 import com.example.ui.components.AppPrimaryButton
 import com.example.ui.theme.*
@@ -43,6 +45,9 @@ fun LoginScreen(viewModel: ShopViewModel) {
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val enterUsernameOrEmailError = stringResource(R.string.error_enter_username_or_email)
+    val enterPasswordError = stringResource(R.string.error_enter_password)
+    val loginSuccessMessage = stringResource(R.string.login_success)
 
     Scaffold(
         modifier = Modifier
@@ -53,7 +58,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "सदस्य लॉगिन (User Login) 🔑",
+                        text = stringResource(R.string.login_title),
                         fontWeight = FontWeight.Black,
                         color = SaffronDark
                     )
@@ -81,8 +86,10 @@ fun LoginScreen(viewModel: ShopViewModel) {
             ) {
                 // Babaji / Store welcome emoji
                 Text(
-                    text = "🙏",
-                    fontSize = 54.sp,
+                    text = stringResource(R.string.app_name),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = SaffronDark,
                     textAlign = TextAlign.Center
                 )
 
@@ -95,7 +102,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                 )
 
                 Text(
-                    text = "डिजिटल खाता बही का उपयोग करने के लिए लॉगिन करें।",
+                    text = stringResource(R.string.login_intro),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMediumGray,
@@ -139,8 +146,8 @@ fun LoginScreen(viewModel: ShopViewModel) {
                                 usernameOrEmail = it
                                 errorMsg = null
                             },
-                            label = "Username or Email *",
-                            placeholder = "Enter username or email",
+                            label = stringResource(R.string.login_username_or_email_label),
+                            placeholder = stringResource(R.string.login_username_or_email_placeholder),
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Person,
@@ -162,7 +169,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                             },
                             label = {
                                 Text(
-                                    text = "Password *",
+                                    text = stringResource(R.string.password_label),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -170,7 +177,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                             },
                             placeholder = {
                                 Text(
-                                    text = "Enter account password",
+                                    text = stringResource(R.string.login_password_placeholder),
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 16.sp
@@ -186,7 +193,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                             trailingIcon = {
                                 val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                                    Icon(imageVector = image, contentDescription = stringResource(R.string.content_description_toggle_password_visibility))
                                 }
                             },
                             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -223,12 +230,12 @@ fun LoginScreen(viewModel: ShopViewModel) {
                 } else {
                     // Login submit button
                     AppPrimaryButton(
-                        text = "लॉगिन करें (Login) 🔓",
+                        text = stringResource(R.string.login_button),
                         onClick = {
                             if (usernameOrEmail.isBlank()) {
-                                errorMsg = "Please enter Username or Email!"
+                                errorMsg = enterUsernameOrEmailError
                             } else if (password.isBlank()) {
-                                errorMsg = "Please enter Password!"
+                                errorMsg = enterPasswordError
                             } else {
                                 isLoading = true
                                 viewModel.loginUser(
@@ -236,16 +243,16 @@ fun LoginScreen(viewModel: ShopViewModel) {
                                     password = password,
                                     onSuccess = {
                                         isLoading = false
-                                        Toast.makeText(context, "लॉगिन सफल! (Login successful)", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, loginSuccessMessage, Toast.LENGTH_SHORT).show()
                                         if (settings.firstLaunchCompleted) {
                                             viewModel.navigateTo(Screen.Home)
                                         } else {
                                             viewModel.navigateTo(Screen.Setup)
                                         }
                                     },
-                                    onError = { err ->
+                                    onError = { errorResId ->
                                         isLoading = false
-                                        errorMsg = err
+                                        errorMsg = context.getString(errorResId)
                                     }
                                 )
                             }
@@ -263,13 +270,13 @@ fun LoginScreen(viewModel: ShopViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "खाता नहीं है? (No account?) ",
+                            text = stringResource(R.string.login_no_account) + " ",
                             fontWeight = FontWeight.Bold,
                             color = TextMediumGray,
                             fontSize = 15.sp
                         )
                         Text(
-                            text = "नया बनाएं (Register Here)",
+                            text = stringResource(R.string.login_register_here),
                             fontWeight = FontWeight.ExtraBold,
                             color = SaffronDark,
                             fontSize = 15.sp,
@@ -300,6 +307,12 @@ fun RegisterScreen(viewModel: ShopViewModel) {
 
     var isLoading by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+    val requiredFieldsError = stringResource(R.string.error_required_fields)
+    val usernameMinLengthError = stringResource(R.string.error_username_min_length)
+    val validEmailError = stringResource(R.string.error_valid_email)
+    val passwordMinLengthError = stringResource(R.string.error_password_min_length)
+    val passwordsDoNotMatchError = stringResource(R.string.error_passwords_do_not_match)
+    val registerSuccessMessage = stringResource(R.string.register_success)
 
     Scaffold(
         modifier = Modifier
@@ -310,7 +323,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
             CenterAlignedTopAppBar(
                 title = {
                     Text(
-                        text = "पंजीकरण (New Registration) ✍️",
+                        text = stringResource(R.string.register_title),
                         fontWeight = FontWeight.Black,
                         color = SaffronDark
                     )
@@ -337,20 +350,22 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
-                    text = "📝",
-                    fontSize = 54.sp,
+                    text = stringResource(R.string.app_name),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = SaffronDark,
                     textAlign = TextAlign.Center
                 )
 
                 Text(
-                    text = "नया ओनर अकाउंट बनाएं",
+                    text = stringResource(R.string.register_heading),
                     fontSize = 19.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = TextNearBlack
                 )
 
                 Text(
-                    text = "सुरक्षित लॉगिन के लिए क्रेडेंशियल दर्ज करें।",
+                    text = stringResource(R.string.register_intro),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMediumGray,
@@ -394,8 +409,8 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                                 username = it
                                 errorMsg = null
                             },
-                            label = "Username *",
-                            placeholder = "Min 3 characters",
+                            label = stringResource(R.string.username_label),
+                            placeholder = stringResource(R.string.username_placeholder),
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.Default.Person,
@@ -415,8 +430,8 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                                 email = it
                                 errorMsg = null
                             },
-                            label = "Email Address *",
-                            placeholder = "e.g. name@example.com",
+                            label = stringResource(R.string.email_label),
+                            placeholder = stringResource(R.string.email_placeholder),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             leadingIcon = {
                                 Icon(
@@ -439,7 +454,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                             },
                             label = {
                                 Text(
-                                    text = "Password (Min 6 chars) *",
+                                    text = stringResource(R.string.register_password_label),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -447,7 +462,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                             },
                             placeholder = {
                                 Text(
-                                    text = "Enter master password",
+                                    text = stringResource(R.string.register_password_placeholder),
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 16.sp
@@ -463,7 +478,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                             trailingIcon = {
                                 val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
                                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                                    Icon(imageVector = image, contentDescription = "Toggle password")
+                                    Icon(imageVector = image, contentDescription = stringResource(R.string.content_description_toggle_password))
                                 }
                             },
                             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -497,7 +512,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                             },
                             label = {
                                 Text(
-                                    text = "Confirm Password *",
+                                    text = stringResource(R.string.confirm_password_label),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -505,7 +520,7 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                             },
                             placeholder = {
                                 Text(
-                                    text = "Re-enter password",
+                                    text = stringResource(R.string.confirm_password_placeholder),
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 16.sp
@@ -552,18 +567,18 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                 } else {
                     // Register submit button
                     AppPrimaryButton(
-                        text = "पंजीकरण करें (Register Account) 📝",
+                        text = stringResource(R.string.register_button),
                         onClick = {
                             if (username.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank()) {
-                                errorMsg = "All fields marked with * are required!"
+                                errorMsg = requiredFieldsError
                             } else if (username.trim().length < 3) {
-                                errorMsg = "Username must be at least 3 characters!"
+                                errorMsg = usernameMinLengthError
                             } else if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
-                                errorMsg = "Please enter a valid email address!"
+                                errorMsg = validEmailError
                             } else if (password.length < 6) {
-                                errorMsg = "Password must be at least 6 characters!"
+                                errorMsg = passwordMinLengthError
                             } else if (password != confirmPassword) {
-                                errorMsg = "Passwords do not match!"
+                                errorMsg = passwordsDoNotMatchError
                             } else {
                                 isLoading = true
                                 viewModel.registerUser(
@@ -572,16 +587,16 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                                     password = password,
                                     onSuccess = {
                                         isLoading = false
-                                        Toast.makeText(context, "पंजीकरण सफल! (Registration successful)", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, registerSuccessMessage, Toast.LENGTH_SHORT).show()
                                         if (settings.firstLaunchCompleted) {
                                             viewModel.navigateTo(Screen.Home)
                                         } else {
                                             viewModel.navigateTo(Screen.Setup)
                                         }
                                     },
-                                    onError = { err ->
+                                    onError = { errorResId ->
                                         isLoading = false
-                                        errorMsg = err
+                                        errorMsg = context.getString(errorResId)
                                     }
                                 )
                             }
@@ -599,13 +614,13 @@ fun RegisterScreen(viewModel: ShopViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "पहले से खाता है? (Have account?) ",
+                            text = stringResource(R.string.register_have_account) + " ",
                             fontWeight = FontWeight.Bold,
                             color = TextMediumGray,
                             fontSize = 15.sp
                         )
                         Text(
-                            text = "लॉगिन करें (Login Here)",
+                            text = stringResource(R.string.register_login_here),
                             fontWeight = FontWeight.ExtraBold,
                             color = SaffronDark,
                             fontSize = 15.sp,

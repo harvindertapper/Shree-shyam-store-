@@ -16,11 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.components.AppOutlinedTextField
 import com.example.ui.components.AppPrimaryButton
 import com.example.ui.theme.*
@@ -28,11 +30,18 @@ import com.example.viewmodel.ShopViewModel
 
 @Composable
 fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
-    var shopName by remember { mutableStateOf("Shree Shyam General Store") }
+    var shopName by remember { mutableStateOf("") }
     var ownerPhone by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
 
     var shopNameError by remember { mutableStateOf(false) }
+    val defaultShopName = stringResource(R.string.default_shop_name)
+
+    LaunchedEffect(defaultShopName) {
+        if (shopName.isBlank()) {
+            shopName = defaultShopName
+        }
+    }
 
     Scaffold(
         modifier = Modifier
@@ -58,13 +67,15 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
 
                 // Heading Logo/Chant Emoji
                 Text(
-                    text = "✍️",
-                    fontSize = 44.sp,
+                    text = stringResource(R.string.app_name),
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Black,
+                    color = SaffronDark,
                     textAlign = TextAlign.Center
                 )
 
                 Text(
-                    text = "पहला सेटअप (Quick Setup) ✍️",
+                    text = stringResource(R.string.setup_title),
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Black,
                     color = TextNearBlack,
@@ -72,7 +83,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                 )
 
                 Text(
-                    text = "दुकान की जानकारी डालें ताकि बिल और खाते सही बन सकें।",
+                    text = stringResource(R.string.setup_intro),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMediumGray,
@@ -93,7 +104,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         Text(
-                            text = "Shop Details (दुकान की जानकारी)",
+                            text = stringResource(R.string.setup_shop_details),
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Black,
                             color = SaffronPrimary
@@ -106,7 +117,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                                 shopName = it
                                 if (it.trim().isNotEmpty()) shopNameError = false
                             },
-                            label = "Shop Name (दुकान का नाम) *",
+                            label = stringResource(R.string.shop_name_label),
                             leadingIcon = { 
                                 Icon(
                                     imageVector = Icons.Default.Business, 
@@ -118,14 +129,14 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             supportingText = {
                                 if (shopNameError) {
                                     Text(
-                                        text = "Shop name is required!", 
+                                        text = stringResource(R.string.shop_name_required),
                                         color = ErrorRed,
                                         fontWeight = FontWeight.ExtraBold,
                                         fontSize = 13.sp
                                     )
                                 } else {
                                     Text(
-                                        text = "यह नाम बिल के ऊपर दिखेगा।",
+                                        text = stringResource(R.string.shop_name_supporting_text),
                                         fontWeight = FontWeight.Bold,
                                         color = TextMutedGray,
                                         fontSize = 13.sp
@@ -141,7 +152,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                         AppOutlinedTextField(
                             value = ownerPhone,
                             onValueChange = { ownerPhone = it },
-                            label = "Mobile Number (ओनर का नंबर - optional)",
+                            label = stringResource(R.string.owner_phone_label),
                             leadingIcon = { 
                                 Icon(
                                     imageVector = Icons.Default.Phone, 
@@ -149,7 +160,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                                     tint = SaffronPrimary
                                 ) 
                             },
-                            placeholder = "e.g. 9876543210",
+                            placeholder = stringResource(R.string.phone_placeholder),
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = KeyboardType.Phone
                             ),
@@ -183,13 +194,13 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(
-                                        text = "Welcome Sound (Chant) 🔔",
+                                        text = stringResource(R.string.welcome_chant_title),
                                         fontSize = 17.sp,
                                         fontWeight = FontWeight.Black,
                                         color = TextNearBlack
                                     )
                                     Text(
-                                        text = "ऐप शुरू होने पर 'जय श्री श्याम' भजन बजेगा।",
+                                        text = stringResource(R.string.welcome_chant_description),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextMediumGray
@@ -215,7 +226,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
 
                 // Start Button
                 AppPrimaryButton(
-                    text = "शुरू करें (Start App) 🚀",
+                    text = stringResource(R.string.setup_start_app),
                     onClick = {
                         if (shopName.trim().isEmpty()) {
                             shopNameError = true

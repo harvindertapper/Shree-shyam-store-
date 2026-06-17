@@ -15,11 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.data.Customer
 import com.example.data.Sale
 import com.example.data.SaleItem
@@ -62,10 +64,10 @@ fun ReportsScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("दुकान रिपोर्ट (Business Reports) 📈", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.reports_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -85,19 +87,19 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                 Tab(
                     selected = selectedIntervalTab == 0,
                     onClick = { selectedIntervalTab = 0 },
-                    text = { Text("आज (Today)", fontSize = 14.sp) },
+                    text = { Text(stringResource(R.string.reports_tab_today), fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_today")
                 )
                 Tab(
                     selected = selectedIntervalTab == 1,
                     onClick = { selectedIntervalTab = 1 },
-                    text = { Text("महीना (This Month)", fontSize = 14.sp) },
+                    text = { Text(stringResource(R.string.reports_tab_month), fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_month")
                 )
                 Tab(
                     selected = selectedIntervalTab == 2,
                     onClick = { selectedIntervalTab = 2 },
-                    text = { Text("सब (All Time)", fontSize = 14.sp) },
+                    text = { Text(stringResource(R.string.reports_tab_all), fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_all")
                 )
             }
@@ -124,7 +126,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("कुल बिक्री (Total Sales Volume)", fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.reports_total_sales), fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                                 Text(
                                     text = CurrencyUtils.formatRupees(totalRevenue),
                                     fontSize = 32.sp,
@@ -132,7 +134,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     color = SaffronDark
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("$invoicesCount bills generated", fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.reports_bills_generated, invoicesCount), fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -147,7 +149,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Cash Paid", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.payment_mode_cash), fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(cashRevenue),
                                         fontSize = 14.sp,
@@ -164,7 +166,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("UPI Paid", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.payment_mode_upi), fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(upiRevenue),
                                         fontSize = 14.sp,
@@ -181,7 +183,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Udhaar", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.payment_mode_credit), fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(udhaarRevenue),
                                         fontSize = 14.sp,
@@ -197,7 +199,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                 // Header lists title
                 item {
                     Text(
-                        text = "बिक्री का इतिहास (Sales History):",
+                        text = stringResource(R.string.reports_sales_history),
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = TextMediumGray,
@@ -215,7 +217,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.History, null, modifier = Modifier.size(48.dp), tint = BorderStrong)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("कोई रिकॉर्ड नहीं मिला!", color = TextMediumGray, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.reports_no_records), color = TextMediumGray, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
@@ -252,9 +254,10 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     )
                                     // Customer name if Udhaar
                                     if (sale.paymentMode == "UDHAAR") {
-                                        val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
+                                        val custName = customers.find { it.id == sale.customerId }?.name
+                                            ?: stringResource(R.string.customer_default_name)
                                         Text(
-                                            text = "👤 Udhaar client: $custName",
+                                            text = stringResource(R.string.reports_credit_client_format, custName),
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Black,
                                             color = ErrorRed
@@ -284,7 +287,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = sale.paymentMode,
+                                            text = reportPaymentModeLabel(sale.paymentMode),
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Black,
                                             color = when (sale.paymentMode) {
@@ -305,7 +308,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
         // --- DETAILED INVOICE MODAL DIALOG ---
         selectedViewSale?.let { sale ->
             val saleItems = viewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
-            val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
+            val custName = customers.find { it.id == sale.customerId }?.name
+                ?: stringResource(R.string.customer_default_name)
 
             Dialog(onDismissRequest = { selectedViewSale = null }) {
                 Card(
@@ -320,7 +324,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "🚩 SHREE SHYAM STORE",
+                            stringResource(R.string.reports_invoice_store_title),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Black,
                             color = SaffronDark,
@@ -333,12 +337,12 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Bill No: ${sale.billNumber}", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
+                            Text(stringResource(R.string.bill_number_format, sale.billNumber), fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
                             Text(DateTimeUtils.formatDateOnly(sale.createdAt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }
 
                         if (sale.paymentMode == "UDHAAR") {
-                            Text("client: $custName", fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
+                            Text(stringResource(R.string.reports_client_format, custName), fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
                         }
 
                         Divider()
@@ -352,7 +356,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Text(
-                                            "${line.productNameSnapshot} x${line.quantity}",
+                                            stringResource(R.string.reports_line_item_format, line.productNameSnapshot, line.quantity),
                                             color = TextNearBlack,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 12.sp,
@@ -376,7 +380,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Total Amount:", fontWeight = FontWeight.Black, color = TextNearBlack)
+                            Text(stringResource(R.string.reports_total_amount_label), fontWeight = FontWeight.Black, color = TextNearBlack)
                             Text(CurrencyUtils.formatRupees(sale.totalAmount), fontWeight = FontWeight.Black, color = SuccessGreen)
                         }
 
@@ -384,8 +388,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Payment Mode:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
-                            Text(sale.paymentMode, fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
+                            Text(stringResource(R.string.reports_payment_mode_label), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                            Text(reportPaymentModeLabel(sale.paymentMode), fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -395,11 +399,20 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Close (बंद करें)")
+                            Text(stringResource(R.string.action_close))
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun reportPaymentModeLabel(paymentMode: String): String {
+    return when (paymentMode) {
+        "UPI" -> stringResource(R.string.payment_mode_upi)
+        "UDHAAR" -> stringResource(R.string.payment_mode_credit)
+        else -> stringResource(R.string.payment_mode_cash)
     }
 }

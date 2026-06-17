@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.R
 import com.example.data.*
 import com.example.utils.CurrencyUtils
 import kotlinx.coroutines.flow.*
@@ -62,7 +63,8 @@ class ShopViewModel(
                 firstLaunchCompleted = false,
                 loggedInUsername = "",
                 loggedInEmail = "",
-                isUserLoggedIn = false
+                isUserLoggedIn = false,
+                selectedLanguage = "en"
             )
         )
 
@@ -72,6 +74,12 @@ class ShopViewModel(
             settingsDataStore.updateOwnerPhone(ownerPhone)
             settingsDataStore.updateWelcomeChantEnabled(welcomeChantEnabled)
             settingsDataStore.updateStaticPaytmQrImageUri(qrImageUri)
+        }
+    }
+
+    fun updateSelectedLanguage(languageCode: String) {
+        viewModelScope.launch {
+            settingsDataStore.updateSelectedLanguage(languageCode)
         }
     }
 
@@ -88,21 +96,21 @@ class ShopViewModel(
         email: String,
         password: String,
         onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        onError: (Int) -> Unit
     ) {
         viewModelScope.launch {
             val trimmedUsername = username.trim()
             val trimmedEmail = email.trim()
             if (trimmedUsername.length < 3) {
-                onError("Username must be at least 3 characters!")
+                onError(R.string.error_username_min_length)
                 return@launch
             }
             if (!android.util.Patterns.EMAIL_ADDRESS.matcher(trimmedEmail).matches()) {
-                onError("Please enter a valid email address!")
+                onError(R.string.error_valid_email)
                 return@launch
             }
             if (password.length < 6) {
-                onError("Password must be at least 6 characters!")
+                onError(R.string.error_password_min_length)
                 return@launch
             }
 
@@ -111,9 +119,9 @@ class ShopViewModel(
                 val existingUser = repository.getUserByUsernameOrEmail(trimmedUsername, trimmedEmail)
                 if (existingUser != null) {
                     if (existingUser.username.equals(trimmedUsername, ignoreCase = true)) {
-                        onError("Username is already taken!")
+                        onError(R.string.error_username_already_taken)
                     } else {
-                        onError("Email is already registered!")
+                        onError(R.string.error_email_already_registered)
                     }
                     return@launch
                 }
@@ -130,8 +138,8 @@ class ShopViewModel(
                 settingsDataStore.saveSession(trimmedUsername, trimmedEmail)
 
                 onSuccess()
-            } catch (e: Exception) {
-                onError("Registration failed: ${e.message}")
+            } catch (_: Exception) {
+                onError(R.string.error_registration_failed)
             }
         }
     }
@@ -140,16 +148,16 @@ class ShopViewModel(
         usernameOrEmail: String,
         password: String,
         onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        onError: (Int) -> Unit
     ) {
         viewModelScope.launch {
             val key = usernameOrEmail.trim()
             if (key.isEmpty()) {
-                onError("Please enter Username or Email!")
+                onError(R.string.error_enter_username_or_email)
                 return@launch
             }
             if (password.isEmpty()) {
-                onError("Please type your Password!")
+                onError(R.string.error_enter_password)
                 return@launch
             }
 
@@ -162,7 +170,7 @@ class ShopViewModel(
                 }
 
                 if (user == null) {
-                    onError("User not found!")
+                    onError(R.string.error_user_not_found)
                     return@launch
                 }
 
@@ -172,10 +180,10 @@ class ShopViewModel(
                     settingsDataStore.saveSession(user.username, user.email)
                     onSuccess()
                 } else {
-                    onError("Incorrect password! Change and retry.")
+                    onError(R.string.error_incorrect_password)
                 }
-            } catch (e: Exception) {
-                onError("Login failed: ${e.message}")
+            } catch (_: Exception) {
+                onError(R.string.error_login_failed)
             }
         }
     }
@@ -562,37 +570,56 @@ class ShopViewModel(
     fun getSaleItems(saleId: Long): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleId)
 
     // Helper functions for clipboard copy text
-    fun generateInvoiceText(): String {
-        val sale = _lastSale.value ?: return "No Invoice Found"
+    fun generateInvoiceText(context: Context): String {
+        val sale = _lastSale.value ?: return context.getString(R.string.invoice_not_found)
         val items = _lastSaleItems.value
         val settings = storeSettings.value
 
         val sb = StringBuilder()
-        sb.append("🚩 ${settings.shopName}\n")
-        sb.append("Bill No: ${sale.billNumber}\n")
-        val df = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH)
-        sb.append("Date: ${df.format(java.util.Date(sale.createdAt))}\n")
+        sb.append(settings.shopName).append('\n')
+        sb.append(context.getString(R.string.invoice_bill_number_format, sale.billNumber)).append('\n')
+        val locale = context.resources.configuration.locales[0]
+        val df = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", locale)
+        sb.append(context.getString(R.string.invoice_date_format, df.format(java.util.Date(sale.createdAt)))).append('\n')
         sb.append("----------------------------\n")
         for (itm in items) {
-            sb.append("${itm.productNameSnapshot}\n")
-            sb.append("  ${itm.quantity} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
+            sb.append(
+                context.getString(
+                    R.string.invoice_line_item_format,
+                    itm.productNameSnapshot,
+                    itm.quantity,
+                    CurrencyUtils.formatRupees(itm.unitPrice),
+                    CurrencyUtils.formatRupees(itm.lineTotal)
+                )
+            ).append('\n')
         }
         sb.append("----------------------------\n")
-        sb.append("Total Amount: ${CurrencyUtils.formatRupees(sale.totalAmount)}\n")
-        sb.append("Payment Mode: ${sale.paymentMode}\n")
+        sb.append(
+            context.getString(
+                R.string.invoice_total_amount_format,
+                CurrencyUtils.formatRupees(sale.totalAmount)
+            )
+        ).append('\n')
+        val paymentMode = when (sale.paymentMode.uppercase()) {
+            "CASH" -> context.getString(R.string.payment_mode_cash)
+            "UPI" -> context.getString(R.string.payment_mode_upi)
+            "CREDIT" -> context.getString(R.string.payment_mode_credit)
+            else -> sale.paymentMode
+        }
+        sb.append(context.getString(R.string.invoice_payment_mode_format, paymentMode)).append('\n')
         sb.append("----------------------------\n")
-        sb.append("Jai Shree Shyam 🙏\n")
-        sb.append("Thank you! Visit Again.")
+        sb.append(context.getString(R.string.invoice_closing_line)).append('\n')
+        sb.append(context.getString(R.string.invoice_thank_you))
 
         return sb.toString()
     }
 
     fun copyInvoiceToClipboard(context: Context) {
-        val txt = generateInvoiceText()
+        val txt = generateInvoiceText(context)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("Store Bill", txt)
+        val clip = android.content.ClipData.newPlainText(context.getString(R.string.invoice_clipboard_label), txt)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Bill Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.invoice_copied_toast), Toast.LENGTH_SHORT).show()
     }
 }
 

@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -28,6 +29,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.data.Category
 import com.example.data.Product
 import com.example.utils.CurrencyUtils
@@ -60,15 +62,15 @@ fun ProductsScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("स्टॉक लिस्ट (Inventory) 📦", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.products_inventory_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { showCategoryManagerDialog = true }) {
-                        Icon(Icons.Default.Category, contentDescription = "Manage Categories")
+                        Icon(Icons.Default.Category, contentDescription = stringResource(R.string.content_description_manage_categories))
                     }
                 }
             )
@@ -79,7 +81,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.testTag("fab_add_product")
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Product", tint = Color.White)
+                Icon(Icons.Default.Add, contentDescription = stringResource(R.string.content_description_add_product), tint = Color.White)
             }
         }
     ) { innerPadding ->
@@ -93,7 +95,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("सामान का नाम खोजें (Search products)...", color = TextMutedGray) },
+                placeholder = { Text(stringResource(R.string.products_search_placeholder), color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -122,7 +124,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                     FilterChip(
                         selected = selectedCategoryId == null,
                         onClick = { selectedCategoryId = null },
-                        label = { Text("सभी (All)", fontWeight = FontWeight.Bold) }
+                        label = { Text(stringResource(R.string.category_all), fontWeight = FontWeight.Bold) }
                     )
                 }
                 items(categories) { cat ->
@@ -152,12 +154,13 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.Inbox, null, modifier = Modifier.size(54.dp), tint = BorderStrong)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("कोई सामान उपलब्ध नहीं है!", color = TextMediumGray, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                            Text(stringResource(R.string.products_empty), color = TextMediumGray, fontWeight = FontWeight.Black, fontSize = 16.sp)
                         }
                     }
                 } else {
                     items(filteredProducts) { prod ->
-                        val catName = categories.find { it.id == prod.categoryId }?.name ?: "Miscellaneous"
+                        val catName = categories.find { it.id == prod.categoryId }?.name
+                            ?: stringResource(R.string.category_miscellaneous)
 
                         Card(
                             colors = CardDefaults.cardColors(
@@ -186,12 +189,12 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                             color = if (prod.isActive) TextNearBlack else TextMutedGray
                                         )
                                         if (!prod.isActive) {
-                                            SuggestionChip(onClick = {}, label = { Text("Inactive", fontWeight = FontWeight.Bold) })
+                                            SuggestionChip(onClick = {}, label = { Text(stringResource(R.string.product_inactive), fontWeight = FontWeight.Bold) })
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Category: $catName",
+                                        text = stringResource(R.string.product_category_format, catName),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextMediumGray
@@ -201,13 +204,13 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                                     ) {
                                         Text(
-                                            text = "MRP: ${CurrencyUtils.formatRupees(prod.mrp)}",
+                                            text = stringResource(R.string.product_mrp_format, CurrencyUtils.formatRupees(prod.mrp)),
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextMediumGray
                                         )
                                         Text(
-                                            text = "SP: ${CurrencyUtils.formatRupees(prod.getEffectivePrice())}",
+                                            text = stringResource(R.string.product_sp_format, CurrencyUtils.formatRupees(prod.getEffectivePrice())),
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Black,
                                             color = SaffronPrimary
@@ -218,28 +221,28 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     if (prod.trackStock) {
                                         if (prod.currentStock <= 0) {
                                             Text(
-                                                "स्टॉक ख़त्म (Out of Stock) ❌",
+                                                stringResource(R.string.stock_out),
                                                 color = ErrorRed,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else if (prod.currentStock <= prod.lowStockAlertQty) {
                                             Text(
-                                                "कम स्टॉक (Low Stock): ${prod.currentStock} बचा है ⚠️",
+                                                stringResource(R.string.stock_low_format, prod.currentStock),
                                                 color = WarningOrange,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else {
                                             Text(
-                                                "स्टॉक: ${prod.currentStock} पीस 👍",
+                                                stringResource(R.string.stock_units_format, prod.currentStock),
                                                 color = SuccessGreen,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         }
                                     } else {
-                                        Text(text = "स्टॉक अनट्रैक्ड (No limit)", color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(text = stringResource(R.string.stock_untracked_no_limit), color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                 }
 
@@ -250,7 +253,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     // Adjustment button
                                     if (prod.trackStock) {
                                         IconButton(onClick = { viewModel.navigateTo(Screen.StockAdjustment(prod.id)) }) {
-                                            Icon(Icons.Default.EditCalendar, contentDescription = "Adjust Stock", tint = Color.DarkGray)
+                                            Icon(Icons.Default.EditCalendar, contentDescription = stringResource(R.string.content_description_adjust_stock), tint = Color.DarkGray)
                                         }
                                     }
 
@@ -258,7 +261,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         onClick = { viewModel.navigateTo(Screen.AddEditProduct(prod.id)) },
                                         modifier = Modifier.testTag("edit_product_${prod.id}")
                                     ) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Edit Product", tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.content_description_edit_product), tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -286,7 +289,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "कैटेगरी मैनेजमेंट (Categories) 🗂️",
+                            stringResource(R.string.categories_title),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -301,7 +304,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = newCatName,
                                 onValueChange = { newCatName = it },
-                                placeholder = { Text("विविध कैटेगरी नाम (e.g. Rice)") },
+                                placeholder = { Text(stringResource(R.string.category_add_placeholder)) },
                                 modifier = Modifier.weight(1f).testTag("category_add_input")
                             )
                             Button(onClick = {
@@ -310,7 +313,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     newCatName = ""
                                 }
                             }) {
-                                Text("जोड़ें")
+                                Text(stringResource(R.string.action_add))
                             }
                         }
 
@@ -318,7 +321,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 
                         // Editing listing dialog line
                         if (renamingCat != null) {
-                            Text("कैटेगरी का नाम बदलें:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text(stringResource(R.string.category_rename_title), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -336,7 +339,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         renameText = ""
                                     }
                                 }) {
-                                    Text("बदलें")
+                                    Text(stringResource(R.string.action_rename))
                                 }
                             }
                         }
@@ -370,7 +373,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             onClick = { showCategoryManagerDialog = false },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Done (पूर्ण)")
+                            Text(stringResource(R.string.action_done))
                         }
                     }
                 }
@@ -399,7 +402,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
     var lowStockQty by remember { mutableStateOf("5") }
     var isActive by remember { mutableStateOf(true) }
 
-    var title by remember { mutableStateOf("नया सामान जोड़ें (New Product)") }
+    val title = stringResource(if (productId == null) R.string.product_add_title else R.string.product_edit_title)
 
     // Validation flags
     var nameError by remember { mutableStateOf(false) }
@@ -407,7 +410,6 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
 
     LaunchedEffect(productId) {
         if (productId != null) {
-            title = "सामान बदलाव (Edit Product) ✏️"
             val prod = viewModel.getProduct(productId)
             if (prod != null) {
                 name = prod.name
@@ -429,7 +431,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 title = { Text(title, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Products) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -451,9 +453,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     name = it
                     if (it.trim().isNotEmpty()) nameError = false
                 },
-                label = { Text("Product Name * (सामान का नाम)") },
+                label = { Text(stringResource(R.string.product_name_label)) },
                 isError = nameError,
-                supportingText = { if (nameError) Text("Name cannot be empty!", color = Color.Red) },
+                supportingText = { if (nameError) Text(stringResource(R.string.product_name_error), color = Color.Red) },
                 modifier = Modifier.fillMaxWidth().testTag("product_name_input"),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -461,8 +463,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             // Category Selection Spinner Box
             var catDropdownExpanded by remember { mutableStateOf(false) }
             val selectedCategoryName = remember(categoryId, categories) {
-                categories.find { it.id == categoryId }?.name ?: "Miscellaneous"
+                categories.find { it.id == categoryId }?.name
             }
+            val fallbackCategoryName = stringResource(R.string.category_miscellaneous)
 
             Box(
                 modifier = Modifier
@@ -470,10 +473,10 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     .clickable { catDropdownExpanded = true }
             ) {
                 OutlinedTextField(
-                    value = selectedCategoryName,
+                    value = selectedCategoryName ?: fallbackCategoryName,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Category (कैटेगरी चुनें)", fontWeight = FontWeight.Bold) },
+                    label = { Text(stringResource(R.string.product_category_label), fontWeight = FontWeight.Bold) },
                     trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -513,10 +516,10 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     mrp = it
                     if (it.trim().toDoubleOrNull() != null) mrpError = false
                 },
-                label = { Text("MRP * (अधिकतम प्रिंट रेट - ₹)") },
+                label = { Text(stringResource(R.string.product_mrp_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 isError = mrpError,
-                supportingText = { if (mrpError) Text("Provide a valid numeric MRP!", color = Color.Red) },
+                supportingText = { if (mrpError) Text(stringResource(R.string.product_mrp_error), color = Color.Red) },
                 modifier = Modifier.fillMaxWidth().testTag("product_mrp_input"),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -525,8 +528,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             OutlinedTextField(
                 value = sellingPrice,
                 onValueChange = { sellingPrice = it },
-                label = { Text("Selling Price (बिक्री रेट - ₹, blank assumes MRP)") },
-                placeholder = { Text("e.g. ${mrp.ifEmpty { "10" }}") },
+                label = { Text(stringResource(R.string.selling_price_label)) },
+                placeholder = { Text(stringResource(R.string.example_price_format, mrp.ifEmpty { "10" })) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().testTag("product_sp_input"),
                 shape = RoundedCornerShape(10.dp)
@@ -536,7 +539,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             OutlinedTextField(
                 value = purchasePrice,
                 onValueChange = { purchasePrice = it },
-                label = { Text("Purchase Price (ख़रीद रेट - ₹ - optional)") },
+                label = { Text(stringResource(R.string.purchase_price_label)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
@@ -551,8 +554,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
-                    Text("Track Stock (स्टॉक की गिनती करें)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("स्टॉक ऑटोमैटिक घटेगा बिक्री होने पर।", fontSize = 11.sp, color = Color.Gray)
+                    Text(stringResource(R.string.track_stock_label), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(stringResource(R.string.track_stock_description), fontSize = 11.sp, color = Color.Gray)
                 }
                 Switch(checked = trackStock, onCheckedChange = { trackStock = it })
             }
@@ -563,7 +566,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     OutlinedTextField(
                         value = currentStock,
                         onValueChange = { currentStock = it },
-                        label = { Text("Starting Stock *(शुरुआती स्टॉक)") },
+                        label = { Text(stringResource(R.string.starting_stock_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).testTag("product_stock_input"),
                         shape = RoundedCornerShape(10.dp)
@@ -573,7 +576,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     OutlinedTextField(
                         value = lowStockQty,
                         onValueChange = { lowStockQty = it },
-                        label = { Text("Low Alert *(अलर्ट सीमा)") },
+                        label = { Text(stringResource(R.string.low_alert_label)) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
@@ -588,8 +591,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
-                    Text("Product Active (चालू स्थिति)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("बंद करने पर यह बिलिंग में छिप जाएगा।", fontSize = 11.sp, color = Color.Gray)
+                    Text(stringResource(R.string.product_active_label), fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(stringResource(R.string.product_active_description), fontSize = 11.sp, color = Color.Gray)
                 }
                 Switch(checked = isActive, onCheckedChange = { isActive = it })
             }
@@ -626,7 +629,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                             lowStockAlertQty = alertValue,
                             isActive = isActive
                         )
-                        Toast.makeText(context, "${name.trim()} Saved successfully!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.product_saved_toast, name.trim()), Toast.LENGTH_SHORT).show()
                         viewModel.navigateTo(Screen.Products)
                     }
                 },
@@ -636,7 +639,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     .height(56.dp)
                     .testTag("save_product_button")
             ) {
-                Text("सुरक्षित करें (Save Product) 💾", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.save_product), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -661,6 +664,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
     var sp by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("10") }
     var trackStock by remember { mutableStateOf(true) }
+    val openingValidationToast = stringResource(R.string.opening_validation_toast)
 
     LaunchedEffect(categories) {
         if (selectedCatId == null && categories.isNotEmpty()) {
@@ -675,10 +679,10 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("शुरुआती स्टॉक (Opening Stock) 📚", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.opening_stock_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -692,7 +696,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
         ) {
             // Select category header scroll
             Text(
-                "कैटेगरी चुनें (Choose Category):",
+                stringResource(R.string.choose_category_label),
                 fontSize = 14.sp,
                 color = Color.DarkGray,
                 fontWeight = FontWeight.Bold,
@@ -730,7 +734,11 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "Fast Add: '${categories.find { it.id == catId }?.name}' category",
+                            stringResource(
+                                R.string.opening_fast_add_category_format,
+                                categories.find { it.id == catId }?.name
+                                    ?: stringResource(R.string.category_miscellaneous)
+                            ),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -739,7 +747,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            placeholder = { Text("Item Name - (e.g. Parle G 100g)") },
+                            placeholder = { Text(stringResource(R.string.opening_item_name_placeholder)) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("opening_stock_item_name"),
@@ -750,8 +758,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = mrp,
                                 onValueChange = { mrp = it },
-                                placeholder = { Text("MRP Code Price") },
-                                label = { Text("MRP *") },
+                                placeholder = { Text(stringResource(R.string.opening_mrp_placeholder)) },
+                                label = { Text(stringResource(R.string.product_mrp_label)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
                                     .weight(1f)
@@ -762,8 +770,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = sp,
                                 onValueChange = { sp = it },
-                                placeholder = { Text("Selling Price") },
-                                label = { Text("SP (Blank=MRP)") },
+                                placeholder = { Text(stringResource(R.string.opening_selling_price_placeholder)) },
+                                label = { Text(stringResource(R.string.opening_sp_label)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
                                     .weight(1f)
@@ -780,8 +788,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = stock,
                                 onValueChange = { stock = it },
-                                placeholder = { Text("Qty") },
-                                label = { Text("Stock Quantity *") },
+                                placeholder = { Text(stringResource(R.string.quantity_short)) },
+                                label = { Text(stringResource(R.string.opening_stock_quantity_label)) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1.2f).testTag("opening_stock_item_qty"),
                                 shape = RoundedCornerShape(10.dp),
@@ -793,7 +801,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                Text("Count Stock?", fontSize = 11.sp, color = Color.Gray)
+                                Text(stringResource(R.string.count_stock_label), fontSize = 11.sp, color = Color.Gray)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Switch(checked = trackStock, onCheckedChange = { trackStock = it })
                             }
@@ -806,7 +814,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                 val stockValue = stock.trim().toIntOrNull() ?: 0
 
                                 if (name.trim().isEmpty() || mrpValue == null) {
-                                    Toast.makeText(context, "Item Name and MRP Price required!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, openingValidationToast, Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.saveProduct(
                                         id = 0L, // insert new
@@ -820,7 +828,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                         lowStockAlertQty = 5,
                                         isActive = true
                                     )
-                                    Toast.makeText(context, "'${name.trim()}' added successfully!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, context.getString(R.string.opening_added_toast, name.trim()), Toast.LENGTH_SHORT).show()
                                     // Reset fields to trigger rapid sequential entries!
                                     name = ""
                                     mrp = ""
@@ -836,7 +844,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("जोड़ें (Add Product & Next)")
+                                Text(stringResource(R.string.add_product_next))
                             }
                         }
                     }
@@ -850,8 +858,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Recently Created Items:", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                    Text("Total: ${productsInSelectedCategory.size}", fontSize = 12.sp, color = Color.Gray)
+                    Text(stringResource(R.string.recently_created_items), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text(stringResource(R.string.total_count_format, productsInSelectedCategory.size), fontSize = 12.sp, color = Color.Gray)
                 }
 
                 // Listing rows
@@ -863,7 +871,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                     if (productsInSelectedCategory.isEmpty()) {
                         item {
                             Text(
-                                "इस कैटेगरी में कोई सामान नहीं जुड़ा है। ऊपर दर्ज करें!",
+                                stringResource(R.string.category_empty_message),
                                 fontSize = 14.sp,
                                 color = Color.Gray,
                                 textAlign = TextAlign.Center,
@@ -883,14 +891,14 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(itemInfo.name, fontWeight = FontWeight.Bold)
                                         Text(
-                                            "Price: ${CurrencyUtils.formatRupees(itemInfo.getEffectivePrice())}",
+                                            stringResource(R.string.price_format, CurrencyUtils.formatRupees(itemInfo.getEffectivePrice())),
                                             fontSize = 12.sp, color = Color.DarkGray
                                         )
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         if (itemInfo.trackStock) {
-                                            Text("Stock: ${itemInfo.currentStock}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                            Text(stringResource(R.string.stock_units_format, itemInfo.currentStock), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             // Edit counts indicator to change errors quickly
                                             IconButton(onClick = {
                                                 viewModel.saveProduct(
@@ -906,10 +914,10 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                                     isActive = itemInfo.isActive
                                                 )
                                             }) {
-                                                Icon(Icons.Default.AddCircleOutline, "Plus 1 to Stock", tint = Color.Gray)
+                                                Icon(Icons.Default.AddCircleOutline, stringResource(R.string.content_description_plus_one_stock), tint = Color.Gray)
                                             }
                                         } else {
-                                            Text("Stock Uncounted", fontSize = 11.sp, color = Color.Gray)
+                                            Text(stringResource(R.string.stock_uncounted), fontSize = 11.sp, color = Color.Gray)
                                         }
                                     }
                                 }
@@ -934,14 +942,16 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
     var countedStock by remember { mutableStateOf("") }
     var selectedReason by remember { mutableStateOf("Manual correction") }
     var dropdownExpanded by remember { mutableStateOf(false) }
+    val validStockToast = stringResource(R.string.valid_stock_required_toast)
+    val adjustmentSavedToast = stringResource(R.string.adjustment_saved_toast)
 
     val reasons = listOf(
-        "Opening stock entry",
-        "Purchase added",
-        "Manual correction",
-        "Damaged/expired",
-        "Stock count correction",
-        "Other"
+        "Opening stock entry" to stringResource(R.string.stock_reason_opening),
+        "Purchase added" to stringResource(R.string.stock_reason_purchase),
+        "Manual correction" to stringResource(R.string.stock_reason_manual),
+        "Damaged/expired" to stringResource(R.string.stock_reason_damaged),
+        "Stock count correction" to stringResource(R.string.stock_reason_count),
+        "Other" to stringResource(R.string.stock_reason_other)
     )
 
     val adjustmentHistory = viewModel.getAdjustmentsForProduct(productId).collectAsState(initial = emptyList())
@@ -956,10 +966,10 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("स्टॉक सुधारे (Adjustment) 🔧", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.stock_adjustment_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Products) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -981,10 +991,10 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "सामान (Product): ${prod.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(R.string.product_label_format, prod.name), fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "अभी दर्ज स्टॉक Amount: ${prod.currentStock} पीस",
+                            text = stringResource(R.string.current_stock_amount_format, prod.currentStock),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.DarkGray
@@ -1002,12 +1012,12 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("सच्चा स्टॉक संख्या डालें (Actual stock physical count):", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.actual_stock_count_label), fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
                         OutlinedTextField(
                             value = countedStock,
                             onValueChange = { countedStock = it },
-                            label = { Text("Physical Stock Counted") },
+                            label = { Text(stringResource(R.string.physical_stock_counted_label)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_stock_input"),
                             shape = RoundedCornerShape(10.dp)
@@ -1019,18 +1029,24 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                 onClick = { dropdownExpanded = true },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Reason: $selectedReason")
+                                Text(
+                                    stringResource(
+                                        R.string.reason_format,
+                                        reasons.find { it.first == selectedReason }?.second
+                                            ?: stringResource(R.string.stock_reason_other)
+                                    )
+                                )
                                 Icon(Icons.Default.ArrowDropDown, null)
                             }
                             DropdownMenu(
                                 expanded = dropdownExpanded,
                                 onDismissRequest = { dropdownExpanded = false }
                             ) {
-                                reasons.forEach { reas ->
+                                reasons.forEach { (storedReason, displayReason) ->
                                     DropdownMenuItem(
-                                        text = { Text(reas) },
+                                        text = { Text(displayReason) },
                                         onClick = {
-                                            selectedReason = reas
+                                            selectedReason = storedReason
                                             dropdownExpanded = false
                                         }
                                     )
@@ -1042,7 +1058,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                             onClick = {
                                 val countVal = countedStock.toIntOrNull()
                                 if (countVal == null || countVal < 0) {
-                                    Toast.makeText(context, "Valid stock quantity is required!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, validStockToast, Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.adjustStock(
                                         productId = productId,
@@ -1051,19 +1067,19 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     )
                                     // Refresh details UI
                                     product = prod.copy(currentStock = countVal)
-                                    Toast.makeText(context, "Adjustment Saved!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, adjustmentSavedToast, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_save_button")
                         ) {
-                            Text("स्टॉक दर्ज करें (Save Correction)")
+                            Text(stringResource(R.string.save_correction))
                         }
                     }
                 }
 
                 // History adjustments lists logger
-                Text("स्टॉक सुधार इतिहास (Log History):", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                Text(stringResource(R.string.stock_log_history), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
 
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1077,14 +1093,14 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = record.reason,
+                                        text = localizedStockReason(record.reason),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 14.sp,
                                         color = Color.DarkGray
                                     )
                                     val prefix = if (record.difference >= 0) "+" else ""
                                     Text(
-                                        text = "$prefix${record.difference} पीस",
+                                        text = stringResource(R.string.stock_difference_pieces_format, prefix, record.difference),
                                         fontWeight = FontWeight.ExtraBold,
                                         color = if (record.difference >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
                                     )
@@ -1094,7 +1110,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        "स्टॉक बदला: ${record.oldStock} ➔ ${record.newStock}",
+                                        stringResource(R.string.stock_changed_format, record.oldStock, record.newStock),
                                         fontSize = 12.sp, color = Color.Gray
                                     )
                                     Text(
@@ -1108,5 +1124,17 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun localizedStockReason(reason: String): String {
+    return when (reason) {
+        "Opening stock entry" -> stringResource(R.string.stock_reason_opening)
+        "Purchase added" -> stringResource(R.string.stock_reason_purchase)
+        "Manual correction" -> stringResource(R.string.stock_reason_manual)
+        "Damaged/expired" -> stringResource(R.string.stock_reason_damaged)
+        "Stock count correction" -> stringResource(R.string.stock_reason_count)
+        else -> stringResource(R.string.stock_reason_other)
     }
 }

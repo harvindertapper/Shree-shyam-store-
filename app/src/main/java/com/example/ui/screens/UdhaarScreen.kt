@@ -21,11 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.example.R
 import com.example.data.Customer
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
@@ -75,15 +77,15 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("उधार खाता (Debtor Ledger) 👥", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.credit_ledger_title), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 },
                 actions = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("उधारी वाले", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.credit_debtors_only), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Checkbox(
                             checked = filterDebtorsOnly,
                             onCheckedChange = { filterDebtorsOnly = it },
@@ -99,7 +101,11 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                 containerColor = ErrorRed,
                 modifier = Modifier.testTag("fab_add_customer")
             ) {
-                Icon(Icons.Default.PersonAdd, contentDescription = "Add Customer", tint = Color.White)
+                Icon(
+                    Icons.Default.PersonAdd,
+                    contentDescription = stringResource(R.string.content_description_add_customer),
+                    tint = Color.White
+                )
             }
         }
     ) { innerPadding ->
@@ -113,7 +119,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("ग्राहक का नाम/नंबर खोजें (Search customer)...", color = TextMutedGray) },
+                placeholder = { Text(stringResource(R.string.credit_search_customer), color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -148,7 +154,12 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("कुल उधारी (Total Market Outstanding)", fontSize = 13.sp, color = ErrorRed, fontWeight = FontWeight.Bold)
+                        Text(
+                            stringResource(R.string.credit_total_outstanding),
+                            fontSize = 13.sp,
+                            color = ErrorRed,
+                            fontWeight = FontWeight.Bold
+                        )
                         Text(
                             text = CurrencyUtils.formatRupees(grandOutstanding),
                             fontSize = 24.sp,
@@ -183,7 +194,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.ImportContacts, null, modifier = Modifier.size(56.dp), tint = Color.LightGray)
                             Spacer(modifier = Modifier.height(12.dp))
-                            Text("कोई ग्राहक नहीं मिला!", color = Color.Gray)
+                            Text(stringResource(R.string.credit_no_customers), color = Color.Gray)
                         }
                     }
                 } else {
@@ -218,7 +229,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                                     if (!cust.phone.isNullOrEmpty()) {
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = "📱 ${cust.phone}",
+                                            text = stringResource(R.string.phone_number_format, cust.phone.orEmpty()),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextMediumGray
@@ -228,7 +239,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
-                                        text = "Due Balance",
+                                        text = stringResource(R.string.credit_due_balance),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = TextMediumGray
@@ -264,7 +275,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "नया ग्राहक खाता खोलें 👤",
+                            stringResource(R.string.credit_open_customer_account),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = ErrorRed
@@ -273,14 +284,14 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Customer Name * (नाम)") },
+                            label = { Text(stringResource(R.string.customer_name_required_label)) },
                             modifier = Modifier.fillMaxWidth().testTag("add_customer_name_input"), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderStrong, focusedTextColor = TextNearBlack, unfocusedTextColor = TextNearBlack, focusedLabelColor = ErrorRed, unfocusedLabelColor = TextMediumGray)
                         )
 
                         OutlinedTextField(
                             value = phone,
                             onValueChange = { phone = it },
-                            label = { Text("Phone Number (नंबर - optional)") },
+                            label = { Text(stringResource(R.string.phone_number_optional_label)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.fillMaxWidth().testTag("add_customer_phone_input"), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = ErrorRed, unfocusedBorderColor = BorderStrong, focusedTextColor = TextNearBlack, unfocusedTextColor = TextNearBlack, focusedLabelColor = ErrorRed, unfocusedLabelColor = TextMediumGray)
                         )
@@ -293,24 +304,32 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                                 onClick = { showAddCustomerDialog = false },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Cancel")
+                                Text(stringResource(R.string.action_cancel))
                             }
 
                             Button(
                                 onClick = {
                                     if (name.trim().isEmpty()) {
-                                        Toast.makeText(context, "ग्राहक का नाम आवश्यक है!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.credit_customer_name_required_toast),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     } else {
                                         viewModel.quickAddCustomer(name, phone)
                                         showAddCustomerDialog = false
-                                        Toast.makeText(context, "${name.trim()} added!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.credit_customer_added_toast, name.trim()),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 },
                                 modifier = Modifier
                                     .weight(1.5f)
                                     .testTag("confirm_add_customer_button"), colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White)
                             ) {
-                                Text("खाता खोलें")
+                                Text(stringResource(R.string.credit_open_account))
                             }
                         }
                     }
@@ -352,10 +371,15 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(customer?.name ?: "खाता विवरण (Ledger)", fontWeight = FontWeight.Bold) },
+                title = {
+                    Text(
+                        customer?.name ?: stringResource(R.string.credit_account_details),
+                        fontWeight = FontWeight.Bold
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Udhaar) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.content_description_back))
                     }
                 }
             )
@@ -364,8 +388,20 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
             ExtendedFloatingActionButton(
                 onClick = { showReceivePaymentDialog = true },
                 containerColor = SuccessGreen,
-                text = { Text("रकम जमा करें 💸", color = Color.White, fontWeight = FontWeight.Bold) },
-                icon = { Icon(Icons.Default.Add, contentDescription = "Receive payment", tint = Color.White) },
+                text = {
+                    Text(
+                        stringResource(R.string.credit_receive_payment),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold
+                    )
+                },
+                icon = {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.content_description_receive_payment),
+                        tint = Color.White
+                    )
+                },
                 modifier = Modifier.testTag("fab_receive_payment")
             )
         }
@@ -391,7 +427,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "कुल बचा हुआ उधार (Outstanding Due)",
+                            text = stringResource(R.string.credit_outstanding_due),
                             fontSize = 13.sp,
                             color = ErrorRed,
                             fontWeight = FontWeight.Bold
@@ -406,7 +442,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         if (!cust.phone.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "📱 Mobile: ${cust.phone}",
+                                text = stringResource(R.string.phone_number_format, cust.phone.orEmpty()),
                                 fontSize = 14.sp,
                                 color = Color.DarkGray
                             )
@@ -415,7 +451,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                 }
 
                 Text(
-                    text = "लेन-देन इतिहास (Transaction Ledger History):",
+                    text = stringResource(R.string.credit_transaction_history),
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = Color.Gray
@@ -429,7 +465,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                     if (customerTransactions.value.isEmpty()) {
                         item {
                             Text(
-                                "इस खाते में कोई लेन-देन इतिहास नहीं है।",
+                                stringResource(R.string.credit_no_transactions),
                                 color = Color.Gray,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center,
@@ -473,7 +509,13 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
 
                                         Column {
                                             Text(
-                                                text = if (isCredit) "उधार दिया (Goods Purchased)" else "रकम मिली (Cash Received)",
+                                                text = stringResource(
+                                                    if (isCredit) {
+                                                        R.string.credit_goods_purchased
+                                                    } else {
+                                                        R.string.credit_cash_received
+                                                    }
+                                                ),
                                                 fontWeight = FontWeight.ExtraBold,
                                                 color = TextNearBlack,
                                                 fontSize = 14.sp
@@ -524,7 +566,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "जमा राशि दर्ज करें (Deposit Money) 💸",
+                            stringResource(R.string.credit_record_payment),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = SuccessGreen
@@ -533,7 +575,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         OutlinedTextField(
                             value = amount,
                             onValueChange = { amount = it },
-                            label = { Text("Payment Received Amount * (₹)") },
+                            label = { Text(stringResource(R.string.credit_payment_amount_label)) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("payment_amount_input"), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SuccessGreen, unfocusedBorderColor = BorderStrong, focusedTextColor = TextNearBlack, unfocusedTextColor = TextNearBlack, focusedLabelColor = SuccessGreen, unfocusedLabelColor = TextMediumGray)
                         )
@@ -541,8 +583,13 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         OutlinedTextField(
                             value = note,
                             onValueChange = { note = it },
-                            label = { Text("Note / Remark - (Optional)") },
-                            placeholder = { Text("e.g. Cash, Paytm, PhonePe...", color = TextMutedGray) },
+                            label = { Text(stringResource(R.string.credit_payment_note_label)) },
+                            placeholder = {
+                                Text(
+                                    stringResource(R.string.credit_payment_note_placeholder),
+                                    color = TextMutedGray
+                                )
+                            },
                             modifier = Modifier.fillMaxWidth().testTag("payment_note_input"), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SuccessGreen, unfocusedBorderColor = BorderStrong, focusedTextColor = TextNearBlack, unfocusedTextColor = TextNearBlack, focusedLabelColor = SuccessGreen, unfocusedLabelColor = TextMediumGray)
                         )
 
@@ -554,14 +601,18 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                 onClick = { showReceivePaymentDialog = false },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Cancel")
+                                Text(stringResource(R.string.action_cancel))
                             }
 
                             Button(
                                 onClick = {
                                     val amtValue = amount.trim().toDoubleOrNull()
                                     if (amtValue == null || amtValue <= 0.0) {
-                                        Toast.makeText(context, "Valid positive amount required!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.credit_valid_payment_required_toast),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     } else {
                                         viewModel.addUdhaarPayment(
                                             customerId = customerId,
@@ -569,7 +620,11 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                             note = note
                                         )
                                         showReceivePaymentDialog = false
-                                        Toast.makeText(context, "Payment logged successfully!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.credit_payment_logged_toast),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
@@ -577,7 +632,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                     .weight(1.5f)
                                     .testTag("confirm_payment_button")
                             ) {
-                                Text("जमा दर्ज Confirm")
+                                Text(stringResource(R.string.credit_confirm_payment))
                             }
                         }
                     }

@@ -23,7 +23,8 @@ data class StoreSettings(
     val firstLaunchCompleted: Boolean,
     val loggedInUsername: String,
     val loggedInEmail: String,
-    val isUserLoggedIn: Boolean
+    val isUserLoggedIn: Boolean,
+    val selectedLanguage: String
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -36,6 +37,7 @@ class SettingsDataStore(private val context: Context) {
         private val LOGGED_IN_USERNAME = stringPreferencesKey("logged_in_username")
         private val LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
         private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
+        private val SELECTED_LANGUAGE = stringPreferencesKey("selected_language")
     }
 
     val settingsFlow: Flow<StoreSettings> = context.dataStore.data
@@ -55,7 +57,8 @@ class SettingsDataStore(private val context: Context) {
                 firstLaunchCompleted = preferences[FIRST_LAUNCH_COMPLETED] ?: false,
                 loggedInUsername = preferences[LOGGED_IN_USERNAME] ?: "",
                 loggedInEmail = preferences[LOGGED_IN_EMAIL] ?: "",
-                isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false
+                isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
+                selectedLanguage = preferences[SELECTED_LANGUAGE] ?: "en"
             )
         }
 
@@ -102,6 +105,16 @@ class SettingsDataStore(private val context: Context) {
             preferences[LOGGED_IN_USERNAME] = ""
             preferences[LOGGED_IN_EMAIL] = ""
             preferences[IS_USER_LOGGED_IN] = false
+        }
+    }
+
+    suspend fun updateSelectedLanguage(languageCode: String) {
+        val supportedLanguage = when (languageCode) {
+            "hi" -> "hi"
+            else -> "en"
+        }
+        context.dataStore.edit { preferences ->
+            preferences[SELECTED_LANGUAGE] = supportedLanguage
         }
     }
 }

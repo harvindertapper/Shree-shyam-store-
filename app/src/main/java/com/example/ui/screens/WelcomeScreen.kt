@@ -19,10 +19,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.*
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
@@ -141,7 +143,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(
                             painter = painterResource(id = drawableId),
-                            contentDescription = "Khatu Shyam Baba",
+                            contentDescription = stringResource(R.string.app_name),
                             tint = Color.Unspecified,
                             modifier = Modifier.fillMaxSize()
                         )
@@ -158,7 +160,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Storefront,
-                            contentDescription = "Store",
+                            contentDescription = stringResource(R.string.content_description_store),
                             tint = Color.White,
                             modifier = Modifier.size(80.dp)
                         )
@@ -168,7 +170,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Text(
-                    text = "Jai Shree Shyam 🙏",
+                    text = stringResource(R.string.welcome_title),
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = SaffronDark, // Warm dark saffron red
@@ -189,7 +191,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Aapka Online Shop Register",
+                    text = stringResource(R.string.welcome_subtitle),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMediumGray,
@@ -230,7 +232,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Aage Badhein (Skip)",
+                            text = stringResource(R.string.welcome_continue),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -238,7 +240,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(
                             imageVector = Icons.Default.ArrowForward,
-                            contentDescription = "Next",
+                            contentDescription = stringResource(R.string.content_description_next),
                             tint = Color.White
                         )
                     }

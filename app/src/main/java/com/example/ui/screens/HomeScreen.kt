@@ -16,10 +16,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.R
 import com.example.ui.theme.*
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
@@ -75,7 +77,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Jai Shree Shyam 🙏",
+                    text = stringResource(R.string.home_greeting),
                     color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.ExtraBold,
@@ -110,7 +112,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "आज का कुल गल्ला (Today's Sales) 🪙",
+                        text = stringResource(R.string.home_todays_sales),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = SaffronDark
@@ -129,7 +131,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     ) {
                         SuggestionChip(
                             onClick = {},
-                            label = { Text("$billsCount Bills Today", fontWeight = FontWeight.Bold, color = TextNearBlack) },
+                            label = { Text(stringResource(R.string.home_bills_today, billsCount), fontWeight = FontWeight.Bold, color = TextNearBlack) },
                             icon = { Icon(Icons.Default.Receipt, null, modifier = Modifier.size(16.dp), tint = TextNearBlack) }
                         )
                     }
@@ -153,7 +155,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = "नकद (Cash)", fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
+                        Text(text = stringResource(R.string.home_cash), fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = CurrencyUtils.formatRupees(cashToday),
@@ -176,7 +178,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = "UPI Paid", fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
+                        Text(text = stringResource(R.string.home_upi_paid), fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = CurrencyUtils.formatRupees(upiToday),
@@ -199,7 +201,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         modifier = Modifier.padding(12.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text(text = "उधार (Udhaar)", fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
+                        Text(text = stringResource(R.string.home_credit), fontSize = 13.sp, color = TextNearBlack, fontWeight = FontWeight.ExtraBold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = CurrencyUtils.formatRupees(udhaarToday),
@@ -228,19 +230,19 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.Warning,
-                            contentDescription = "Alert",
+                            contentDescription = stringResource(R.string.content_description_alert),
                             tint = ErrorRed,
                             modifier = Modifier.size(28.dp)
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "कम स्टॉक चेतावनी (Low Stock) ⚠️",
+                                text = stringResource(R.string.home_low_stock_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Black,
                                 color = ErrorRed
                             )
                             Text(
-                                text = "$lowStockCount आइटम स्टॉक ख़त्म होने वाले हैं।",
+                                text = stringResource(R.string.home_low_stock_message, lowStockCount),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextNearBlack
@@ -248,7 +250,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         }
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "See items",
+                            contentDescription = stringResource(R.string.content_description_see_items),
                             tint = ErrorRed,
                             modifier = Modifier.size(24.dp)
                         )
@@ -268,19 +270,19 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "All set",
+                            contentDescription = stringResource(R.string.content_description_all_set),
                             tint = SuccessGreen,
                             modifier = Modifier.size(28.dp)
                         )
                         Column {
                             Text(
-                                text = "स्टॉक सुरक्षित है 👍",
+                                text = stringResource(R.string.home_stock_safe_title),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Black,
                                 color = SuccessGreen
                             )
                             Text(
-                                text = "सभी आइटम का स्टॉक पर्याप्त है।",
+                                text = stringResource(R.string.home_stock_safe_message),
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextNearBlack
@@ -291,7 +293,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
             }
 
             Text(
-                text = "त्वरित विकल्प (Quick Operations)",
+                text = stringResource(R.string.home_quick_operations),
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Black,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -306,8 +308,8 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     HomeMenuButton(
-                        title = "नया बिल (New Bill)",
-                        subtitle = "Fast Billing Counter",
+                        title = stringResource(R.string.home_new_bill),
+                        subtitle = stringResource(R.string.home_new_bill_subtitle),
                         icon = Icons.Default.AddShoppingCart,
                         backgroundColor = Color(0xFFE3F2FD),
                         iconColor = Color(0xFF0D47A1),
@@ -318,8 +320,8 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     )
 
                     HomeMenuButton(
-                        title = "नया माल (Add Product)",
-                        subtitle = "Register New Stock",
+                        title = stringResource(R.string.home_add_product),
+                        subtitle = stringResource(R.string.home_add_product_subtitle),
                         icon = Icons.Default.AddBox,
                         backgroundColor = Color(0xFFE8F5E9),
                         iconColor = Color(0xFF1B5E20),
@@ -334,8 +336,8 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     HomeMenuButton(
-                        title = "शुरुआती स्टॉक (Opening Stock)",
-                        subtitle = "Rapid Inventory Entry",
+                        title = stringResource(R.string.home_opening_stock),
+                        subtitle = stringResource(R.string.home_opening_stock_subtitle),
                         icon = Icons.Default.ViewList,
                         backgroundColor = Color(0xFFFFF3E0),
                         iconColor = Color(0xFFE65100),
@@ -346,8 +348,8 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     )
 
                     HomeMenuButton(
-                        title = "उधार खाता (Udhaar Ledger)",
-                        subtitle = "Track Credits & Payments",
+                        title = stringResource(R.string.home_udhaar_ledger),
+                        subtitle = stringResource(R.string.home_udhaar_ledger_subtitle),
                         icon = Icons.Default.ImportContacts,
                         backgroundColor = Color(0xFFFFEBEE),
                         iconColor = Color(0xFFB71C1C),
