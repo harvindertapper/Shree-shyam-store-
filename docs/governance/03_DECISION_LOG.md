@@ -1,0 +1,20 @@
+# Decision Log
+
+Status: Append-only governance record. Add new decisions at the top.
+
+| Date | Decision | Status | Owner | Evidence |
+| --- | --- | --- | --- | --- |
+| 2026-06-17 | Final Android app identity for Firebase, Google Sign-In, Play Store, application id, and namespace is `com.harrylabs.shreeshyamstore`. Do not configure Firebase against the old random application id. | Accepted | Owner | `DM-004-FOUNDATION-RESET-FIREBASE-WEIGHT-IMPLEMENTATION-PLAN`, `docs/governance/FOUNDATION_RESET_DM004.md` |
+| 2026-06-17 | No real shop inventory has been entered yet; Room v2 reset is allowed before real inventory entry. Owner will enter real inventory only after Firebase auth/profile, rules/App Check/cost guardrails, product unit UI, product/category/settings sync, and inventory restore QA pass. | Accepted | Owner | `DM-004-FOUNDATION-RESET-FIREBASE-WEIGHT-IMPLEMENTATION-PLAN`, `docs/DATA_MODEL.md` |
+| 2026-06-17 | DM-004 v2 billing foundation uses Long paise for money, Long base units for quantities, per-line billing rate override, sync-safe local fields, soft delete for syncable master data, bill idempotency, sale status planning, and purchase-cost sale item snapshots. | Accepted | Owner + delivery manager | `docs/governance/FOUNDATION_RESET_DM004.md`, `docs/DATA_MODEL.md` |
+| 2026-06-17 | Hybrid Firebase architecture is accepted for the foundation reset: Firestore becomes canonical cloud source over time while Room remains the local cache/offline working store. Product/category/settings sync must pass before real inventory entry; sales/stock/udhaar sync remains later planning. | Accepted | Owner + delivery manager | `docs/governance/FIREBASE_CLOUD_SYNC_ARCHITECTURE.md`, `docs/governance/FOUNDATION_RESET_DM004.md`, `docs/DATA_MODEL.md`, `docs/PRODUCT_SPEC.md` |
+| 2026-06-17 | Firebase Auth and Firestore/cloud sync are mandatory MVP foundation before Billing Phase 2. This supersedes the prior cloud-deferred roadmap. | Accepted | Owner | `DM-002-CLOUD-SYNC-ROADMAP-RESET`, `docs/PRODUCT_SPEC.md`, `docs/IMPLEMENTATION_PLAN.md`, `docs/DATA_MODEL.md` |
+| 2026-06-17 | Firebase implementation must start with architecture, config prerequisites, Auth model, Firestore data model, security/privacy rules, Room-to-cloud migration, offline/conflict handling, and QA packets before code. | Accepted | Owner + delivery manager | `docs/governance/task-packets/M02F-*.md` |
+| 2026-06-15 | Shree Shyam Store will be treated as an offline-capable Android shop-management app for small Indian retailers. | Superseded for local-only/offline-first wording on 2026-06-17; app remains offline-capable. | Owner | `AGENTS.md`, `APP_BUILD_CHECKLIST.md`, `docs/PRODUCT_SPEC.md`, `DM-002-CLOUD-SYNC-ROADMAP-RESET` |
+| 2026-06-15 | English is the default app language and Hindi is the required second language. | Accepted | Owner | `AGENTS.md`, `docs/SCREEN_FLOW.md` |
+| 2026-06-15 | Bluetooth printer, cloud sync, multi-store, staff roles, and real UPI confirmation are deferred. | Superseded for cloud sync on 2026-06-17; still applies to printer, multi-store implementation, staff-role implementation, and real UPI confirmation. | Owner | `AGENTS.md`, `APP_BUILD_CHECKLIST.md`, `DM-002-CLOUD-SYNC-ROADMAP-RESET` |
+| 2026-06-15 | UPI sale state is a manual payment record, not verified payment. | Accepted | Owner | `AGENTS.md`, `docs/DATA_MODEL.md` |
+| 2026-06-15 | Final package/brand/signing choices are not locked. | TBD - owner decision required | Owner | `app/build.gradle.kts`, `docs/PRODUCT_SPEC.md` |
+| 2026-06-15 | Production credential hardening is required before release. | TBD - owner decision required | Owner + security/governance | `docs/DATA_MODEL.md`, `ShopViewModel.kt` |
+| 2026-06-15 | Room destructive migration behavior must be removed or replaced before production schema changes. | TBD - owner decision required | Owner + delivery manager | `AppDatabase.kt`, `AGENTS.md` |
+| 2026-06-15 | AI Studio/Gemini scaffolding and unused network dependencies need an owner decision. | TBD - owner decision required | Owner | `README.md`, `.env.example`, `metadata.json`, `app/build.gradle.kts` |
