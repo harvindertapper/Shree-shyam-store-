@@ -16,6 +16,15 @@ M02F-A/DM-004 architecture decision: use a hybrid phased migration with Firestor
 
 DM-004 foundation reset decision: no real shop inventory has been entered yet, so Room v2 reset is allowed before real inventory entry. New v2 model work must use `Long` paise for money, `Long` base units for quantities, cloud sync fields, soft delete where appropriate, and final app identity `com.harrylabs.shreeshyamstore`.
 
+FR-B Room v2 reset implementation:
+
+- `AppDatabase` is now Room schema version 2.
+- The v1 to v2 transition uses an explicit `fallbackToDestructiveMigrationFrom(true, 1)` reset only from Room version 1, based on the owner decision that no real shop inventory has been entered yet.
+- The broad production `fallbackToDestructiveMigration()` policy is not retained for future versions.
+- Default seeded categories are recreated on fresh database create and on the approved v1 reset.
+- Future Room changes from v2 onward require intentional migrations or a new owner-approved reset decision.
+- Legacy `Double` money and `Int` quantity/stock columns remain temporarily as compatibility fields for existing Product/Billing UI code. The v2 `Long` paise and base-unit columns are present now and are synchronized by repository inserts/updates until later UI packets migrate fully to the v2 contract.
+
 ## Entities
 
 ## Category
@@ -56,7 +65,7 @@ Fields:
 - `createdAt`
 - `updatedAt`
 
-Future cloud/unit readiness, not implemented in Room yet:
+FR-B v2 cloud/unit readiness fields implemented in Room while legacy fields remain for UI compatibility:
 
 - `unitType`
 - `displayUnit`
@@ -392,7 +401,7 @@ Recommended conflict posture:
 - When adding fields, prefer nullable/default values and explicit migration.
 - Do not introduce cloud sync fields, remote IDs, or sync metadata into Room entities until the Room-to-cloud migration strategy is approved.
 - Do not migrate current `Int` stock and sale item quantities to measured/decimal quantities without an approved unit/base-quantity migration plan.
-- DM-004 exception: because no real shop inventory has been entered yet, FR-B may reset Room from v1 to v2 after FR-A and FR-C accept the v2 contract. This reset must be explicitly documented and verified.
+- DM-004 exception applied in FR-B: because no real shop inventory has been entered yet, Room v1 may reset to v2 after FR-A and FR-C acceptance. This is scoped to v1 only and must not be reused as a broad production destructive-migration policy.
 
 ## DM-004 Calculator Rules
 

@@ -1,8 +1,6 @@
 package com.example.data
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
 
 class ShopRepository(
     private val categoryDao: CategoryDao,
@@ -18,9 +16,19 @@ class ShopRepository(
     
     suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
     suspend fun getCategoryByName(name: String): Category? = categoryDao.getCategoryByName(name)
-    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category)
-    suspend fun updateCategory(category: Category) = categoryDao.update(category)
-    suspend fun deleteCategory(category: Category) = categoryDao.delete(category)
+    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category.markPendingSync())
+    suspend fun updateCategory(category: Category) = categoryDao.update(category.markPendingSync())
+    suspend fun deleteCategory(category: Category) {
+        val now = System.currentTimeMillis()
+        categoryDao.delete(
+            category.copy(
+                isActive = false,
+                deletedAt = now,
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING
+            )
+        )
+    }
 
     // Products
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -29,8 +37,8 @@ class ShopRepository(
     fun getProductByIdFlow(id: Long): Flow<Product?> = productDao.getProductByIdFlow(id)
     fun getProductsByCategory(categoryId: Long): Flow<List<Product>> = productDao.getProductsByCategory(categoryId)
     
-    suspend fun insertProduct(product: Product): Long = productDao.insert(product)
-    suspend fun updateProduct(product: Product) = productDao.update(product)
+    suspend fun insertProduct(product: Product): Long = productDao.insert(product.withLegacyFieldsSyncedToV2())
+    suspend fun updateProduct(product: Product) = productDao.update(product.withLegacyFieldsSyncedToV2())
 
     // Sales
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
@@ -56,15 +64,15 @@ class ShopRepository(
         // 1. Insert Sale
         val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
         val finalizedSale = sale.copy(customerId = finalCustomerId)
-        val saleId = saleDao.insertSale(finalizedSale)
+        val saleId = saleDao.insertSale(finalizedSale.withLegacyFieldsSyncedToV2())
 
         // 2. Loop and save each item
         for (item in items) {
             val itemToSave = item.copy(saleId = saleId)
-            saleDao.insertSaleItem(itemToSave)
+            val product = productDao.getProductById(item.productId)
+            saleDao.insertSaleItem(itemToSave.withLegacyFieldsSyncedToV2(product))
 
             // 3. Stock handling
-            val product = productDao.getProductById(item.productId)
             if (product != null && product.trackStock) {
                 val oldStock = product.currentStock
                 val newStock = oldStock - item.quantity
@@ -74,7 +82,7 @@ class ShopRepository(
                     currentStock = newStock,
                     updatedAt = System.currentTimeMillis()
                 )
-                productDao.update(updatedProduct)
+                productDao.update(updatedProduct.withLegacyFieldsSyncedToV2())
 
                 // Create stock adjustment history record
                 val adj = StockAdjustment(
@@ -85,7 +93,7 @@ class ShopRepository(
                     reason = "Bill Sale (No: ${sale.billNumber})",
                     createdAt = System.currentTimeMillis()
                 )
-                stockAdjustmentDao.insertAdjustment(adj)
+                stockAdjustmentDao.insertAdjustment(adj.withLegacyFieldsSyncedToV2())
             }
         }
 
@@ -99,7 +107,7 @@ class ShopRepository(
                 note = "Bill No: ${sale.billNumber}",
                 createdAt = System.currentTimeMillis()
             )
-            udhaarDao.insertTransaction(udhaarTx)
+            udhaarDao.insertTransaction(udhaarTx.withLegacyFieldsSyncedToV2())
         }
 
         return saleId
@@ -110,9 +118,19 @@ class ShopRepository(
     
     suspend fun getCustomerById(id: Long): Customer? = customerDao.getCustomerById(id)
     suspend fun getCustomerByName(name: String): Customer? = customerDao.getCustomerByName(name)
-    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer)
-    suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer)
-    suspend fun deleteCustomer(customer: Customer) = customerDao.deleteCustomer(customer)
+    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer.markPendingSync())
+    suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer.markPendingSync())
+    suspend fun deleteCustomer(customer: Customer) {
+        val now = System.currentTimeMillis()
+        customerDao.deleteCustomer(
+            customer.copy(
+                isActive = false,
+                deletedAt = now,
+                updatedAt = now,
+                syncStatus = SyncStatus.PENDING
+            )
+        )
+    }
 
     // Udhaar
     val allUdhaarTransactions: Flow<List<UdhaarTransaction>> = udhaarDao.getAllTransactions()
@@ -124,10 +142,16 @@ class ShopRepository(
         udhaarDao.getTransactionsForCustomerList(customerId)
 
     suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long = 
-        udhaarDao.insertTransaction(transaction)
+        udhaarDao.insertTransaction(transaction.withLegacyFieldsSyncedToV2())
 
-    suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) = 
-        udhaarDao.deleteTransaction(transaction)
+    suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) {
+        udhaarDao.deleteTransaction(
+            transaction.copy(
+                deletedAt = System.currentTimeMillis(),
+                syncStatus = SyncStatus.PENDING
+            )
+        )
+    }
 
     // Stock Adjustments
     val allStockAdjustments: Flow<List<StockAdjustment>> = stockAdjustmentDao.getAllAdjustments()
@@ -136,7 +160,7 @@ class ShopRepository(
         stockAdjustmentDao.getAdjustmentsForProduct(productId)
 
     suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long {
-        return stockAdjustmentDao.insertAdjustment(adjustment)
+        return stockAdjustmentDao.insertAdjustment(adjustment.withLegacyFieldsSyncedToV2())
     }
 
     /**
@@ -151,7 +175,7 @@ class ShopRepository(
             currentStock = actualStockCounted,
             updatedAt = System.currentTimeMillis()
         )
-        productDao.update(updatedProduct)
+        productDao.update(updatedProduct.withLegacyFieldsSyncedToV2())
 
         val adjustment = StockAdjustment(
             productId = productId,
@@ -161,7 +185,7 @@ class ShopRepository(
             reason = reason,
             createdAt = System.currentTimeMillis()
         )
-        stockAdjustmentDao.insertAdjustment(adjustment)
+        stockAdjustmentDao.insertAdjustment(adjustment.withLegacyFieldsSyncedToV2())
     }
 
     // --- User Authentication / Session Management Functions ---
@@ -170,5 +194,75 @@ class ShopRepository(
     suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
     suspend fun insertUser(user: User): Long = userDao.insertUser(user)
     suspend fun getUserById(userId: Long): User? = userDao.getUserById(userId)
-}
 
+    private fun Category.markPendingSync(): Category {
+        return copy(syncStatus = SyncStatus.PENDING)
+    }
+
+    private fun Product.withLegacyFieldsSyncedToV2(): Product {
+        val effectivePrice = sellingPrice?.takeIf { it > 0.0 } ?: mrp
+        val purchasePricePaise = purchasePrice?.let { rupeesToPaise(it) }
+        return copy(
+            syncStatus = SyncStatus.PENDING,
+            pricePerUnitPaise = rupeesToPaise(effectivePrice),
+            priceUnitBaseQty = priceUnitBaseQty.takeIf { it > 0L } ?: 1L,
+            purchasePricePerUnitPaise = purchasePricePaise,
+            purchasePriceUnitBaseQty = purchasePricePaise?.let {
+                purchasePriceUnitBaseQty?.takeIf { baseQty -> baseQty > 0L } ?: 1L
+            },
+            stockQuantityBase = currentStock.toLong(),
+            lowStockAlertBase = lowStockAlertQty.toLong()
+        )
+    }
+
+    private fun Sale.withLegacyFieldsSyncedToV2(): Sale {
+        return copy(
+            syncStatus = SyncStatus.PENDING,
+            totalAmountPaise = rupeesToPaise(totalAmount),
+            saleStatus = saleStatus.ifBlank { SaleStatus.COMPLETED },
+            idempotencyKey = idempotencyKey.ifBlank { newLocalUuid() }
+        )
+    }
+
+    private fun SaleItem.withLegacyFieldsSyncedToV2(product: Product?): SaleItem {
+        val effectivePricePaise = rupeesToPaise(unitPrice)
+        val originalPricePaise = product?.pricePerUnitPaise ?: effectivePricePaise
+        val priceUnitBaseQty = product?.priceUnitBaseQty?.takeIf { it > 0L } ?: 1L
+        return copy(
+            syncStatus = SyncStatus.PENDING,
+            unitTypeSnapshot = product?.unitType ?: unitTypeSnapshot,
+            displayUnitSnapshot = product?.displayUnit ?: displayUnitSnapshot,
+            baseUnitSnapshot = product?.baseUnit ?: baseUnitSnapshot,
+            enteredQuantityText = quantity.toString(),
+            quantityBase = quantity.toLong(),
+            originalPricePerUnitPaise = originalPricePaise,
+            originalPriceUnitBaseQty = priceUnitBaseQty,
+            effectivePricePerUnitPaise = effectivePricePaise,
+            effectivePriceUnitBaseQty = priceUnitBaseQty,
+            rateOverridden = effectivePricePaise != originalPricePaise,
+            lineTotalPaise = rupeesToPaise(lineTotal),
+            purchasePricePerUnitPaiseSnapshot = product?.purchasePricePerUnitPaise,
+            purchasePriceUnitBaseQtySnapshot = product?.purchasePriceUnitBaseQty
+        )
+    }
+
+    private fun Customer.markPendingSync(): Customer {
+        return copy(syncStatus = SyncStatus.PENDING)
+    }
+
+    private fun UdhaarTransaction.withLegacyFieldsSyncedToV2(): UdhaarTransaction {
+        return copy(
+            syncStatus = SyncStatus.PENDING,
+            amountPaise = rupeesToPaise(amount)
+        )
+    }
+
+    private fun StockAdjustment.withLegacyFieldsSyncedToV2(): StockAdjustment {
+        return copy(
+            syncStatus = SyncStatus.PENDING,
+            oldQuantityBase = oldStock.toLong(),
+            newQuantityBase = newStock.toLong(),
+            differenceBase = difference.toLong()
+        )
+    }
+}
