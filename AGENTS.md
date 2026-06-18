@@ -51,15 +51,15 @@ If source-of-truth documents disagree, stop and report the conflict instead of s
 ## Current Repo Shape
 
 - Single Android app module: `app`.
-- Main activity and manual Compose navigation: `app/src/main/java/com/example/MainActivity.kt`.
-- Screen state: `Screen` sealed class in `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`.
-- Screens: `app/src/main/java/com/example/ui/screens/`.
-- Business/data coordination: `app/src/main/java/com/example/viewmodel/ShopViewModel.kt` and `app/src/main/java/com/example/data/ShopRepository.kt`.
-- Room entities/DAOs/database: `app/src/main/java/com/example/data/`.
-- Settings/session/language: `app/src/main/java/com/example/data/SettingsDataStore.kt`.
+- Main activity and manual Compose navigation: `app/src/main/java/com/harrylabs/shreeshyamstore/MainActivity.kt`.
+- Screen state: `Screen` sealed class in `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`.
+- Screens: `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/`.
+- Business/data coordination: `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt` and `app/src/main/java/com/harrylabs/shreeshyamstore/data/ShopRepository.kt`.
+- Room entities/DAOs/database: `app/src/main/java/com/harrylabs/shreeshyamstore/data/`.
+- Settings/session/language: `app/src/main/java/com/harrylabs/shreeshyamstore/data/SettingsDataStore.kt`.
 - User-facing strings: `app/src/main/res/values/strings.xml` and `app/src/main/res/values-hi/strings.xml`.
-- Unit/Robolectric tests: `app/src/test/java/com/example/`.
-- Instrumented tests: `app/src/androidTest/java/com/example/`.
+- Unit/Robolectric tests: `app/src/test/java/com/harrylabs/shreeshyamstore/`.
+- Instrumented tests: `app/src/androidTest/java/com/harrylabs/shreeshyamstore/`.
 
 ## Module-by-Module Work Rule
 
@@ -187,10 +187,10 @@ For manual launch QA:
 Then launch package:
 
 ```powershell
-adb shell am start -n com.aistudio.shreeshyamstore.pqwzkb/com.example.MainActivity
+adb shell am start -n com.harrylabs.shreeshyamstore/com.harrylabs.shreeshyamstore.MainActivity
 ```
 
-After the approved app identity rename packet, the launch package/activity must be updated to the final `com.harrylabs.shreeshyamstore` identity.
+The launch package/activity uses the final `com.harrylabs.shreeshyamstore` identity.
 
 ## Definition of Done
 

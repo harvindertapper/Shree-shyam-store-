@@ -49,11 +49,11 @@ Real billing use waits until:
 
 ## Final App Identity Gate
 
-- Current code still uses old identity values until `FR-P-APP-IDENTITY-RENAME`.
-- `FR-P` must set `applicationId` to `com.harrylabs.shreeshyamstore`.
-- `FR-P` must set Android namespace to `com.harrylabs.shreeshyamstore`.
-- `FR-P` must rename Kotlin packages from `com.example` to `com.harrylabs.shreeshyamstore`.
-- `FR-P` must update package assertions, launch commands, imports, and docs.
+- Current code uses the final `com.harrylabs.shreeshyamstore` identity after `FR-P-APP-IDENTITY-RENAME`.
+- `FR-P` sets `applicationId` to `com.harrylabs.shreeshyamstore`.
+- `FR-P` sets Android namespace to `com.harrylabs.shreeshyamstore`.
+- `FR-P` renames Kotlin packages to `com.harrylabs.shreeshyamstore`.
+- `FR-P` updates package assertions, launch commands, imports, and current docs.
 - `FR-G` must not start until `FR-P` passes.
 
 ## V2 Calculation Contract
@@ -180,4 +180,3 @@ This protects future profit reporting after product purchase cost changes.
 - Real UPI/payment verification.
 - Sales/stock/udhaar cloud sync implementation.
 - Welcome sound/assets.
-

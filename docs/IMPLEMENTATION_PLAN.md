@@ -80,9 +80,9 @@ Goal: Make startup routing and main shell behavior predictable across logged-out
 
 Scope paths:
 
-- `app/src/main/java/com/example/MainActivity.kt`
-- `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`
-- `app/src/main/java/com/example/ui/screens/WelcomeScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/MainActivity.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/WelcomeScreen.kt`
 - `app/src/test/**`
 - `app/src/androidTest/**`
 
@@ -156,12 +156,12 @@ Goal: Make local owner login/session behavior reliable and prepare a hardening p
 
 Scope paths:
 
-- `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`
-- `app/src/main/java/com/example/data/Entities.kt`
-- `app/src/main/java/com/example/data/Daos.kt`
-- `app/src/main/java/com/example/data/AppDatabase.kt`
-- `app/src/main/java/com/example/data/SettingsDataStore.kt`
-- `app/src/main/java/com/example/ui/screens/AuthScreens.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/Entities.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/Daos.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/AppDatabase.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/SettingsDataStore.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/AuthScreens.kt`
 - `app/src/test/**`
 
 Dependencies: M01, M02.
@@ -192,9 +192,9 @@ Goal: Make first-launch setup and settings reliable, localized, and restart-safe
 
 Scope paths:
 
-- `app/src/main/java/com/example/data/SettingsDataStore.kt`
-- `app/src/main/java/com/example/ui/screens/FirstLaunchSetupScreen.kt`
-- `app/src/main/java/com/example/ui/screens/SettingsScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/SettingsDataStore.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/FirstLaunchSetupScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/SettingsScreen.kt`
 - `app/src/main/res/values*/strings.xml`
 - `app/src/test/**`
 
@@ -224,9 +224,9 @@ Goal: Make products, categories, opening stock, and stock adjustments auditable 
 
 Scope paths:
 
-- `app/src/main/java/com/example/data/**`
-- `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`
-- `app/src/main/java/com/example/ui/screens/ProductsAndStockScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/ProductsAndStockScreen.kt`
 - `docs/DATA_MODEL.md`
 - `app/src/test/**`
 
@@ -258,9 +258,9 @@ Goal: Make billing production-grade for cart behavior, stock validation, sale pe
 
 Scope paths:
 
-- `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`
-- `app/src/main/java/com/example/data/ShopRepository.kt`
-- `app/src/main/java/com/example/ui/screens/BillingAndPaymentScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/ShopRepository.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/BillingAndPaymentScreen.kt`
 - `docs/DATA_MODEL.md`
 - `app/src/test/**`
 
@@ -292,9 +292,9 @@ Goal: Make customer credit ledger accurate and understandable.
 
 Scope paths:
 
-- `app/src/main/java/com/example/data/**`
-- `app/src/main/java/com/example/viewmodel/ShopViewModel.kt`
-- `app/src/main/java/com/example/ui/screens/UdhaarScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/viewmodel/ShopViewModel.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/UdhaarScreen.kt`
 - `app/src/test/**`
 
 Dependencies: M06.
@@ -324,9 +324,9 @@ Goal: Make daily/monthly reports reliable for shop decisions.
 
 Scope paths:
 
-- `app/src/main/java/com/example/data/**`
-- `app/src/main/java/com/example/ui/screens/ReportsScreen.kt`
-- `app/src/main/java/com/example/utils/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/ReportsScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/utils/**`
 - `app/src/test/**`
 
 Dependencies: M06, M07.
@@ -353,7 +353,7 @@ Goal: Add local PDF invoice generation and Android share/WhatsApp share after bi
 
 Scope paths:
 
-- `app/src/main/java/com/example/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/**`
 - `app/src/main/res/values*/strings.xml`
 - `app/src/test/**`
 - `app/src/androidTest/**`
@@ -387,8 +387,8 @@ Goal: Add safe local backup/export/import for business records.
 
 Scope paths:
 
-- `app/src/main/java/com/example/data/**`
-- `app/src/main/java/com/example/ui/screens/SettingsScreen.kt`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/data/**`
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/SettingsScreen.kt`
 - `app/src/main/res/xml/**`
 - `app/src/test/**`
 
