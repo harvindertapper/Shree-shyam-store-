@@ -48,7 +48,7 @@ Add Firebase Auth with Android Credential Manager Sign in with Google, create/re
 - All registration, login, and session persistence logic must use Firebase Auth (with offline support). Password hashing and local credentials verification must be deleted.
 - Formulate and deploy minimum secure bootstrap Firestore rules:
   - Users document `users/{uid}`: Only accessible by the owner user itself.
-  - Shops document `shops/{shopId}`: Only writeable/deleteable by the owner (`request.auth.uid == resource.data.ownerUid`), and `ownerUid` must be immutable.
+  - Shops document `shops/{shopId}`: Only writeable by the owner (`request.auth.uid == resource.data.ownerUid`), ownerUid must be immutable, and deletion is deferred/denied.
   - Members subcollection `shops/{shopId}/members/{memberUid}`: Manage membership creation atomically and validate role immutability.
 - No phone OTP implementation.
 - No service-account keys, signing passwords, or production credentials in repo.
@@ -58,11 +58,12 @@ Add Firebase Auth with Android Credential Manager Sign in with Google, create/re
 ## acceptance_criteria
 
 - Owner can sign in with Google through Credential Manager in a test environment.
-- App creates/restores `users/{uid}` (storing `activeShopId`), `shops/{shopId}`, and owner membership atomically using a Firestore write batch.
+- App creates/restores `users/{uid}` (storing `activeShopId`), `shops/{shopId}`, and owner membership atomically using a Firestore transaction.
 - Secure Firestore rules are deployed to the project and verified via automated rules unit tests.
 - Session restore after app restart works for the implemented profile slice using Firebase Auth.
 - Local `users` table is completely removed from Room schema using Migration(3,4).
 - UI strings are English/Hindi resource-backed.
+
 
 
 ## required_evidence
