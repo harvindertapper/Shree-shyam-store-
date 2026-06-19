@@ -77,7 +77,7 @@ If source-of-truth documents disagree, stop and report the conflict instead of s
 - Do not store tokens, API keys, signing passwords, or production secrets in Room, DataStore, strings, source code, screenshots, or docs.
 - Do not read `.env` or secret files unless the user explicitly approves it for that task. `.env.example` may be read.
 - Current local password storage is basic SHA-256. Do not worsen it. Production hardening needs an owner-approved task.
-- Current Room database code uses `fallbackToDestructiveMigration()`. Do not add schema changes until this is removed or a migration strategy is explicitly approved.
+- Room is schema version 2. The approved v1-only reset uses `fallbackToDestructiveMigrationFrom(true, 1)` because no real inventory existed. Any migration from v2 onward requires an intentional migration or a new explicit owner-approved reset; broad production destructive migration remains forbidden.
 - UPI must remain a manual payment record unless real verification is implemented and approved.
 - Backup/export/import must protect customer and sales data and must not silently leak files to shared storage.
 - Android backup behavior must be reviewed before release because `android:allowBackup` is currently enabled.
@@ -85,7 +85,7 @@ If source-of-truth documents disagree, stop and report the conflict instead of s
 
 ## Auth, Session, API, Storage, and Permission Rules
 
-- Auth/session is local only today: owner account in Room, session flags in DataStore.
+- The currently implemented auth/session flow is local: owner account in Room and non-secret session flags in DataStore. This is transitional; Firebase owner auth and cloud restore remain mandatory upcoming MVP foundation work.
 - DataStore may store preferences and non-secret session state, but not passwords, tokens, API secrets, or signing data.
 - Room is the source for products, categories, sales, sale items, customers, udhaar transactions, stock adjustments, and users.
 - Owner decision on 2026-06-17: Firebase Auth and Firestore/cloud sync are mandatory MVP foundation, not deferred scope.
@@ -139,19 +139,26 @@ Every future agent should finish with:
 
 ## Priority Feature Roadmap
 
-1. Stabilize baseline app and language resources.
-2. Establish Firebase Auth, shop ownership, Firestore security rules, cloud data model, and local cache/sync strategy.
-3. Clean login/setup/home/product/billing UI copy into English + Hindi resources as touched by approved packets.
-4. Make billing production-grade: stock validation, cart behavior, invoice data correctness.
-5. Add PDF invoice generation.
-6. Add WhatsApp invoice share.
-7. Add backup/export/import if still needed beyond cloud recovery.
-8. Add barcode/product-code workflow.
-9. Add purchase/supplier module.
-10. Add profit reporting using purchase price.
-11. Add discounts, returns/refunds, and tax/GST options.
-12. Add app lock/PIN and password recovery/reset.
-13. Add release branding: app name, icon, package, signing, versioning.
+Completed foundation checkpoints:
+
+- `FR-A` at `0bd189b`.
+- `FR-C` at `f36d613`.
+- `FR-B` at `4bb4927`.
+- `FR-P` at `b7d92f2`.
+
+Remaining route:
+
+1. Complete Firebase project/config prerequisites.
+2. Complete `FR-K` Room UUID primary keys and relationship refactoring.
+3. Implement Firebase Auth with Android Credential Manager Sign in with Google.
+4. Create/restore owner, shop, and membership profiles.
+5. Establish Firestore rules, App Check, and cost controls.
+6. Add Product unit/rate/stock UI with inline category creation.
+7. Sync product/category/settings and pass inventory restore QA.
+8. Add weighted billing, bidirectional amount/quantity calculation, and per-line rate override.
+9. Complete billing persistence and billing restore QA.
+10. Add PDF invoice generation and WhatsApp/share-sheet sharing.
+11. Continue later approved roadmap items.
 
 ## Deferred Scope
 

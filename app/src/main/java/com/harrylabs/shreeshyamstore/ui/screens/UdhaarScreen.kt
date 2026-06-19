@@ -68,7 +68,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
     var filterDebtorsOnly by remember { mutableStateOf(false) }
     val displayCustomers = remember(filteredCustomers, customerBalances, filterDebtorsOnly) {
         if (filterDebtorsOnly) {
-            filteredCustomers.filter { (customerBalances[it.id] ?: 0.0) > 0.01 }
+            filteredCustomers.filter { (customerBalances[it.localUuid] ?: 0.0) > 0.01 }
         } else {
             filteredCustomers
         }
@@ -199,7 +199,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                     }
                 } else {
                     items(displayCustomers) { cust ->
-                        val balance = customerBalances[cust.id] ?: 0.0
+                        val balance = customerBalances[cust.localUuid] ?: 0.0
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -209,7 +209,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    viewModel.navigateTo(Screen.CustomerDetail(cust.id))
+                                    viewModel.navigateTo(Screen.CustomerDetail(cust.localUuid))
                                 }
                         ) {
                             Row(
@@ -345,7 +345,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
+fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: String) {
     val context = LocalContext.current
     var customer by remember { mutableStateOf<Customer?>(null) }
     var currentBalance by remember { mutableStateOf(0.0) }
@@ -355,7 +355,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     val customerTransactions = viewModel.getTransactionsForCustomer(customerId).collectAsState(initial = emptyList())
 
     LaunchedEffect(customerId, customerTransactions.value) {
-        customer = viewModel.customers.value.find { it.id == customerId }
+        customer = viewModel.customers.value.find { it.localUuid == customerId }
         // Let's compute outstanding balance locally from transactions list directly!
         currentBalance = customerTransactions.value.sumOf { tx ->
             if (tx.type == "CREDIT") tx.amount else -tx.amount
@@ -364,7 +364,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
 
     // Workaround helper to get customer sync safely inside Compose launch (the viewmodel has repository query)
     LaunchedEffect(customerId) {
-        val cust = viewModel.customers.value.find { it.id == customerId }
+        val cust = viewModel.customers.value.find { it.localUuid == customerId }
         customer = cust
     }
 
@@ -615,7 +615,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         ).show()
                                     } else {
                                         viewModel.addUdhaarPayment(
-                                            customerId = customerId,
+                                            customerUuid = customerId,
                                             amount = amtValue,
                                             note = note
                                         )

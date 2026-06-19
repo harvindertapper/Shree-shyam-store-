@@ -21,7 +21,7 @@ Observation:
 Current evidence:
 
 - `docs/SCREEN_FLOW.md` and `docs/PRODUCT_SPEC.md` describe a welcome chant setting.
-- `app/src/main/java/com/example/ui/screens/WelcomeScreen.kt` looks up a raw resource named `jai_shree_shyam_chant`.
+- `app/src/main/java/com/harrylabs/shreeshyamstore/ui/screens/WelcomeScreen.kt` looks up a raw resource named `jai_shree_shyam_chant`.
 - `app/src/main/res/raw/` is currently missing, so no chant audio asset is packaged in the app.
 
 Classification:
@@ -60,20 +60,20 @@ Observation:
 
 Current evidence:
 
-- `AGENTS.md` states auth/session is local only today: owner account is in Room and session flags are in DataStore.
+- `AGENTS.md` states the currently implemented auth/session flow is local: owner account is in Room and session flags are in DataStore.
 - `docs/DATA_MODEL.md` states Room is the local database and DataStore stores settings/session.
 - Android Clear storage wipes app-private local storage, including Room database files and DataStore preferences.
 
 Classification:
 
-- Expected Android behavior for the current local-only build, not a simple UI bug.
+- Expected Android behavior for the current pre-Firebase implementation, not a simple UI bug.
 - Data safety, backup/restore, and auth hardening concern.
 - Do not work around this by hiding business data in unsafe external files or hardcoded defaults.
 - Owner decision on 2026-06-17 makes cloud auth/sync mandatory MVP foundation before Billing Phase 2.
 
 Assigned phase/module:
 
-- Primary: M02F Firebase Cloud Sync Foundation for owner account, shop ownership, clear-storage restore, reinstall restore, and future second-device recovery.
+- Primary: `FR-G`, `FR-G2`, `FR-H`, and `FR-I1` for owner account, shop ownership, clear-storage restore, reinstall restore, and future second-device recovery.
 - Related: M10 Backup / Export / Import only if manual backup remains needed after cloud recovery decisions.
 - Related: M03 Local Auth and Session Hardening.
 - Related release gate: M12 Release Hardening / Android backup policy.
@@ -94,7 +94,7 @@ Acceptance criteria when scheduled:
 
 Owner decisions needed:
 
-- Which Firebase Auth provider should be MVP default?
+- Confirm Credential Manager Sign in with Google as the first provider and decide any later provider rollout.
 - What is the owner UID to shop membership model?
 - Should manual encrypted backup/restore still exist after Firebase restore?
 - Should Android Auto Backup be disabled or configured before release?
@@ -141,9 +141,9 @@ Acceptance criteria when scheduled:
 - Validation prevents invalid quantities such as zero, negative, or unsupported decimal precision.
 - English and Hindi UI strings are added for all new unit/quantity labels.
 
-Owner decisions needed:
+Accepted foundation and remaining decisions:
 
-- Which units are required for MVP: piece, kg, gram, litre, ml, packet, box, custom?
-- Should kg/litre products store stock internally as grams/ml for precision?
-- How many decimal places should billing allow for weight/measure items?
-- Should barcode/product-code later support different units for the same product?
+- Accepted: piece products use count, weight uses grams, volume uses ml, and permanent money uses `Long` paise.
+- Accepted: weighted/volume amount-to-quantity rounds to the nearest gram/ml and fractional pieces are invalid.
+- Remaining Product UI decision: whether packet, box, or custom units enter the first Product UI release.
+- Remaining future decision: whether barcode/product-code later supports different units for the same product.

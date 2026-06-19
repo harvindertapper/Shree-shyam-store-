@@ -45,8 +45,7 @@ internal fun rupeesToPaise(amount: Double): Long {
 
 @Entity(tableName = "categories")
 data class Category(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -63,8 +62,7 @@ data class Category(
 
 @Entity(tableName = "products")
 data class Product(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -74,7 +72,7 @@ data class Product(
     val updatedByUid: String? = null,
     val sourceDeviceId: String? = null,
     val name: String,
-    val categoryId: Long,
+    val categoryId: String,
     val mrp: Double,
     val sellingPrice: Double? = null,
     val purchasePrice: Double? = null,
@@ -103,8 +101,7 @@ data class Product(
 
 @Entity(tableName = "sales")
 data class Sale(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -121,15 +118,14 @@ data class Sale(
     val totalAmountPaise: Long = rupeesToPaise(totalAmount),
     val paymentMode: String, // "CASH", "UPI", "UDHAAR"
     val saleStatus: String = SaleStatus.COMPLETED,
-    val customerId: Long? = null,
+    val customerId: String? = null,
     val note: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "sale_items")
 data class SaleItem(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -138,8 +134,8 @@ data class SaleItem(
     val createdByUid: String? = null,
     val updatedByUid: String? = null,
     val sourceDeviceId: String? = null,
-    val saleId: Long,
-    val productId: Long,
+    val saleId: String,
+    val productId: String,
     val productNameSnapshot: String,
     val quantity: Int,
     val unitTypeSnapshot: String = DataUnitType.PIECE,
@@ -161,8 +157,7 @@ data class SaleItem(
 
 @Entity(tableName = "customers")
 data class Customer(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -180,8 +175,7 @@ data class Customer(
 
 @Entity(tableName = "udhaar_transactions")
 data class UdhaarTransaction(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -190,8 +184,8 @@ data class UdhaarTransaction(
     val createdByUid: String? = null,
     val updatedByUid: String? = null,
     val sourceDeviceId: String? = null,
-    val customerId: Long,
-    val saleId: Long? = null,
+    val customerId: String,
+    val saleId: String? = null,
     val type: String, // "CREDIT" (when buying on credit), "PAYMENT" (when paying back)
     val amount: Double,
     val amountPaise: Long = rupeesToPaise(amount),
@@ -201,8 +195,7 @@ data class UdhaarTransaction(
 
 @Entity(tableName = "stock_adjustments")
 data class StockAdjustment(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val localUuid: String = newLocalUuid(),
+    @PrimaryKey val localUuid: String = newLocalUuid(),
     val remoteId: String? = null,
     val shopId: String? = null,
     val syncStatus: String = SyncStatus.PENDING,
@@ -211,7 +204,7 @@ data class StockAdjustment(
     val createdByUid: String? = null,
     val updatedByUid: String? = null,
     val sourceDeviceId: String? = null,
-    val productId: Long,
+    val productId: String,
     val oldStock: Int,
     val oldQuantityBase: Long = oldStock.toLong(),
     val newStock: Int,

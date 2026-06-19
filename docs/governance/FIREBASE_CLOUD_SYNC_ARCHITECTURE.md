@@ -13,8 +13,7 @@ Do not implement Firebase code until the config, Auth, Firestore data model, sec
 Final app identity gate:
 
 - Final Android application id, namespace, Firebase app registration, Google Sign-In setup, SHA keys, and Play Store identity must use `com.harrylabs.shreeshyamstore`.
-- Current code still uses the old random application id until the dedicated app identity rename packet runs.
-- Do not configure Firebase using the old application id.
+- Current code uses `com.harrylabs.shreeshyamstore` after completed packet `FR-P` at `b7d92f2`.
 
 ## Alternatives Considered
 
@@ -83,7 +82,7 @@ MVP behavior:
 - Only one active shop should be exposed in UI for now. Multi-store UI remains deferred.
 - Staff membership may be modeled in documents now, but staff-role UI and permission management remain deferred.
 
-Open decision:
+Remaining implementation decision:
 
 - Whether the existing local Room `User` table remains a transitional local login fallback, is linked to the Firebase UID, or is replaced by Firebase Auth in the MVP path.
 
@@ -141,6 +140,7 @@ Practical MVP stance:
 - Once the shop profile and selected domains are cached, the app should remain usable offline for daily counter work.
 - Billing should eventually be allowed offline, but only after sales, stock adjustments, and udhaar writes have an accepted local queue, idempotency, and reconciliation plan.
 - Until then, the first implementation slice should avoid billing, sales, stock, customers, and udhaar sync.
+- Firestore offline persistence is a transport/cache capability, not a complete business-conflict solution. Sales, stock, and udhaar still require idempotency, append-only records, and explicit reconciliation rules.
 
 Conflict policy by risk:
 
@@ -222,7 +222,7 @@ Required before syncing sensitive data:
 After the app identity rename and Firebase prerequisites are accepted, the first Firebase implementation slice should be:
 
 1. Firebase SDK/config scaffold using owner-approved project/config policy.
-2. Google Sign-In or owner-approved Auth provider.
+2. Firebase Auth using Android Credential Manager Sign in with Google or another explicitly owner-approved provider.
 3. Create/restore `users/{uid}`.
 4. Create/restore one `shops/{shopId}` profile.
 5. Create/restore owner membership.
@@ -232,6 +232,14 @@ After Firestore rules, App Check posture, and cost guardrails pass, the next clo
 
 Product/category/settings sync must happen before real shop inventory entry. Do not sync sales, stock adjustments, customers, or udhaar in the first Firebase slice.
 
+## Android Firebase Implementation Guidance
+
+- Use the main Firebase modules `firebase-auth` and `firebase-firestore`; do not introduce deprecated KTX module artifacts.
+- Use Android Credential Manager for Sign in with Google.
+- Use the App Check debug provider only for emulator/development. Play Integrity is the production direction.
+- Firebase budget alerts monitor spending but do not hard-cap charges; production cost controls also need quotas, usage monitoring, and conservative query/write design.
+- The Firebase BoM entry currently present in Gradle does not mean Auth or Firestore is integrated.
+
 ## Owner Decisions Needed
 
 - Firebase project id, Android app registration for `com.harrylabs.shreeshyamstore`, and environment split.
@@ -240,11 +248,9 @@ Product/category/settings sync must happen before real shop inventory entry. Do 
 - Firestore region and billing/cost guardrails.
 - SHA-1 and SHA-256 keys for the final application id.
 - App Check strategy.
-- Final approval of hybrid phased migration: Firestore canonical over time plus Room local cache/offline queue.
 - Existing local data migration behavior.
 - Whether local Room `User` remains transitional or Firebase Auth replaces local login.
-- Unit list and decimal precision for MQA-003.
-- Whether quantity should use base-unit integer/decimal-safe encoding.
+- Exact Product UI exposure for packet/box/custom units; the accepted foundation already uses count, grams, and ml base units.
 - Retention/delete/account recovery expectations.
 - Whether manual encrypted backup/export remains after Firebase recovery.
 
@@ -257,5 +263,5 @@ Product/category/settings sync must happen before real shop inventory entry. Do 
 - Staff role UI or permissions implementation.
 - Phone OTP implementation.
 - Sync of products, sales, customers, udhaar, stock adjustments, or invoice data.
-- Room schema changes.
+- Future Room schema changes beyond implemented v2 fields.
 - Service-account keys, signing secrets, `.env`, or production credentials in repo.

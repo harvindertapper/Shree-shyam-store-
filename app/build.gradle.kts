@@ -4,7 +4,9 @@ plugins {
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
+  alias(libs.plugins.google.services)
 }
+
 
 android {
   namespace = "com.harrylabs.shreeshyamstore"
@@ -57,6 +59,11 @@ android {
   testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
+ksp {
+  arg("room.schemaLocation", "${projectDir}/schemas")
+}
+
+
 // Configure the Secrets Gradle Plugin to use .env and .env.example files
 // to match the convention used in Web projects.
 secrets {
@@ -69,6 +76,9 @@ secrets {
 dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
+  implementation(libs.firebase.auth)
+  implementation(libs.firebase.firestore)
+
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
   // implementation(libs.androidx.camera.camera2)

@@ -17,10 +17,10 @@ Status: Source of truth for foundation reset before real shop inventory entry an
 
 ## Implementation Order
 
-1. `FR-A-V2-DATA-CALC-DESIGN`
-2. `FR-C-QUANTITY-PRICE-CALCULATOR`
-3. `FR-B-ROOM-V2-RESET`
-4. `FR-P-APP-IDENTITY-RENAME`
+1. `FR-A-V2-DATA-CALC-DESIGN` — completed at `0bd189b`.
+2. `FR-C-QUANTITY-PRICE-CALCULATOR` — completed at `f36d613`.
+3. `FR-B-ROOM-V2-RESET` — completed at `4bb4927`.
+4. `FR-P-APP-IDENTITY-RENAME` — completed at `b7d92f2`.
 5. `FR-G-FIREBASE-AUTH-SHOP-PROFILE`
 6. `FR-G2-FIRESTORE-RULES-APP-CHECK-COST-GUARDRAILS`
 7. `FR-D-PRODUCT-UNIT-STOCK-UI`
@@ -166,6 +166,14 @@ This protects future profit reporting after product purchase cost changes.
 - No service-account keys in repo.
 - Budget/cost guardrails.
 - App Check strategy.
+
+## Current Foundation State
+
+- Room is schema version 2 with the approved v1-only `fallbackToDestructiveMigrationFrom(true, 1)` reset.
+- Weight/volume calculation and per-line effective-rate foundations exist in pure Kotlin and Room v2 fields.
+- Product and Billing UI integration remains pending.
+- Firebase Auth, Credential Manager Sign in with Google, Firestore integration, cloud restore, rules deployment, and App Check are not implemented.
+- The welcome sound issue remains tracked separately and is not part of the Firebase or foundation cleanup route.
 
 ## Explicitly Out Of Scope For This Reset
 

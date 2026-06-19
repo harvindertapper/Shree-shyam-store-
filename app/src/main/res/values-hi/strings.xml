@@ -205,6 +205,7 @@
     <string name="product_category_label">कैटेगरी</string>
     <string name="product_mrp_label">एमआरपी *</string>
     <string name="product_mrp_error">कृपया सही अंकीय एमआरपी दें।</string>
+    <string name="product_category_error">कृपया एक मान्य श्रेणी चुनें।</string>
     <string name="selling_price_label">बिक्री मूल्य (खाली छोड़ने पर एमआरपी)</string>
     <string name="example_price_format">जैसे %1$s</string>
     <string name="purchase_price_label">खरीद मूल्य (वैकल्पिक)</string>

@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+    
+    match /shops/{shopId} {
+      // Allow creation of a new shop if signed in
+      allow create: if request.auth != null;
+      
+      // Allow read/write if the user is a registered member of the shop
+      allow read, write: if request.auth != null && (
+        exists(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid))
+      );
+      
+      match /members/{memberUid} {
+        // Allow creating/reading/writing memberships if the user is signing themselves up,
+        // or if the authenticated user is already verified as the shop's owner.
+        allow create: if request.auth != null && (
+          request.auth.uid == memberUid ||
+          get(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid)).data.role == 'owner'
+        );
+        
+        allow read, write: if request.auth != null && (
+          request.auth.uid == memberUid ||
+          get(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid)).data.role == 'owner'
+        );
+      }
+    }
+  }
+}

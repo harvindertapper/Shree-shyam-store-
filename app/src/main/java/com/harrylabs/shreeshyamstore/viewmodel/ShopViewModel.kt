@@ -22,11 +22,11 @@ sealed class Screen {
     data class Payment(val invoiceTotal: Double) : Screen()
     object BillSuccess : Screen()
     object Products : Screen()
-    data class AddEditProduct(val productId: Long? = null) : Screen()
+    data class AddEditProduct(val productUuid: String? = null) : Screen()
     object OpeningStock : Screen()
-    data class StockAdjustment(val productId: Long) : Screen()
+    data class StockAdjustment(val productUuid: String) : Screen()
     object Udhaar : Screen()
-    data class CustomerDetail(val customerId: Long) : Screen()
+    data class CustomerDetail(val customerUuid: String) : Screen()
     object Reports : Screen()
     object Settings : Screen()
 }
@@ -231,9 +231,9 @@ class ShopViewModel(
         )
 
     fun saveProduct(
-        id: Long,
+        uuid: String?,
         name: String,
-        categoryId: Long,
+        categoryId: String,
         mrp: Double,
         sellingPrice: Double?,
         purchasePrice: Double?,
@@ -244,7 +244,7 @@ class ShopViewModel(
     ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            if (id == 0L) {
+            if (uuid == null) {
                 // Insert
                 val product = Product(
                     name = name.trim(),
@@ -259,11 +259,11 @@ class ShopViewModel(
                     createdAt = now,
                     updatedAt = now
                 )
-                val newProductId = repository.insertProduct(product)
+                val newProductUuid = repository.insertProduct(product)
                 // Log stock adjustment for opening entry
                 if (trackStock && currentStock > 0) {
                     val adjustment = StockAdjustment(
-                        productId = newProductId,
+                        productId = newProductUuid,
                         oldStock = 0,
                         newStock = currentStock,
                         difference = currentStock,
@@ -274,7 +274,7 @@ class ShopViewModel(
                 }
             } else {
                 // Update
-                val existing = repository.getProductById(id)
+                val existing = repository.getProductById(uuid)
                 if (existing != null) {
                     var finalStock = currentStock
                     if (!trackStock) {
@@ -298,7 +298,7 @@ class ShopViewModel(
                     if (trackStock && currentStock != existing.currentStock) {
                         val diff = currentStock - existing.currentStock
                         val adjustment = StockAdjustment(
-                            productId = id,
+                            productId = uuid,
                             oldStock = existing.currentStock,
                             newStock = currentStock,
                             difference = diff,
@@ -312,15 +312,15 @@ class ShopViewModel(
         }
     }
 
-    suspend fun getProduct(id: Long): Product? = repository.getProductById(id)
+    suspend fun getProduct(uuid: String): Product? = repository.getProductById(uuid)
 
-    fun adjustStock(productId: Long, actualStockCounted: Int, reason: String) {
+    fun adjustStock(productUuid: String, actualStockCounted: Int, reason: String) {
         viewModelScope.launch {
-            repository.adjustProductStock(productId, actualStockCounted, reason)
+            repository.adjustProductStock(productUuid, actualStockCounted, reason)
         }
     }
 
-    fun getAdjustmentsForProduct(productId: Long): Flow<List<StockAdjustment>> = repository.getAdjustmentsForProduct(productId)
+    fun getAdjustmentsForProduct(productUuid: String): Flow<List<StockAdjustment>> = repository.getAdjustmentsForProduct(productUuid)
 
 
     // --- Billing State (Cart) ---
@@ -372,7 +372,7 @@ class ShopViewModel(
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
      */
-    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Int) {
+    fun quickAddProduct(name: String, mrp: Double, categoryId: String, trackStock: Boolean, currentStock: Int) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val prod = Product(
@@ -386,13 +386,13 @@ class ShopViewModel(
                 createdAt = now,
                 updatedAt = now
             )
-            val newId = repository.insertProduct(prod)
-            val insertedProduct = prod.copy(id = newId)
+            val newUuid = repository.insertProduct(prod)
+            val insertedProduct = prod.copy(localUuid = newUuid)
 
             if (trackStock && currentStock > 0) {
                 repository.insertStockAdjustment(
                     StockAdjustment(
-                        productId = newId,
+                        productId = newUuid,
                         oldStock = 0,
                         newStock = currentStock,
                         difference = currentStock,
@@ -417,7 +417,7 @@ class ShopViewModel(
 
     fun completeBill(
         paymentMode: String, // "CASH", "UPI", "UDHAAR"
-        customerId: Long? = null,
+        customerUuid: String? = null,
         customerName: String = "",
         customerPhone: String = "",
         note: String? = null
@@ -432,9 +432,9 @@ class ShopViewModel(
             val billNo = "BILL-${formatter.format(java.util.Date())}"
 
             // 1. Determine Customer ID if Udhaar
-            val finalCustomerId = if (paymentMode == "UDHAAR") {
-                if (customerId != null) {
-                    customerId
+            val finalCustomerUuid = if (paymentMode == "UDHAAR") {
+                if (customerUuid != null) {
+                    customerUuid
                 } else {
                     // Create customer on the fly
                     val trimmedName = customerName.trim()
@@ -442,16 +442,16 @@ class ShopViewModel(
 
                     val existing = repository.getCustomerByName(trimmedName)
                     if (existing != null) {
-                        existing.id
+                        existing.localUuid
                     } else {
-                        repository.insertCustomer(
-                            Customer(
-                                name = trimmedName,
-                                phone = customerPhone.trim().ifEmpty { null },
-                                createdAt = System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
-                            )
+                        val newCustomer = Customer(
+                            name = trimmedName,
+                            phone = customerPhone.trim().ifEmpty { null },
+                            createdAt = System.currentTimeMillis(),
+                            updatedAt = System.currentTimeMillis()
                         )
+                        repository.insertCustomer(newCustomer)
+                        newCustomer.localUuid
                     }
                 }
             } else {
@@ -463,15 +463,15 @@ class ShopViewModel(
                 billNumber = billNo,
                 totalAmount = total,
                 paymentMode = paymentMode,
-                customerId = finalCustomerId,
+                customerId = finalCustomerUuid,
                 note = note,
                 createdAt = System.currentTimeMillis()
             )
 
             val saleItems = cartItems.map { (prod, qty) ->
                 SaleItem(
-                    saleId = 0, // setup in repository
-                    productId = prod.id,
+                    saleId = sale.localUuid, // linked using UUID string directly
+                    productId = prod.localUuid, // linked using UUID string directly
                     productNameSnapshot = prod.name,
                     quantity = qty,
                     unitPrice = prod.getEffectivePrice(),
@@ -480,13 +480,13 @@ class ShopViewModel(
             }
 
             // 3. Save sale, adjust quantities and logs inside the helper
-            val savedSaleId = repository.insertSaleWithItems(sale, saleItems, finalCustomerId)
+            val savedSaleUuid = repository.insertSaleWithItems(sale, saleItems, finalCustomerUuid)
 
             // Keep record for invoice receipt visualizer
-            val savedSale = repository.getSaleById(savedSaleId)
+            val savedSale = repository.getSaleById(savedSaleUuid)
             if (savedSale != null) {
                 _lastSale.value = savedSale
-                _lastSaleItems.value = repository.getSaleItemsForSaleList(savedSaleId)
+                _lastSaleItems.value = repository.getSaleItemsForSaleList(savedSaleUuid)
             }
 
             // 4. Wipe cart
@@ -511,12 +511,12 @@ class ShopViewModel(
             initialValue = emptyList()
         )
 
-    fun getTransactionsForCustomer(customerId: Long): Flow<List<UdhaarTransaction>> {
-        return repository.getTransactionsForCustomer(customerId)
+    fun getTransactionsForCustomer(customerUuid: String): Flow<List<UdhaarTransaction>> {
+        return repository.getTransactionsForCustomer(customerUuid)
     }
 
-    suspend fun calculateCustomerBalance(customerId: Long): Double {
-        val txs = repository.getTransactionsForCustomerList(customerId)
+    suspend fun calculateCustomerBalance(customerUuid: String): Double {
+        val txs = repository.getTransactionsForCustomerList(customerUuid)
         var balance = 0.0
         for (tx in txs) {
             if (tx.type == "CREDIT") {
@@ -528,11 +528,11 @@ class ShopViewModel(
         return balance
     }
 
-    fun addUdhaarPayment(customerId: Long, amount: Double, note: String?) {
+    fun addUdhaarPayment(customerUuid: String, amount: Double, note: String?) {
         viewModelScope.launch {
             if (amount <= 0.0) return@launch
             val tx = UdhaarTransaction(
-                customerId = customerId,
+                customerId = customerUuid,
                 type = "PAYMENT",
                 amount = amount,
                 note = note?.trim()?.ifEmpty { "Cash Deposit Received" } ?: "Cash Deposit Received",
@@ -567,7 +567,7 @@ class ShopViewModel(
             initialValue = emptyList()
         )
 
-    fun getSaleItems(saleId: Long): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleId)
+    fun getSaleItems(saleUuid: String): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleUuid)
 
     // Helper functions for clipboard copy text
     fun generateInvoiceText(context: Context): String {

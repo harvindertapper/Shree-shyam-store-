@@ -4,21 +4,27 @@ Status: Draft source of truth for module sequencing. Each module should be assig
 
 ## Implementation Sequence
 
-1. M01 Foundation, repo hygiene, and localization baseline.
-2. FR-A V2 data/calculator design.
-3. FR-C Quantity/price calculator utility.
-4. FR-B Room v2 reset.
-5. FR-P App identity rename to `com.harrylabs.shreeshyamstore`.
-6. FR-G Firebase Auth/shop profile.
-7. FR-G2 Firestore rules/App Check/cost guardrails.
-8. FR-D Product Add/Edit unit/rate/stock UI with inline category creation.
-9. FR-H Product/category/settings Firestore sync.
-10. FR-I1 Inventory restore QA.
-11. FR-E Billing weighted entry plus per-line rate override.
-12. FR-F Sale/stock/invoice/udhaar persistence.
-13. FR-I2 Billing restore QA.
-14. FR-J Sales/stock/udhaar cloud sync plan.
-15. M06 Billing Phase 2 hardening after foundation reset gates pass.
+Completed checkpoints:
+
+1. `FR-A` V2 data/calculator design — `0bd189b`.
+2. `FR-C` Quantity/price calculator utility — `f36d613`.
+3. `FR-B` Room v2 reset — `4bb4927`.
+4. `FR-P` App identity rename to `com.harrylabs.shreeshyamstore` — `b7d92f2`.
+
+Current remaining sequence:
+
+1. Firebase project/config prerequisites.
+2. `FR-K` Room UUID primary keys and relationship refactoring for cross-device sync safety.
+3. `FR-G` Firebase Auth using Android Credential Manager Sign in with Google, owner/shop/membership profile creation/restore, and deprecating local auth tables.
+4. `FR-G2` Firestore rules, App Check posture, and cost controls.
+5. `FR-D` Product Add/Edit unit/rate/stock UI with inline category creation.
+6. `FR-H` Product/category/settings Firestore sync.
+7. `FR-I1` Inventory restore QA.
+8. `FR-E` Billing weighted entry, bidirectional amount/quantity calculator, and per-line rate override.
+9. `FR-F` Sale/stock/invoice/udhaar persistence.
+10. `FR-I2` Billing restore QA.
+11. `FR-J` Sales/stock/udhaar cloud sync planning.
+
 
 ## Shared Constraints
 
@@ -26,7 +32,7 @@ Status: Draft source of truth for module sequencing. Each module should be assig
 - Do not add `fallbackToDestructiveMigration()` to new production schema work.
 - Owner decision on 2026-06-17 approves Firebase Auth/Firestore/cloud sync as mandatory MVP foundation before billing.
 - Owner decision on 2026-06-17 sets final application id, namespace, Firebase app identity, and Play Store identity to `com.harrylabs.shreeshyamstore`.
-- No real inventory has been entered yet; Room v2 reset is allowed in FR-B after FR-A and FR-C.
+- No real inventory has been entered yet. Room v2 and the v1-only reset are already implemented; v2 onward requires intentional migrations or a new explicit owner-approved reset.
 - Real inventory entry is blocked until FR-G, FR-G2, FR-D, FR-H, and FR-I1 pass.
 - Do not add random Firebase implementation without accepted architecture, security rules, privacy, migration, offline/conflict, and QA packets.
 - Do not add Bluetooth printer, multi-store implementation, staff role implementation, or real UPI verification without owner approval.
@@ -37,6 +43,8 @@ Status: Draft source of truth for module sequencing. Each module should be assig
 ## Task Packets
 
 DM-004 task packet files live under `docs/governance/task-packets/FR-*.md`. These supersede the older M02F/M05/M06 route until the foundation reset gates are complete.
+
+The M01 and M02F sections below are retained as historical module records. Do not route new work from them when an FR packet or the current sequence above covers the same area.
 
 ### M01-FOUNDATION-001
 
@@ -106,7 +114,7 @@ Required evidence:
 
 Review owner: QA.
 
-### M02F-FIREBASE-CLOUD-FOUNDATION-001
+### M02F-FIREBASE-CLOUD-FOUNDATION-001 — Historical/Superseded
 
 Goal: Establish Firebase Auth and Firestore as the MVP foundation before billing hardening.
 
@@ -132,8 +140,7 @@ Constraints:
 
 Acceptance criteria:
 
-- Owner-approved Firebase architecture and Auth provider decision exist.
-- M02F-A architecture recommendation is accepted or explicitly revised by the owner.
+- The Firebase architecture is accepted; remaining owner inputs are console/config and provider rollout details.
 - Firestore collection/data ownership model is documented.
 - Security rules and privacy model are reviewed.
 - Room-to-cloud migration and local cache strategy are documented.
@@ -449,13 +456,9 @@ Review owner: delivery manager plus security/governance.
 ## Known Blockers
 
 - `TBD - owner decision required`: production credential storage.
-- `Accepted`: final app identity is `com.harrylabs.shreeshyamstore`.
 - `TBD - owner decision required`: Firebase project/config ownership, environment separation, app registration for `com.harrylabs.shreeshyamstore`, Firestore region, SHA-1/SHA-256 keys, App Check, and cost guardrails.
-- `TBD - owner decision required`: Firebase Auth providers for MVP.
-- `TBD - owner decision required`: approve or revise the M02F-A hybrid architecture recommendation.
-- `TBD - owner decision required`: Firestore ownership model, rules, cost controls, backup/retention, and conflict policy.
-- `TBD - owner decision required`: unit list, decimal precision, and base-unit strategy for loose/weight-based products.
-- `TBD - owner decision required`: database migration policy and removal of destructive migration.
+- `TBD - owner decision required`: Firebase Auth rollout details; current direction is Credential Manager Sign in with Google first.
+- `TBD - owner decision required`: App Check enforcement timing, cost monitoring, backup/retention, and high-risk conflict policy details.
 - `TBD - owner decision required`: invoice legal/tax fields.
 - `TBD - owner decision required`: backup/export/import format and restore policy.
-- `TBD - owner decision required`: final package/branding/signing choices.
+- `TBD - owner decision required`: release icon and signing setup. Final package identity is already accepted and implemented.

@@ -1,5 +1,7 @@
 # FR-P-APP-IDENTITY-RENAME
 
+> **Completed - do not rerun.** Checkpoint: `b7d92f2`.
+
 ## task_id
 
 FR-P-APP-IDENTITY-RENAME
@@ -53,4 +55,3 @@ Delivery manager plus QA.
 - Product/Billing feature behavior.
 - Room schema beyond package/import compatibility.
 - Secrets, signing credentials, welcome sound/assets.
-

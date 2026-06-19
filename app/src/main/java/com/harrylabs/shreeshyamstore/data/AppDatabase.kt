@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import java.util.UUID
 
-private const val ROOM_DATABASE_VERSION = 2
+private const val ROOM_DATABASE_VERSION = 3
 
 @Database(
     entities = [
@@ -21,7 +21,7 @@ private const val ROOM_DATABASE_VERSION = 2
         User::class
     ],
     version = ROOM_DATABASE_VERSION,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
@@ -44,7 +44,19 @@ abstract class AppDatabase : RoomDatabase() {
 
             override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
                 super.onDestructiveMigration(db)
-                seedDefaultCategories(db)
+            }
+
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                super.onOpen(db)
+                try {
+                    db.query("SELECT COUNT(*) FROM categories").use { cursor ->
+                        if (cursor.moveToFirst() && cursor.getInt(0) == 0) {
+                            seedDefaultCategories(db)
+                        }
+                    }
+                } catch (e: Exception) {
+                    // Table might not exist yet if something went wrong
+                }
             }
         }
 
@@ -59,7 +71,7 @@ abstract class AppDatabase : RoomDatabase() {
                     "shree_shyam_store_db"
                 )
                 .addCallback(DEFAULT_CATEGORY_SEED_CALLBACK)
-                .fallbackToDestructiveMigrationFrom(true, ROOM_V1_RESET_START_VERSION)
+                .fallbackToDestructiveMigrationFrom(true, 1, 2)
                 .build()
                 INSTANCE = instance
                 instance

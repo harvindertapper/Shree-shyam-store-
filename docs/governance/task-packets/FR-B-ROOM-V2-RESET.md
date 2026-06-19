@@ -1,5 +1,7 @@
 # FR-B-ROOM-V2-RESET
 
+> **Completed - do not rerun.** Checkpoint: `4bb4927`. Old `com.example` scope paths below record the pre-FR-P execution state; current package is `com.harrylabs.shreeshyamstore`.
+
 ## task_id
 
 FR-B-ROOM-V2-RESET
@@ -54,4 +56,3 @@ Data reviewer plus security/governance.
 - Firebase/Auth/Firestore config or code.
 - Package/application id rename.
 - Welcome sound/assets.
-

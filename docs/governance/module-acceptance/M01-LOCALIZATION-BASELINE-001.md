@@ -1,5 +1,7 @@
 # M01-LOCALIZATION-BASELINE-001 Acceptance
 
+> **Historical/Superseded - do not execute.** Retained as pre-FR-P acceptance evidence. Package/path references below reflect the historical state. Current code and commands use `com.harrylabs.shreeshyamstore`; current routing is the DM-004 FR sequence.
+
 ## Decision
 
 PASS.
@@ -91,9 +93,9 @@ Focused result:
 ## Residual Risks
 
 - `android:allowBackup` remains release-sensitive and must be reviewed before release.
-- `fallbackToDestructiveMigration()` remains a production blocker before schema changes or release.
+- Historical broad destructive-migration risk was resolved for the approved v1-to-v2 reset. Current Room v2 uses `fallbackToDestructiveMigrationFrom(true, 1)`; v2 onward requires intentional migrations or a new explicit owner-approved reset.
 - Local password storage remains basic SHA-256 and needs owner-approved hardening before production release.
 
 ## Next Recommended Task
 
-Checkpoint the accepted M01 remediation state, then prepare the next packet for Phase 2 / M06 Billing Production Hardening.
+M01 is already checkpointed. Follow the current Firebase foundation route in `docs/IMPLEMENTATION_PLAN.md`; do not route directly to old M06 work.

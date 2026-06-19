@@ -55,7 +55,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
     val cartTotal by viewModel.cartTotal.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
     var showQuickAddDialog by remember { mutableStateOf(false) }
 
     // Warning dialog regarding insufficient stock
@@ -147,8 +147,8 @@ fun BillingScreen(viewModel: ShopViewModel) {
                 }
                 items(categories) { cat ->
                     FilterChip(
-                        selected = selectedCategoryId == cat.id,
-                        onClick = { selectedCategoryId = cat.id },
+                        selected = selectedCategoryId == cat.localUuid,
+                        onClick = { selectedCategoryId = cat.localUuid },
                         label = { Text(cat.name, fontWeight = FontWeight.Bold) }
                     )
                 }
@@ -520,9 +520,18 @@ fun BillingScreen(viewModel: ShopViewModel) {
             Dialog(onDismissRequest = { showQuickAddDialog = false }) {
                 var newName by remember { mutableStateOf("") }
                 var newMrp by remember { mutableStateOf("") }
-                var selectedCatId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
+                var selectedCatId by remember { mutableStateOf<String>(categories.firstOrNull()?.localUuid ?: "") }
                 var trackStock by remember { mutableStateOf(true) }
                 var initialStock by remember { mutableStateOf("10") }
+
+                LaunchedEffect(categories) {
+                    if (selectedCatId.isBlank() && categories.isNotEmpty()) {
+                        val firstValid = categories.firstOrNull { it.localUuid.isNotBlank() }
+                        if (firstValid != null) {
+                            selectedCatId = firstValid.localUuid
+                        }
+                    }
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -571,7 +580,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         // Category Dropdown
                         var dropdownExpanded by remember { mutableStateOf(false) }
                         var selectedCatName by remember(selectedCatId) {
-                            mutableStateOf(categories.find { it.id == selectedCatId }?.name ?: "")
+                            mutableStateOf(categories.find { it.localUuid == selectedCatId }?.name ?: "")
                         }
                         val fallbackCategoryName = stringResource(R.string.category_miscellaneous)
 
@@ -591,7 +600,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                     DropdownMenuItem(
                                         text = { Text(cat.name) },
                                         onClick = {
-                                            selectedCatId = cat.id
+                                            selectedCatId = cat.localUuid
                                             selectedCatName = cat.name
                                             dropdownExpanded = false
                                         }
@@ -626,8 +635,12 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                 onClick = {
                                     val mrpValue = newMrp.toDoubleOrNull()
                                     val stockValue = initialStock.toIntOrNull() ?: 0
-                                    if (newName.trim().isEmpty() || mrpValue == null) {
-                                        Toast.makeText(context, quickAddValidationToast, Toast.LENGTH_SHORT).show()
+                                    if (newName.trim().isEmpty() || mrpValue == null || selectedCatId.isBlank()) {
+                                        if (selectedCatId.isBlank()) {
+                                            Toast.makeText(context, context.getString(R.string.product_category_error), Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, quickAddValidationToast, Toast.LENGTH_SHORT).show()
+                                        }
                                     } else {
                                         viewModel.quickAddProduct(
                                             name = newName,
@@ -920,7 +933,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                                 .clickable {
                                                     viewModel.completeBill(
                                                         paymentMode = "UDHAAR",
-                                                        customerId = cust.id
+                                                        customerUuid = cust.localUuid
                                                     )
                                                     showUdhaarCustomerDialog = false
                                                 },
@@ -974,7 +987,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                     } else {
                                         viewModel.completeBill(
                                             paymentMode = "UDHAAR",
-                                            customerId = null, // create dynamic
+                                            customerUuid = null, // create dynamic
                                             customerName = searchCustName,
                                             customerPhone = custPhone
                                         )

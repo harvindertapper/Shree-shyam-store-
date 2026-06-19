@@ -23,7 +23,8 @@ The app should help a shop owner:
 - Local owner registration and login.
 - Firebase Auth/Firestore foundation is now mandatory MVP work but is not implemented yet.
 - Final app identity is `com.harrylabs.shreeshyamstore` after the approved identity rename packet.
-- No real shop inventory has been entered yet; Room v2 reset is allowed before real inventory entry.
+- Room schema version 2 is implemented. Its approved v1-only reset uses `fallbackToDestructiveMigrationFrom(true, 1)`.
+- No real shop inventory has been entered yet; migrations from Room v2 onward require an intentional migration or a new explicit owner-approved reset.
 - First-launch shop setup.
 - Room database for local storage.
 - DataStore for settings/session.
@@ -54,7 +55,7 @@ The app should help a shop owner:
 
 - [ ] Register and login work reliably.
 - [ ] Firebase Auth owner sign-in works reliably.
-- [ ] App identity rename to `com.harrylabs.shreeshyamstore` is complete before Firebase setup.
+- [x] App identity rename to `com.harrylabs.shreeshyamstore` is complete before Firebase setup (`b7d92f2`).
 - [ ] Owner UID maps to one or more shop memberships.
 - [ ] Firestore security rules protect shop data by owner/member access.
 - [ ] App Check and cost/budget guardrails are reviewed before product sync.

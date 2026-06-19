@@ -1,5 +1,7 @@
 # M01-LOCALIZATION-BASELINE-001-CONNECTED-REMEDIATION
 
+> **Historical/Superseded - do not execute.** Completed before FR-P and retained as historical test evidence. Old package names and commands below describe the historical failure state; current package is `com.harrylabs.shreeshyamstore`.
+
 ## task_id
 
 M01-LOCALIZATION-BASELINE-001-CONNECTED-REMEDIATION

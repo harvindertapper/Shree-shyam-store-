@@ -1,5 +1,7 @@
 # FR-C-QUANTITY-PRICE-CALCULATOR
 
+> **Completed - do not rerun.** Checkpoint: `f36d613`. Old `com.example` scope paths below record the pre-FR-P execution state; current package is `com.harrylabs.shreeshyamstore`.
+
 ## task_id
 
 FR-C-QUANTITY-PRICE-CALCULATOR
@@ -47,4 +49,3 @@ QA plus data reviewer.
 - Product UI, Billing UI.
 - Firebase/Auth/Firestore config or code.
 - Package/application id rename.
-

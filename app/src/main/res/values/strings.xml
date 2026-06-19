@@ -205,6 +205,7 @@
     <string name="product_category_label">Category</string>
     <string name="product_mrp_label">MRP *</string>
     <string name="product_mrp_error">Provide a valid numeric MRP.</string>
+    <string name="product_category_error">Please select a valid category.</string>
     <string name="selling_price_label">Selling price (blank uses MRP)</string>
     <string name="example_price_format">e.g. %1$s</string>
     <string name="purchase_price_label">Purchase price (optional)</string>

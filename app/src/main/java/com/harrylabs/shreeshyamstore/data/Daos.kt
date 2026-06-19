@@ -12,14 +12,14 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE deletedAt IS NULL AND isActive = 1 ORDER BY name ASC")
     fun getAllCategories(): Flow<List<Category>>
 
-    @Query("SELECT * FROM categories WHERE id = :id AND deletedAt IS NULL")
-    suspend fun getCategoryById(id: Long): Category?
+    @Query("SELECT * FROM categories WHERE localUuid = :uuid AND deletedAt IS NULL")
+    suspend fun getCategoryById(uuid: String): Category?
 
     @Query("SELECT * FROM categories WHERE name = :name AND deletedAt IS NULL LIMIT 1")
     suspend fun getCategoryByName(name: String): Category?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(category: Category): Long
+    suspend fun insert(category: Category)
 
     @Update
     suspend fun update(category: Category)
@@ -33,17 +33,17 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE deletedAt IS NULL ORDER BY name ASC")
     fun getAllProducts(): Flow<List<Product>>
 
-    @Query("SELECT * FROM products WHERE id = :id AND deletedAt IS NULL")
-    suspend fun getProductById(id: Long): Product?
+    @Query("SELECT * FROM products WHERE localUuid = :uuid AND deletedAt IS NULL")
+    suspend fun getProductById(uuid: String): Product?
 
-    @Query("SELECT * FROM products WHERE id = :id AND deletedAt IS NULL")
-    fun getProductByIdFlow(id: Long): Flow<Product?>
+    @Query("SELECT * FROM products WHERE localUuid = :uuid AND deletedAt IS NULL")
+    fun getProductByIdFlow(uuid: String): Flow<Product?>
 
     @Query("SELECT * FROM products WHERE categoryId = :categoryId AND deletedAt IS NULL ORDER BY name ASC")
-    fun getProductsByCategory(categoryId: Long): Flow<List<Product>>
+    fun getProductsByCategory(categoryId: String): Flow<List<Product>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insert(product: Product): Long
+    suspend fun insert(product: Product)
 
     @Update
     suspend fun update(product: Product)
@@ -54,23 +54,23 @@ interface SaleDao {
     @Query("SELECT * FROM sales WHERE deletedAt IS NULL ORDER BY createdAt DESC")
     fun getAllSales(): Flow<List<Sale>>
 
-    @Query("SELECT * FROM sales WHERE id = :id AND deletedAt IS NULL")
-    suspend fun getSaleById(id: Long): Sale?
+    @Query("SELECT * FROM sales WHERE localUuid = :uuid AND deletedAt IS NULL")
+    suspend fun getSaleById(uuid: String): Sale?
 
     @Query("SELECT * FROM sales WHERE createdAt >= :start AND createdAt <= :end AND deletedAt IS NULL ORDER BY createdAt DESC")
     fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSale(sale: Sale): Long
+    suspend fun insertSale(sale: Sale)
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND deletedAt IS NULL")
-    fun getSaleItemsForSale(saleId: Long): Flow<List<SaleItem>>
+    fun getSaleItemsForSale(saleId: String): Flow<List<SaleItem>>
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND deletedAt IS NULL")
-    suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem>
+    suspend fun getSaleItemsForSaleList(saleId: String): List<SaleItem>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSaleItem(saleItem: SaleItem): Long
+    suspend fun insertSaleItem(saleItem: SaleItem)
 }
 
 @Dao
@@ -78,14 +78,14 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE deletedAt IS NULL AND isActive = 1 ORDER BY name ASC")
     fun getAllCustomers(): Flow<List<Customer>>
 
-    @Query("SELECT * FROM customers WHERE id = :id AND deletedAt IS NULL")
-    suspend fun getCustomerById(id: Long): Customer?
+    @Query("SELECT * FROM customers WHERE localUuid = :uuid AND deletedAt IS NULL")
+    suspend fun getCustomerById(uuid: String): Customer?
 
     @Query("SELECT * FROM customers WHERE name = :name AND deletedAt IS NULL LIMIT 1")
     suspend fun getCustomerByName(name: String): Customer?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCustomer(customer: Customer): Long
+    suspend fun insertCustomer(customer: Customer)
 
     @Update
     suspend fun updateCustomer(customer: Customer)
@@ -100,13 +100,13 @@ interface UdhaarDao {
     fun getAllTransactions(): Flow<List<UdhaarTransaction>>
 
     @Query("SELECT * FROM udhaar_transactions WHERE customerId = :customerId AND deletedAt IS NULL ORDER BY createdAt DESC")
-    fun getTransactionsForCustomer(customerId: Long): Flow<List<UdhaarTransaction>>
+    fun getTransactionsForCustomer(customerId: String): Flow<List<UdhaarTransaction>>
 
     @Query("SELECT * FROM udhaar_transactions WHERE customerId = :customerId AND deletedAt IS NULL")
-    suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction>
+    suspend fun getTransactionsForCustomerList(customerId: String): List<UdhaarTransaction>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTransaction(transaction: UdhaarTransaction): Long
+    suspend fun insertTransaction(transaction: UdhaarTransaction)
 
     @Update
     suspend fun deleteTransaction(transaction: UdhaarTransaction)
@@ -118,10 +118,10 @@ interface StockAdjustmentDao {
     fun getAllAdjustments(): Flow<List<StockAdjustment>>
 
     @Query("SELECT * FROM stock_adjustments WHERE productId = :productId AND deletedAt IS NULL ORDER BY createdAt DESC")
-    fun getAdjustmentsForProduct(productId: Long): Flow<List<StockAdjustment>>
+    fun getAdjustmentsForProduct(productId: String): Flow<List<StockAdjustment>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAdjustment(adjustment: StockAdjustment): Long
+    suspend fun insertAdjustment(adjustment: StockAdjustment)
 }
 
 @Dao

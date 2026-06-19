@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "703624679442",
+    "firebase_url": "https://shreeshyamstore-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "shreeshyamstore",
+    "storage_bucket": "shreeshyamstore.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:703624679442:android:c36bcf4581bcd1f02a48cb",
+        "android_client_info": {
+          "package_name": "com.harrylabs.shreeshyamstore"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAFE1X2fH71SuJ3MNHiQw6Ot4Vg_rq37ck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

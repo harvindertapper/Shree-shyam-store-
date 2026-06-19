@@ -25,6 +25,8 @@ Establish Firestore rules, App Check posture, and budget/cost guardrails before 
 - No broad data sync until rules pass.
 - Enforce signed-in membership on every `shops/{shopId}` path.
 - Block signed-out and cross-shop access.
+- Use the App Check debug provider only for emulator/development; Play Integrity is the production direction.
+- Treat Firebase budget alerts as monitoring, not a hard spending cap.
 - Do not store service-account keys in repo.
 
 ## acceptance_criteria
@@ -32,6 +34,7 @@ Establish Firestore rules, App Check posture, and budget/cost guardrails before 
 - Rules protect user/shop/member/profile/settings/category/product paths.
 - Owner/member access works only within the authorized shop.
 - App Check strategy and budget/cost guardrails are documented.
+- Cost controls include usage monitoring, conservative query/write design, and owner-reviewed alert thresholds.
 - Rules tests or emulator-backed proof exist.
 
 ## required_evidence
@@ -50,4 +53,3 @@ Security/governance plus owner.
 - Sales/stock/udhaar cloud sync.
 - Package rename.
 - Secrets/service-account keys.
-

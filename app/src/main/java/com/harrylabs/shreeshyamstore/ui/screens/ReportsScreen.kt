@@ -254,7 +254,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     )
                                     // Customer name if Udhaar
                                     if (sale.paymentMode == "UDHAAR") {
-                                        val custName = customers.find { it.id == sale.customerId }?.name
+                                        val custName = customers.find { it.localUuid == sale.customerId }?.name
                                             ?: stringResource(R.string.customer_default_name)
                                         Text(
                                             text = stringResource(R.string.reports_credit_client_format, custName),
@@ -307,8 +307,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
 
         // --- DETAILED INVOICE MODAL DIALOG ---
         selectedViewSale?.let { sale ->
-            val saleItems = viewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
-            val custName = customers.find { it.id == sale.customerId }?.name
+            val saleItems = viewModel.getSaleItems(sale.localUuid).collectAsState(initial = emptyList())
+            val custName = customers.find { it.localUuid == sale.customerId }?.name
                 ?: stringResource(R.string.customer_default_name)
 
             Dialog(onDismissRequest = { selectedViewSale = null }) {

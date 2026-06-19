@@ -13,10 +13,13 @@ class ShopRepository(
 ) {
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
-    
-    suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
+
+    suspend fun getCategoryById(uuid: String): Category? = categoryDao.getCategoryById(uuid)
     suspend fun getCategoryByName(name: String): Category? = categoryDao.getCategoryByName(name)
-    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category.markPendingSync())
+    suspend fun insertCategory(category: Category): String {
+        categoryDao.insert(category.markPendingSync())
+        return category.localUuid
+    }
     suspend fun updateCategory(category: Category) = categoryDao.update(category.markPendingSync())
     suspend fun deleteCategory(category: Category) {
         val now = System.currentTimeMillis()
@@ -32,20 +35,23 @@ class ShopRepository(
 
     // Products
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
-    
-    suspend fun getProductById(id: Long): Product? = productDao.getProductById(id)
-    fun getProductByIdFlow(id: Long): Flow<Product?> = productDao.getProductByIdFlow(id)
-    fun getProductsByCategory(categoryId: Long): Flow<List<Product>> = productDao.getProductsByCategory(categoryId)
-    
-    suspend fun insertProduct(product: Product): Long = productDao.insert(product.withLegacyFieldsSyncedToV2())
+
+    suspend fun getProductById(uuid: String): Product? = productDao.getProductById(uuid)
+    fun getProductByIdFlow(uuid: String): Flow<Product?> = productDao.getProductByIdFlow(uuid)
+    fun getProductsByCategory(categoryUuid: String): Flow<List<Product>> = productDao.getProductsByCategory(categoryUuid)
+
+    suspend fun insertProduct(product: Product): String {
+        productDao.insert(product.withLegacyFieldsSyncedToV2())
+        return product.localUuid
+    }
     suspend fun updateProduct(product: Product) = productDao.update(product.withLegacyFieldsSyncedToV2())
 
     // Sales
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
-    
-    suspend fun getSaleById(id: Long): Sale? = saleDao.getSaleById(id)
-    fun getSaleItemsForSale(saleId: Long): Flow<List<SaleItem>> = saleDao.getSaleItemsForSale(saleId)
-    suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem> = saleDao.getSaleItemsForSaleList(saleId)
+
+    suspend fun getSaleById(uuid: String): Sale? = saleDao.getSaleById(uuid)
+    fun getSaleItemsForSale(saleUuid: String): Flow<List<SaleItem>> = saleDao.getSaleItemsForSale(saleUuid)
+    suspend fun getSaleItemsForSaleList(saleUuid: String): List<SaleItem> = saleDao.getSaleItemsForSaleList(saleUuid)
     fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>> = saleDao.getSalesForDateRange(start, end)
 
     /**
@@ -59,16 +65,16 @@ class ShopRepository(
     suspend fun insertSaleWithItems(
         sale: Sale,
         items: List<SaleItem>,
-        selectedCustomerId: Long? = null
-    ): Long {
+        selectedCustomerUuid: String? = null
+    ): String {
         // 1. Insert Sale
-        val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
+        val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerUuid else null
         val finalizedSale = sale.copy(customerId = finalCustomerId)
-        val saleId = saleDao.insertSale(finalizedSale.withLegacyFieldsSyncedToV2())
+        saleDao.insertSale(finalizedSale.withLegacyFieldsSyncedToV2())
 
         // 2. Loop and save each item
         for (item in items) {
-            val itemToSave = item.copy(saleId = saleId)
+            val itemToSave = item.copy(saleId = sale.localUuid)
             val product = productDao.getProductById(item.productId)
             saleDao.insertSaleItem(itemToSave.withLegacyFieldsSyncedToV2(product))
 
@@ -76,7 +82,7 @@ class ShopRepository(
             if (product != null && product.trackStock) {
                 val oldStock = product.currentStock
                 val newStock = oldStock - item.quantity
-                
+
                 // Update product stock
                 val updatedProduct = product.copy(
                     currentStock = newStock,
@@ -86,7 +92,7 @@ class ShopRepository(
 
                 // Create stock adjustment history record
                 val adj = StockAdjustment(
-                    productId = product.id,
+                    productId = product.localUuid,
                     oldStock = oldStock,
                     newStock = newStock,
                     difference = -item.quantity,
@@ -101,7 +107,7 @@ class ShopRepository(
         if (sale.paymentMode == "UDHAAR" && finalCustomerId != null) {
             val udhaarTx = UdhaarTransaction(
                 customerId = finalCustomerId,
-                saleId = saleId,
+                saleId = sale.localUuid,
                 type = "CREDIT",
                 amount = sale.totalAmount,
                 note = "Bill No: ${sale.billNumber}",
@@ -110,15 +116,18 @@ class ShopRepository(
             udhaarDao.insertTransaction(udhaarTx.withLegacyFieldsSyncedToV2())
         }
 
-        return saleId
+        return sale.localUuid
     }
 
     // Customers
     val allCustomers: Flow<List<Customer>> = customerDao.getAllCustomers()
-    
-    suspend fun getCustomerById(id: Long): Customer? = customerDao.getCustomerById(id)
+
+    suspend fun getCustomerById(uuid: String): Customer? = customerDao.getCustomerById(uuid)
     suspend fun getCustomerByName(name: String): Customer? = customerDao.getCustomerByName(name)
-    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer.markPendingSync())
+    suspend fun insertCustomer(customer: Customer): String {
+        customerDao.insertCustomer(customer.markPendingSync())
+        return customer.localUuid
+    }
     suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer.markPendingSync())
     suspend fun deleteCustomer(customer: Customer) {
         val now = System.currentTimeMillis()
@@ -134,15 +143,17 @@ class ShopRepository(
 
     // Udhaar
     val allUdhaarTransactions: Flow<List<UdhaarTransaction>> = udhaarDao.getAllTransactions()
-    
-    fun getTransactionsForCustomer(customerId: Long): Flow<List<UdhaarTransaction>> = 
-        udhaarDao.getTransactionsForCustomer(customerId)
 
-    suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction> = 
-        udhaarDao.getTransactionsForCustomerList(customerId)
+    fun getTransactionsForCustomer(customerUuid: String): Flow<List<UdhaarTransaction>> =
+        udhaarDao.getTransactionsForCustomer(customerUuid)
 
-    suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long = 
+    suspend fun getTransactionsForCustomerList(customerUuid: String): List<UdhaarTransaction> =
+        udhaarDao.getTransactionsForCustomerList(customerUuid)
+
+    suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): String {
         udhaarDao.insertTransaction(transaction.withLegacyFieldsSyncedToV2())
+        return transaction.localUuid
+    }
 
     suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) {
         udhaarDao.deleteTransaction(
@@ -155,22 +166,23 @@ class ShopRepository(
 
     // Stock Adjustments
     val allStockAdjustments: Flow<List<StockAdjustment>> = stockAdjustmentDao.getAllAdjustments()
-    
-    fun getAdjustmentsForProduct(productId: Long): Flow<List<StockAdjustment>> = 
-        stockAdjustmentDao.getAdjustmentsForProduct(productId)
 
-    suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long {
-        return stockAdjustmentDao.insertAdjustment(adjustment.withLegacyFieldsSyncedToV2())
+    fun getAdjustmentsForProduct(productUuid: String): Flow<List<StockAdjustment>> =
+        stockAdjustmentDao.getAdjustmentsForProduct(productUuid)
+
+    suspend fun insertStockAdjustment(adjustment: StockAdjustment): String {
+        stockAdjustmentDao.insertAdjustment(adjustment.withLegacyFieldsSyncedToV2())
+        return adjustment.localUuid
     }
 
     /**
      * Corrects a product stock level manually and lists history
      */
-    suspend fun adjustProductStock(productId: Long, actualStockCounted: Int, reason: String) {
-        val product = productDao.getProductById(productId) ?: return
+    suspend fun adjustProductStock(productUuid: String, actualStockCounted: Int, reason: String) {
+        val product = productDao.getProductById(productUuid) ?: return
         val oldStock = product.currentStock
         val diff = actualStockCounted - oldStock
-        
+
         val updatedProduct = product.copy(
             currentStock = actualStockCounted,
             updatedAt = System.currentTimeMillis()
@@ -178,7 +190,7 @@ class ShopRepository(
         productDao.update(updatedProduct.withLegacyFieldsSyncedToV2())
 
         val adjustment = StockAdjustment(
-            productId = productId,
+            productId = productUuid,
             oldStock = oldStock,
             newStock = actualStockCounted,
             difference = diff,

@@ -1,5 +1,7 @@
 # FR-A-V2-DATA-CALC-DESIGN
 
+> **Completed - do not rerun.** Checkpoint: `0bd189b`.
+
 ## task_id
 
 FR-A-V2-DATA-CALC-DESIGN
@@ -67,4 +69,3 @@ Delivery manager plus data/security reviewer.
 - `.env`, signing files, service-account keys, production credentials
 - Firebase console/project settings
 - Product UI, Billing UI, Room implementation, package rename, Firebase implementation, welcome sound/assets.
-

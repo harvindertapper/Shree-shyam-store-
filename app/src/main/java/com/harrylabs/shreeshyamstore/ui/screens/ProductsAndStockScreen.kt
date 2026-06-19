@@ -48,7 +48,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
     val categories by viewModel.categories.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
     var showCategoryManagerDialog by remember { mutableStateOf(false) }
 
     val filteredProducts = remember(products, searchQuery, selectedCategoryId) {
@@ -129,8 +129,8 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                 }
                 items(categories) { cat ->
                     FilterChip(
-                        selected = selectedCategoryId == cat.id,
-                        onClick = { selectedCategoryId = cat.id },
+                        selected = selectedCategoryId == cat.localUuid,
+                        onClick = { selectedCategoryId = cat.localUuid },
                         label = { Text(cat.name, fontWeight = FontWeight.Bold) }
                     )
                 }
@@ -159,7 +159,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                     }
                 } else {
                     items(filteredProducts) { prod ->
-                        val catName = categories.find { it.id == prod.categoryId }?.name
+                        val catName = categories.find { it.localUuid == prod.categoryId }?.name
                             ?: stringResource(R.string.category_miscellaneous)
 
                         Card(
@@ -252,14 +252,14 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                 ) {
                                     // Adjustment button
                                     if (prod.trackStock) {
-                                        IconButton(onClick = { viewModel.navigateTo(Screen.StockAdjustment(prod.id)) }) {
+                                        IconButton(onClick = { viewModel.navigateTo(Screen.StockAdjustment(prod.localUuid)) }) {
                                             Icon(Icons.Default.EditCalendar, contentDescription = stringResource(R.string.content_description_adjust_stock), tint = Color.DarkGray)
                                         }
                                     }
 
                                     IconButton(
-                                        onClick = { viewModel.navigateTo(Screen.AddEditProduct(prod.id)) },
-                                        modifier = Modifier.testTag("edit_product_${prod.id}")
+                                        onClick = { viewModel.navigateTo(Screen.AddEditProduct(prod.localUuid)) },
+                                        modifier = Modifier.testTag("edit_product_${prod.localUuid}")
                                     ) {
                                         Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.content_description_edit_product), tint = MaterialTheme.colorScheme.primary)
                                     }
@@ -388,12 +388,12 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
+fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
     val context = LocalContext.current
     val categories by viewModel.categories.collectAsState()
 
     var name by remember { mutableStateOf("") }
-    var categoryId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
+    var categoryId by remember { mutableStateOf<String>(categories.firstOrNull()?.localUuid ?: "") }
     var mrp by remember { mutableStateOf("") }
     var sellingPrice by remember { mutableStateOf("") }
     var purchasePrice by remember { mutableStateOf("") }
@@ -421,6 +421,15 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 currentStock = prod.currentStock.toString()
                 lowStockQty = prod.lowStockAlertQty.toString()
                 isActive = prod.isActive
+            }
+        }
+    }
+
+    LaunchedEffect(categories) {
+        if (productId == null && categoryId.isBlank() && categories.isNotEmpty()) {
+            val firstValid = categories.firstOrNull { it.localUuid.isNotBlank() }
+            if (firstValid != null) {
+                categoryId = firstValid.localUuid
             }
         }
     }
@@ -463,7 +472,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             // Category Selection Spinner Box
             var catDropdownExpanded by remember { mutableStateOf(false) }
             val selectedCategoryName = remember(categoryId, categories) {
-                categories.find { it.id == categoryId }?.name
+                categories.find { it.localUuid == categoryId }?.name
             }
             val fallbackCategoryName = stringResource(R.string.category_miscellaneous)
 
@@ -501,7 +510,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                         DropdownMenuItem(
                             text = { Text(cat.name, fontWeight = FontWeight.Bold) },
                             onClick = {
-                                categoryId = cat.id
+                                categoryId = cat.localUuid
                                 catDropdownExpanded = false
                             }
                         )
@@ -615,10 +624,13 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     if (mrpValue == null || mrpValue <= 0.0) {
                         mrpError = true
                     }
+                    if (categoryId.isBlank()) {
+                        Toast.makeText(context, context.getString(R.string.product_category_error), Toast.LENGTH_SHORT).show()
+                    }
 
-                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0.0) {
+                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0.0 && categoryId.isNotBlank()) {
                         viewModel.saveProduct(
-                            id = productId ?: 0L,
+                            uuid = productId,
                             name = name,
                             categoryId = categoryId,
                             mrp = mrpValue,
@@ -656,7 +668,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
 
-    var selectedCatId by remember { mutableStateOf<Long?>(null) }
+    var selectedCatId by remember { mutableStateOf<String?>(null) }
     
     // Quick Add input values
     var name by remember { mutableStateOf("") }
@@ -667,8 +679,11 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
     val openingValidationToast = stringResource(R.string.opening_validation_toast)
 
     LaunchedEffect(categories) {
-        if (selectedCatId == null && categories.isNotEmpty()) {
-            selectedCatId = categories.first().id
+        if ((selectedCatId == null || selectedCatId.isNullOrBlank()) && categories.isNotEmpty()) {
+            val firstValid = categories.firstOrNull { it.localUuid.isNotBlank() }
+            if (firstValid != null) {
+                selectedCatId = firstValid.localUuid
+            }
         }
     }
 
@@ -712,8 +727,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
             ) {
                 items(categories) { cat ->
                     FilterChip(
-                        selected = selectedCatId == cat.id,
-                        onClick = { selectedCatId = cat.id },
+                        selected = selectedCatId == cat.localUuid,
+                        onClick = { selectedCatId = cat.localUuid },
                         label = { Text(cat.name) }
                     )
                 }
@@ -736,7 +751,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         Text(
                             stringResource(
                                 R.string.opening_fast_add_category_format,
-                                categories.find { it.id == catId }?.name
+                                categories.find { it.localUuid == catId }?.name
                                     ?: stringResource(R.string.category_miscellaneous)
                             ),
                             fontSize = 15.sp,
@@ -815,9 +830,11 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
 
                                 if (name.trim().isEmpty() || mrpValue == null) {
                                     Toast.makeText(context, openingValidationToast, Toast.LENGTH_SHORT).show()
+                                } else if (catId.isBlank()) {
+                                    Toast.makeText(context, context.getString(R.string.product_category_error), Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.saveProduct(
-                                        id = 0L, // insert new
+                                        uuid = null, // insert new
                                         name = name,
                                         categoryId = catId,
                                         mrp = mrpValue,
@@ -902,7 +919,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                             // Edit counts indicator to change errors quickly
                                             IconButton(onClick = {
                                                 viewModel.saveProduct(
-                                                    id = itemInfo.id,
+                                                    uuid = itemInfo.localUuid,
                                                     name = itemInfo.name,
                                                     categoryId = itemInfo.categoryId,
                                                     mrp = itemInfo.mrp,
@@ -936,7 +953,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
+fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: String) {
     val context = LocalContext.current
     var product by remember { mutableStateOf<Product?>(null) }
     var countedStock by remember { mutableStateOf("") }
@@ -1061,7 +1078,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     Toast.makeText(context, validStockToast, Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.adjustStock(
-                                        productId = productId,
+                                        productUuid = productId,
                                         actualStockCounted = countVal,
                                         reason = selectedReason
                                     )

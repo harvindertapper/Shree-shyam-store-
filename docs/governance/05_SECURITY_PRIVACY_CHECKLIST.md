@@ -62,10 +62,15 @@ Status: Governance source of truth. Review this before auth, data, payment, back
 - [ ] Owner UID to shop membership mapping is documented and tested.
 - [ ] Firestore security rules enforce per-shop ownership/membership on every collection.
 - [ ] App Check, abuse controls, quota/cost monitoring, and rate-limit strategy are reviewed before production.
+- [ ] App Check uses the debug provider only for emulator/development; Play Integrity is the production direction.
+- [ ] Firebase budget alerts are configured as monitoring only and are not described as a hard spending cap.
+- [ ] Android Firebase implementation uses the main `firebase-auth` and `firebase-firestore` modules.
+- [ ] Sign in with Google uses Android Credential Manager rather than legacy Google Sign-In client APIs.
 - [ ] Budget/cost guardrails are reviewed before product/category/settings sync.
 - [ ] Firestore indexes, backup/export, retention, and delete/account recovery expectations are documented.
 - [ ] No customer phone numbers, sales records, invoices, QR URIs, or udhaar balances are exposed in logs, analytics, screenshots, crash reports, or public documents.
 - [ ] Offline writes, conflict handling, and restore flows are tested for clear storage, reinstall, and second device.
+- [ ] Firestore offline persistence is not treated as a complete conflict solution; sales, stock, and udhaar require idempotency, append-only records, and reconciliation rules.
 - [ ] Security rules have automated or emulator-backed tests before cloud data sync is accepted.
 
 ## Release

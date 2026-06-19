@@ -10,7 +10,7 @@ Governance and future work must stay aligned to the Shree Shyam Store kiryana-sh
 
 The app is not a payment verification system. Cash, UPI, and udhaar entries are business records entered by the user unless a future approved integration verifies payment.
 
-Owner decision on 2026-06-17: cloud sync/auth is mandatory MVP foundation. Firebase Auth and Firestore planning must happen before Billing Phase 2 hardening.
+Owner decision on 2026-06-17: cloud sync/auth is mandatory MVP foundation. Firebase prerequisites, Auth/shop restore, rules/App Check/cost controls, and inventory restore gates must pass before Billing Phase 2 hardening.
 
 Owner decision on 2026-06-17: final Android application id, namespace, Firebase app identity, and Play Store identity must be `com.harrylabs.shreeshyamstore`. Firebase Auth, Google Sign-In, SHA keys, and `google-services.json` must not be configured against the old random application id.
 
@@ -40,7 +40,7 @@ M02F-A/DM-004 architecture decision: use a hybrid phased migration with Firestor
 - Customer udhaar ledger and payment entry.
 - Reports screen with sales summaries and history.
 - Settings screen with shop profile, language switch, static Paytm QR image URI, welcome chant, and logout.
-- Firebase Auth/Firestore dependencies may exist, but no accepted Firebase architecture or implementation is active yet.
+- The hybrid Firestore/Room architecture is accepted. A Firebase BoM entry exists, but Firebase Auth, Google Sign-In, Firestore integration, cloud restore, rules deployment, and App Check are not implemented yet.
 
 ## Core Workflows
 
@@ -102,7 +102,7 @@ Future unit/measurement data must support loose kiryana goods without forcing pi
 ## Privacy and Security Expectations
 
 - The app should be offline-capable but cloud-backed for ownership, recovery, and future multi-device operation.
-- Firebase Auth/Firestore must not sync sensitive data until security rules, ownership, privacy, and migration strategy are approved.
+- Firebase Auth/Firestore must not sync sensitive data until security rules, ownership, privacy, migration, and conflict controls are implemented and verified.
 - Customer and sales data must be treated as sensitive business records.
 - Password storage must be hardened before production release.
 - Database migrations must preserve existing shop data.
@@ -137,15 +137,19 @@ Out of scope until explicitly approved:
 - GST/tax filing or legal compliance claims beyond owner-approved user-entered invoice fields.
 - AI-generated business decisions.
 
-## TBD Decisions
+## Accepted Foundation Decisions
 
-- `Accepted`: final Android application id and namespace target is `com.harrylabs.shreeshyamstore`.
+- Final Android application id and namespace are `com.harrylabs.shreeshyamstore`.
+- Firestore becomes canonical over time while Room remains the local working cache/offline store.
+- Room v2 and the v1-only reset allowance are implemented.
+- Money uses `Long` paise and quantity uses `Long` base units: count, grams, and ml.
+- Per-line billing rate override is part of the accepted billing foundation and must not mutate product master pricing.
+
+## Remaining Owner Decisions
+
 - `TBD - owner decision required`: Firebase project id, dev/prod project policy, Firestore region, SHA-1/SHA-256 keys, `google-services.json` handling, budget/cost guardrails, and App Check strategy.
-- `TBD - owner decision required`: Firebase Auth providers for MVP. Default planning assumption is Google Sign-In first, phone OTP later/optional.
-- `TBD - owner decision required`: Firestore region, billing/cost controls, backup/export policy, and retention expectations.
-- `TBD - owner decision required`: approve or revise the M02F-A hybrid source-of-truth recommendation.
-- `TBD - owner decision required`: local Room cache versus Firestore source-of-truth boundaries and conflict policy.
-- `TBD - owner decision required`: unit list, decimal precision, and base-unit quantity strategy for loose/weight-based products.
+- `TBD - owner decision required`: Auth provider rollout details. Current implementation direction is Android Credential Manager Sign in with Google first; phone OTP remains later/optional.
+- `TBD - owner decision required`: App Check enforcement timing, Firebase cost monitoring, backup/export policy, and retention expectations.
 - `TBD - owner decision required`: production credential hardening approach for local login.
 - `TBD - owner decision required`: whether to remove all AI Studio/Gemini scaffolding and unused network dependencies.
 - `TBD - owner decision required`: Android backup policy for customer/sales data before release.
