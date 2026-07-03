@@ -316,6 +316,8 @@
     <string name="credit_open_account">खाता खोलें</string>
     <string name="credit_account_details">खाता विवरण</string>
     <string name="credit_receive_payment">भुगतान प्राप्त करें</string>
+    <string name="credit_share_reminder">रिमाइंडर शेयर करें</string>
+    <string name="credit_reminder_default_note">सुविधा अनुसार भुगतान कर दें।</string>
     <string name="content_description_receive_payment">भुगतान प्राप्त करें</string>
     <string name="credit_outstanding_due">कुल बकाया उधार</string>
     <string name="credit_transaction_history">लेन-देन इतिहास:</string>

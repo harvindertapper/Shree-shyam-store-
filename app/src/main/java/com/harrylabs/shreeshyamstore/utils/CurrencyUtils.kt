@@ -7,18 +7,12 @@ object CurrencyUtils {
     fun formatRupees(amount: Double): String {
         return try {
             val format = NumberFormat.getCurrencyInstance(Locale("en", "IN"))
-            var formatted = format.format(amount)
-            // Replace INR or Rs. with the classic ₹ symbol
-            formatted = formatted
+            val formatted = format.format(amount)
                 .replace("Rs.", "₹")
                 .replace("INR", "₹")
                 .replace("Rs", "₹")
                 .trim()
-            if (!formatted.contains("₹")) {
-                "₹$formatted"
-            } else {
-                formatted
-            }
+            if (formatted.contains("₹")) formatted else "₹$formatted"
         } catch (e: Exception) {
             String.format("₹%.2f", amount)
         }

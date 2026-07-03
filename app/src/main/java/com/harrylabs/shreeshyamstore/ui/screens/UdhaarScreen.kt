@@ -1,5 +1,6 @@
 package com.harrylabs.shreeshyamstore.ui.screens
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +32,7 @@ import com.harrylabs.shreeshyamstore.R
 import com.harrylabs.shreeshyamstore.data.Customer
 import com.harrylabs.shreeshyamstore.utils.CurrencyUtils
 import com.harrylabs.shreeshyamstore.utils.DateTimeUtils
+import com.harrylabs.shreeshyamstore.utils.UdhaarReminderFormatter
 import com.harrylabs.shreeshyamstore.viewmodel.Screen
 import com.harrylabs.shreeshyamstore.viewmodel.ShopViewModel
 import com.harrylabs.shreeshyamstore.ui.theme.*
@@ -347,6 +349,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 @Composable
 fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: String) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
     var customer by remember { mutableStateOf<Customer?>(null) }
     var currentBalance by remember { mutableStateOf(0.0) }
 
@@ -446,6 +449,42 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: String) {
                                 fontSize = 14.sp,
                                 color = Color.DarkGray
                             )
+                        }
+                        if (currentBalance > 0.01) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val reminderText = UdhaarReminderFormatter.buildReminderMessage(
+                                        shopName = settings.shopName,
+                                        customerName = cust.name,
+                                        balanceRupees = currentBalance,
+                                        paymentNote = context.getString(R.string.credit_reminder_default_note)
+                                    )
+                                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "text/plain"
+                                        putExtra(Intent.EXTRA_TEXT, reminderText)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(
+                                            sendIntent,
+                                            context.getString(R.string.credit_share_reminder)
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.testTag("share_credit_reminder_button")
+                            ) {
+                                Icon(
+                                    Icons.Default.Share,
+                                    contentDescription = null,
+                                    tint = ErrorRed
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.credit_share_reminder),
+                                    color = ErrorRed,
+                                    fontWeight = FontWeight.Black
+                                )
+                            }
                         }
                     }
                 }

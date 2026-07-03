@@ -317,6 +317,8 @@
     <string name="credit_open_account">Open account</string>
     <string name="credit_account_details">Account details</string>
     <string name="credit_receive_payment">Receive payment</string>
+    <string name="credit_share_reminder">Share reminder</string>
+    <string name="credit_reminder_default_note">Please pay when convenient.</string>
     <string name="content_description_receive_payment">Receive payment</string>
     <string name="credit_outstanding_due">Outstanding due</string>
     <string name="credit_transaction_history">Transaction history:</string>
