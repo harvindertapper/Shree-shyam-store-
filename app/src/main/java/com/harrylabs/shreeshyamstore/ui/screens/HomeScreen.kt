@@ -27,12 +27,14 @@ import com.harrylabs.shreeshyamstore.utils.CurrencyUtils
 import com.harrylabs.shreeshyamstore.utils.DateTimeUtils
 import com.harrylabs.shreeshyamstore.viewmodel.Screen
 import com.harrylabs.shreeshyamstore.viewmodel.ShopViewModel
+import com.harrylabs.shreeshyamstore.viewmodel.SyncState
 
 @Composable
 fun HomeScreen(viewModel: ShopViewModel) {
     val settings by viewModel.storeSettings.collectAsState()
     val sales by viewModel.salesHistory.collectAsState()
     val products by viewModel.products.collectAsState()
+    val syncState by viewModel.syncState.collectAsState()
 
     // Determine bounds for Today
     val startOfDay = remember { DateTimeUtils.getStartOfDay() }
@@ -100,6 +102,11 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            SyncStatusBanner(
+                syncState = syncState,
+                onRetry = viewModel::retrySyncNow
+            )
+
             // --- MAIN SALES CARD ---
             Card(
                 colors = CardDefaults.cardColors(containerColor = SaffronLight),
@@ -361,6 +368,82 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SyncStatusBanner(
+    syncState: SyncState,
+    onRetry: () -> Unit
+) {
+    when (syncState) {
+        SyncState.Syncing -> {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = SaffronLight),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, SaffronPrimary),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
+                        color = SaffronDark
+                    )
+                    Text(
+                        text = stringResource(R.string.sync_status_syncing),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextNearBlack
+                    )
+                }
+            }
+        }
+
+        is SyncState.Error -> {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = ErrorRed.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, ErrorRed),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.sync_status_error_title),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = ErrorRed
+                    )
+                    Text(
+                        text = stringResource(R.string.sync_status_error_message),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextNearBlack
+                    )
+                    Text(
+                        text = syncState.message,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = TextMediumGray
+                    )
+                    TextButton(onClick = onRetry) {
+                        Text(
+                            text = stringResource(R.string.action_retry_sync),
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                }
+            }
+        }
+
+        else -> Unit
     }
 }
 

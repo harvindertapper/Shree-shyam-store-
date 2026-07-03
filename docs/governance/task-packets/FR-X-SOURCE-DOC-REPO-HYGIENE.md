@@ -1,5 +1,7 @@
 # FR-X-SOURCE-DOC-REPO-HYGIENE
 
+> Historical/Superseded as of 2026-07-02. This packet described the post-`b7d92f2` cleanup state when Room v2 was current and Firebase Auth/Firestore were not yet implemented. Current source-of-truth status is Room v4 with Firebase Auth as the runtime owner identity direction, FR-G local implementation in progress, and the professional delivery route tracked in `docs/IMPLEMENTATION_PLAN.md` plus `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md`.
+
 ## task_id
 
 FR-X-SOURCE-DOC-REPO-HYGIENE
@@ -340,4 +342,3 @@ Return:
 ## Next recommended task
 - Firebase project/config and Auth implementation route; do not create another docs-cleanup packet.
 ```
-

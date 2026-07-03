@@ -6,7 +6,7 @@ Status: M02F-A recommendation accepted by owner as part of DM-004 foundation res
 
 Use a hybrid phased migration that moves Shree Shyam Store toward Firestore as the canonical cloud source of truth while keeping Room as the local working cache and offline transaction store.
 
-This is the safest MVP path for a real kiryana shop because the current app already uses Room for products, sales, stock, customers, and udhaar, while the owner requirement now requires cloud-backed recovery after clear storage, reinstall, phone loss, and future device change.
+This is the safest professional path for a real kiryana shop because the current app already uses Room for products, sales, stock, customers, and udhaar, while the owner requirement requires cloud-backed recovery after clear storage, reinstall, phone loss, and future device change.
 
 Do not implement Firebase code until the config, Auth, Firestore data model, security rules, migration, offline/conflict, and QA packets are accepted.
 
@@ -32,11 +32,11 @@ Cons:
 
 - Requires explicit sync metadata, conflict handling, migration, and QA.
 - Requires careful security rules and shop membership checks.
-- Adds more architecture work before Billing Phase 2.
+- Adds more architecture work before billing hardening.
 
 ### Firestore Direct With SDK Offline Persistence
 
-Not recommended as the immediate MVP architecture.
+Not recommended as the immediate professional architecture.
 
 Pros:
 
@@ -52,7 +52,7 @@ Cons:
 
 ### Local Room With Manual Backup Only
 
-Rejected for MVP foundation.
+Rejected for the professional foundation.
 
 Pros:
 
@@ -74,7 +74,7 @@ Recommended cloud identity boundary:
 - `shops/{shopId}/members/{uid}`: membership document with `role`, `status`, `createdAt`, `updatedAt`, and future permission flags.
 - Optional later index: `users/{uid}/shopMemberships/{shopId}` for faster shop lookup after login.
 
-MVP behavior:
+Current product behavior:
 
 - Firebase Auth UID identifies the signed-in owner.
 - First signed-in owner creates a shop and receives `role = "owner"`.
@@ -82,9 +82,9 @@ MVP behavior:
 - Only one active shop should be exposed in UI for now. Multi-store UI remains deferred.
 - Staff membership may be modeled in documents now, but staff-role UI and permission management remain deferred.
 
-Remaining implementation decision:
+Resolved implementation decision:
 
-- Whether the existing local Room `User` table remains a transitional local login fallback, is linked to the Firebase UID, or is replaced by Firebase Auth in the MVP path.
+- Firebase Auth replaces local owner login in the runtime path. The old local Room `User` table is removed in Room v4, and Room v5 adds a retryable local sync outbox for cloud-sync reliability.
 
 ## Data-Domain Strategy
 
@@ -134,7 +134,7 @@ Architecture rule:
 
 ## Offline And Conflict Strategy
 
-Practical MVP stance:
+Practical professional stance:
 
 - Sign-in, first cloud restore, and first shop creation need internet.
 - Once the shop profile and selected domains are cached, the app should remain usable offline for daily counter work.
@@ -219,7 +219,13 @@ Required before syncing sensitive data:
 
 ## Foundation Implementation Slices
 
-After the app identity rename and Firebase prerequisites are accepted, the first Firebase implementation slice should be:
+Current implementation status:
+
+- App identity rename and Firebase project/config prerequisites are complete.
+- Firebase Auth/shop profile implementation exists locally, but final live Google Sign-In/shop-profile acceptance remains pending.
+- The next sync work must follow the professional delivery plan with restore gates, visible pending/error sync state, retry, idempotency, and rules coverage.
+
+The initial Firebase implementation slice was:
 
 1. Firebase SDK/config scaffold using owner-approved project/config policy.
 2. Firebase Auth using Android Credential Manager Sign in with Google or another explicitly owner-approved provider.
@@ -228,9 +234,9 @@ After the app identity rename and Firebase prerequisites are accepted, the first
 5. Create/restore owner membership.
 6. Sync shop profile/settings first.
 
-After Firestore rules, App Check posture, and cost guardrails pass, the next cloud slice must sync product/category/settings before real inventory entry.
+After Firestore rules, App Check posture, and cost guardrails pass, the next cloud slice must sync product/category/settings before real inventory entry. Because owner testing already exposed clear-storage product/credit loss, customer/udhaar sync must follow immediately before real credit records are trusted.
 
-Product/category/settings sync must happen before real shop inventory entry. Do not sync sales, stock adjustments, customers, or udhaar in the first Firebase slice.
+Product/category/settings sync must happen before real shop inventory entry. Sales, sale items, stock adjustments, customers, and udhaar require the later professional sync engine with append-only records, idempotency, and restore proof.
 
 ## Android Firebase Implementation Guidance
 
@@ -238,30 +244,24 @@ Product/category/settings sync must happen before real shop inventory entry. Do 
 - Use Android Credential Manager for Sign in with Google.
 - Use the App Check debug provider only for emulator/development. Play Integrity is the production direction.
 - Firebase budget alerts monitor spending but do not hard-cap charges; production cost controls also need quotas, usage monitoring, and conservative query/write design.
-- The Firebase BoM entry currently present in Gradle does not mean Auth or Firestore is integrated.
+- The presence of Firebase dependencies or local code does not mean the professional restore/sync path is accepted; live sign-in and clear-storage restore evidence are still required.
 
 ## Owner Decisions Needed
 
-- Firebase project id, Android app registration for `com.harrylabs.shreeshyamstore`, and environment split.
-- Whether `google-services.json` can be committed as public client config or must be provisioned another way.
-- MVP Auth provider: Google Sign-In recommended; phone OTP later/optional.
-- Firestore region and billing/cost guardrails.
-- SHA-1 and SHA-256 keys for the final application id.
+- Dev/prod environment split.
+- App Check enforcement timing.
+- Firestore delete protection/PITR posture and billing/cost guardrails.
 - App Check strategy.
-- Existing local data migration behavior.
-- Whether local Room `User` remains transitional or Firebase Auth replaces local login.
+- Existing local data migration and cloud restore behavior for product/customer/sale data.
 - Exact Product UI exposure for packet/box/custom units; the accepted foundation already uses count, grams, and ml base units.
 - Retention/delete/account recovery expectations.
 - Whether manual encrypted backup/export remains after Firebase recovery.
 
 ## Blocked Until Later Packets
 
-- Billing Phase 2.
-- Product/stock/billing unit implementation.
-- Firebase SDK, Gradle plugin, `google-services.json`, or Kotlin app code.
-- Firestore rules deployment.
+- Billing hardening until the owner trust/sync gates are stable.
+- Broad trusted product/customer/sales sync until App Check/cost posture, rules, restore gates, and idempotency are implemented.
 - Staff role UI or permissions implementation.
 - Phone OTP implementation.
-- Sync of products, sales, customers, udhaar, stock adjustments, or invoice data.
-- Future Room schema changes beyond implemented v2 fields.
+- Future Room schema changes beyond Room v5 without intentional migration.
 - Service-account keys, signing secrets, `.env`, or production credentials in repo.

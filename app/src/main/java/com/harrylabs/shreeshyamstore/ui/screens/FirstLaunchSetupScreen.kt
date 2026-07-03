@@ -1,5 +1,9 @@
 package com.harrylabs.shreeshyamstore.ui.screens
 
+import android.widget.Toast
+import com.harrylabs.shreeshyamstore.viewmodel.AuthState
+import androidx.compose.ui.platform.LocalContext
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -30,11 +34,14 @@ import com.harrylabs.shreeshyamstore.viewmodel.ShopViewModel
 
 @Composable
 fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
+    val context = LocalContext.current
+    val authState by viewModel.authState.collectAsState()
     var shopName by remember { mutableStateOf("") }
     var ownerPhone by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
 
     var shopNameError by remember { mutableStateOf(false) }
+    var ownerPhoneError by remember { mutableStateOf(false) }
     val defaultShopName = stringResource(R.string.default_shop_name)
 
     LaunchedEffect(defaultShopName) {
@@ -151,7 +158,10 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                         // Phone number
                         AppOutlinedTextField(
                             value = ownerPhone,
-                            onValueChange = { ownerPhone = it },
+                            onValueChange = {
+                                ownerPhone = it
+                                if (isValidOwnerPhone(it)) ownerPhoneError = false
+                            },
                             label = stringResource(R.string.owner_phone_label),
                             leadingIcon = { 
                                 Icon(
@@ -164,6 +174,24 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                 keyboardType = KeyboardType.Phone
                             ),
+                            isError = ownerPhoneError,
+                            supportingText = {
+                                if (ownerPhoneError) {
+                                    Text(
+                                        text = stringResource(R.string.owner_phone_required_or_invalid),
+                                        color = ErrorRed,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 13.sp
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.owner_phone_supporting_text),
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextMutedGray,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("owner_phone_input")
@@ -224,30 +252,51 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Start Button
-                AppPrimaryButton(
-                    text = stringResource(R.string.setup_start_app),
-                    onClick = {
-                        if (shopName.trim().isEmpty()) {
-                            shopNameError = true
-                        } else {
-                            viewModel.updateSettings(
-                                shopName = shopName.trim(),
-                                ownerPhone = ownerPhone.trim(),
-                                welcomeChantEnabled = welcomeChantEnabled,
-                                qrImageUri = "" // blank initially
-                            )
-                            viewModel.completeFirstLaunch()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp)
-                        .testTag("start_app_button")
-                )
+                // Start Button or Progress Indicator
+                if (authState is AuthState.Loading) {
+                    CircularProgressIndicator(
+                        color = SaffronPrimary,
+                        modifier = Modifier
+                            .size(44.dp)
+                            .testTag("setup_progress")
+                    )
+                } else {
+                    AppPrimaryButton(
+                        text = stringResource(R.string.setup_start_app),
+                        onClick = {
+                            if (shopName.trim().isEmpty()) {
+                                shopNameError = true
+                            } else if (!isValidOwnerPhone(ownerPhone)) {
+                                ownerPhoneError = true
+                            } else {
+                                viewModel.createShop(
+                                    shopName = shopName.trim(),
+                                    ownerPhone = ownerPhone.trim(),
+                                    welcomeChantEnabled = welcomeChantEnabled,
+                                    context = context,
+                                    onSuccess = {
+                                        Toast.makeText(context, context.getString(R.string.settings_saved_toast), Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { error ->
+                                        Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .testTag("start_app_button")
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(30.dp))
             }
         }
     }
+}
+
+private fun isValidOwnerPhone(ownerPhone: String): Boolean {
+    val trimmedPhone = ownerPhone.trim()
+    return trimmedPhone.length in 10..15 && trimmedPhone.all { it.isDigit() }
 }

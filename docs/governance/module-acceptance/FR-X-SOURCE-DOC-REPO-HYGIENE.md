@@ -1,5 +1,7 @@
 # FR-X-SOURCE-DOC-REPO-HYGIENE Acceptance
 
+> Historical/Superseded as of 2026-07-02. This acceptance note recorded the post-`b7d92f2` Room v2/Firebase-not-yet-implemented cleanup state. Current source-of-truth status is Room v4, Firebase Auth as runtime owner identity direction, FR-G local implementation in progress, and professional delivery routing through `docs/IMPLEMENTATION_PLAN.md` plus `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md`.
+
 ## Decision
 
 PASS.

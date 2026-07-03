@@ -18,7 +18,7 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
-class RoomV3UUIDSchemaTest {
+class RoomV4UUIDSchemaTest {
     private var database: AppDatabase? = null
 
     @After
@@ -27,22 +27,22 @@ class RoomV3UUIDSchemaTest {
     }
 
     @Test
-    fun roomDatabaseVersionIsV3() {
-        assertEquals(3, AppDatabase.ROOM_SCHEMA_VERSION)
+    fun roomDatabaseVersionIsV5() {
+        assertEquals(5, AppDatabase.ROOM_SCHEMA_VERSION)
     }
 
     @Test
-    fun freshRoomV3DatabaseSeedsDefaultCategoriesAndIncludesV3Columns() = runTest {
+    fun freshRoomV5DatabaseSeedsDefaultCategoriesAndIncludesV5Columns() = runTest {
         val db = createDatabase()
 
-        val categoryNames = db.categoryDao().getAllCategories().first().map { it.name }
+        val categoryNames = db.awaitCategoryNamed("Grocery").map { it.name }
 
         assertTrue(categoryNames.contains("Biscuits"))
         assertTrue(categoryNames.contains("Grocery"))
         assertTrue(categoryNames.contains("Dairy"))
 
         // Verify localUuid is present and legacy id is NOT present
-        assertV3Schema(db.openHelper.readableDatabase)
+        assertV5Schema(db.openHelper.readableDatabase)
     }
 
     @Test
@@ -67,7 +67,7 @@ class RoomV3UUIDSchemaTest {
             .allowMainThreadQueries()
             .build()
 
-        val categories = db.categoryDao().getAllCategories().first()
+        val categories = db.awaitCategoryNamed("Grocery")
         // Verify V1 Category is removed (since database was reset)
         assertFalse(categories.any { it.name == "V1 Category" })
         // Verify default categories are reseeded
@@ -99,7 +99,7 @@ class RoomV3UUIDSchemaTest {
             .allowMainThreadQueries()
             .build()
 
-        val categories = db.categoryDao().getAllCategories().first()
+        val categories = db.awaitCategoryNamed("Grocery")
         // Verify V2 Category is removed
         assertFalse(categories.any { it.name == "V2 Category" })
         // Verify default categories are reseeded
@@ -114,12 +114,12 @@ class RoomV3UUIDSchemaTest {
         val db = createDatabase()
         val repository = ShopRepository(
             categoryDao = db.categoryDao(),
+            syncOutboxDao = db.syncOutboxDao(),
             productDao = db.productDao(),
             saleDao = db.saleDao(),
             customerDao = db.customerDao(),
             udhaarDao = db.udhaarDao(),
-            stockAdjustmentDao = db.stockAdjustmentDao(),
-            userDao = db.userDao()
+            stockAdjustmentDao = db.stockAdjustmentDao()
         )
 
         // 1. Setup Customer & Category & Product
@@ -191,6 +191,62 @@ class RoomV3UUIDSchemaTest {
         assertEquals(76.0, transactions[0].amount, 0.01)
     }
 
+    @Test
+    fun shopSnapshotIncludesAndRestoresSalesSaleItemsAndStockAdjustments() = runTest {
+        val db = createDatabase()
+        val repository = ShopRepository(
+            categoryDao = db.categoryDao(),
+            syncOutboxDao = db.syncOutboxDao(),
+            productDao = db.productDao(),
+            saleDao = db.saleDao(),
+            customerDao = db.customerDao(),
+            udhaarDao = db.udhaarDao(),
+            stockAdjustmentDao = db.stockAdjustmentDao()
+        )
+
+        val category = Category(name = "Grocery")
+        db.categoryDao().insert(category)
+        val product = Product(
+            name = "Sugar",
+            categoryId = category.localUuid,
+            mrp = 47.0,
+            sellingPrice = 47.0,
+            currentStock = 10,
+            trackStock = true
+        )
+        db.productDao().insert(product)
+        val customer = Customer(name = "Ramesh")
+        db.customerDao().insertCustomer(customer)
+        val sale = Sale(
+            billNumber = "BILL-RESTORE-001",
+            totalAmount = 94.0,
+            paymentMode = "UDHAAR",
+            customerId = customer.localUuid
+        )
+        val item = SaleItem(
+            saleId = sale.localUuid,
+            productId = product.localUuid,
+            productNameSnapshot = product.name,
+            quantity = 2,
+            unitPrice = 47.0,
+            lineTotal = 94.0
+        )
+
+        repository.insertSaleWithItems(sale, listOf(item), customer.localUuid)
+
+        val snapshot = repository.getShopDataSnapshot()
+        assertEquals(1, snapshot.sales.size)
+        assertEquals(1, snapshot.saleItems.size)
+        assertEquals(1, snapshot.stockAdjustments.size)
+
+        repository.replaceLocalShopDataFromSnapshot(db, snapshot)
+
+        assertNotNull(repository.getSaleById(sale.localUuid))
+        assertEquals(1, repository.getSaleItemsForSaleList(sale.localUuid).size)
+        assertEquals(1, db.stockAdjustmentDao().getAdjustmentsForProduct(product.localUuid).first().size)
+        assertEquals(1, db.udhaarDao().getTransactionsForCustomer(customer.localUuid).first().size)
+    }
+
     private fun createDatabase(): AppDatabase {
         val context = ApplicationProvider.getApplicationContext<Context>()
         return Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
@@ -200,15 +256,37 @@ class RoomV3UUIDSchemaTest {
             .also { database = it }
     }
 
-    private fun assertV3Schema(db: SupportSQLiteDatabase) {
-        val tables = listOf(
+    private suspend fun AppDatabase.awaitCategoryNamed(categoryName: String): List<Category> {
+        repeat(50) {
+            val categories = categoryDao().getAllCategories().first()
+            if (categories.any { it.name == categoryName }) {
+                return categories
+            }
+            Thread.sleep(20)
+        }
+        return categoryDao().getAllCategories().first()
+    }
+
+    private fun assertV5Schema(db: SupportSQLiteDatabase) {
+        val businessTables = listOf(
             "categories", "products", "sales", "sale_items",
             "customers", "udhaar_transactions", "stock_adjustments"
         )
-        for (table in tables) {
+        for (table in businessTables) {
             val columns = db.columnNames(table)
             assertTrue("Table $table should have localUuid", columns.contains("localUuid"))
             assertFalse("Table $table should NOT have id column", columns.contains("id"))
+        }
+
+        val outboxColumns = db.columnNames("sync_outbox_operations")
+        assertTrue(outboxColumns.contains("clientOperationId"))
+        assertTrue(outboxColumns.contains("entityUuid"))
+        assertTrue(outboxColumns.contains("retryCount"))
+        assertTrue(outboxColumns.contains("lastError"))
+
+        // Verify users table does not exist in V5
+        db.query("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").use { cursor ->
+            assertFalse("users table should not exist in V5 database", cursor.count > 0)
         }
     }
 

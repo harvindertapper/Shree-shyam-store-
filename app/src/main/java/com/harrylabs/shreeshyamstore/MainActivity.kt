@@ -41,19 +41,20 @@ class MainActivity : ComponentActivity() {
         val database = AppDatabase.getDatabase(applicationContext)
         val repo = ShopRepository(
             categoryDao = database.categoryDao(),
+            syncOutboxDao = database.syncOutboxDao(),
             productDao = database.productDao(),
             saleDao = database.saleDao(),
             customerDao = database.customerDao(),
             udhaarDao = database.udhaarDao(),
-            stockAdjustmentDao = database.stockAdjustmentDao(),
-            userDao = database.userDao()
+            stockAdjustmentDao = database.stockAdjustmentDao()
         )
         val settingsStore = SettingsDataStore(applicationContext)
+        val firebaseOwnerRepo = com.harrylabs.shreeshyamstore.data.FirebaseOwnerRepositoryImpl()
 
         // 2. ViewModel instantiation using custom provider factory
         val viewModel = ViewModelProvider(
             this,
-            ShopViewModelFactory(repo, settingsStore)
+            ShopViewModelFactory(repo, settingsStore, firebaseOwnerRepo, database)
         )[ShopViewModel::class.java]
 
         setContent {
@@ -65,8 +66,8 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            // Do not show bottom nav drawer in welcome, login, register, or onboarding setup flows
-                            if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Register && currentScreen !is Screen.Setup) {
+                            // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
+                            if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
                                 NavigationBar(
                                     modifier = Modifier.testTag("bottom_nav")
                                 ) {
@@ -125,7 +126,6 @@ class MainActivity : ComponentActivity() {
                             when (val screen = currentScreen) {
                                 is Screen.Welcome -> WelcomeScreen(viewModel)
                                 is Screen.Login -> LoginScreen(viewModel)
-                                is Screen.Register -> RegisterScreen(viewModel)
                                 is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
                                 is Screen.Home -> HomeScreen(viewModel)
                                 is Screen.Billing -> BillingScreen(viewModel)

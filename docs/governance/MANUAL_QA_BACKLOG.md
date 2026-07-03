@@ -60,45 +60,46 @@ Observation:
 
 Current evidence:
 
-- `AGENTS.md` states the currently implemented auth/session flow is local: owner account is in Room and session flags are in DataStore.
-- `docs/DATA_MODEL.md` states Room is the local database and DataStore stores settings/session.
+- `AGENTS.md` states Firebase Auth is now the runtime owner identity direction and Room is the local cache/offline working store.
+- `docs/DATA_MODEL.md` states Room remains the local database/cache and DataStore stores non-secret preferences/session markers.
 - Android Clear storage wipes app-private local storage, including Room database files and DataStore preferences.
+- FR-G local implementation exists, but final live owner restore and broader product/customer/sale/udhaar sync acceptance are still pending.
 
 Classification:
 
-- Expected Android behavior for the current pre-Firebase implementation, not a simple UI bug.
-- Data safety, backup/restore, and auth hardening concern.
+- Expected Android behavior for local storage, but unacceptable for professional shop trust unless cloud restore/sync gates pass.
+- Data safety, backup/restore, sync, and auth hardening concern.
 - Do not work around this by hiding business data in unsafe external files or hardcoded defaults.
-- Owner decision on 2026-06-17 makes cloud auth/sync mandatory MVP foundation before Billing Phase 2.
+- Owner decisions on 2026-06-17 and 2026-07-02 make cloud auth/sync mandatory professional foundation before trusted real inventory and billing use.
 
 Assigned phase/module:
 
-- Primary: `FR-G`, `FR-G2`, `FR-H`, and `FR-I1` for owner account, shop ownership, clear-storage restore, reinstall restore, and future second-device recovery.
-- Related: M10 Backup / Export / Import only if manual backup remains needed after cloud recovery decisions.
-- Related: M03 Local Auth and Session Hardening.
-- Related release gate: M12 Release Hardening / Android backup policy.
+- Primary: `PD-02` Firebase owner trust gate and `PD-03` professional sync/restore gate.
+- Related: `PD-10` release hardening / Android backup policy.
+- Related: Manual backup/export/import only if still needed after cloud recovery decisions.
 
 Recommended product solution when scheduled:
 
-- On first launch after fresh install/cleared storage, show a Firebase sign-in/restore path before new setup once cloud foundation exists.
-- Add owner-approved cloud-backed restore workflow for shop data and owner account recovery.
+- On first launch after fresh install/cleared storage, show Firebase sign-in and restore gate before Home.
+- Restore settings, categories, products, customers, udhaar, sales, sale items, stock adjustments, and invoice metadata according to the accepted sync phase.
+- Show visible pending/error sync state; do not silently open an empty shop as success.
 - Decide whether Android Auto Backup should be disabled, configured, or excluded for sensitive shop data.
 - Use the approved Firebase account/sync architecture, not an accidental local workaround.
 
 Acceptance criteria when scheduled:
 
-- Clear storage behavior is documented as fresh install until Firebase restore is implemented.
-- Backup file format, encryption/password policy, and restore conflict behavior are owner-approved.
-- Restore flow is tested with products, sales, customers, udhaar, shop settings, and owner account/session behavior.
+- Same Google account after clear storage restores the same owner/shop profile and accepted synced business domains.
+- Products, customers, udhaar balances, sales, sale items, stock adjustments, and settings restore without duplicates after retry.
+- Backup file format, encryption/password policy, and restore conflict behavior are owner-approved if manual backup remains.
 - No secrets, signing data, or unsafe tokens are stored in Room, DataStore, strings, or source code.
 
 Owner decisions needed:
 
 - Confirm Credential Manager Sign in with Google as the first provider and decide any later provider rollout.
-- What is the owner UID to shop membership model?
+- Confirm live Google provider/SHA setup and final manual owner sign-in/shop-profile QA.
 - Should manual encrypted backup/restore still exist after Firebase restore?
 - Should Android Auto Backup be disabled or configured before release?
-- What clear-storage/reinstall/second-device restore behavior is required for MVP acceptance?
+- What clear-storage/reinstall/second-device restore evidence is required for professional acceptance?
 
 ## MQA-003 - Loose/weight-based products are not supported
 

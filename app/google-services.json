@@ -13,7 +13,28 @@
           "package_name": "com.harrylabs.shreeshyamstore"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "703624679442-4bo6ridg5vqp1jln4hqctbsu39qaj2oa.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.harrylabs.shreeshyamstore",
+            "certificate_hash": "341a8703cdb2d2c36b7e91de905e214002641b54"
+          }
+        },
+        {
+          "client_id": "703624679442-i0dtbo67aq62l3e5mnrcgij1vb8pme8r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.harrylabs.shreeshyamstore",
+            "certificate_hash": "d05372958a39e07d5745e3c00fef951d121680a2"
+          }
+        },
+        {
+          "client_id": "703624679442-c0kku5e4gvkuf7ek0u6u3lvi9rqg4gdd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAFE1X2fH71SuJ3MNHiQw6Ot4Vg_rq37ck"
@@ -21,7 +42,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "703624679442-c0kku5e4gvkuf7ek0u6u3lvi9rqg4gdd.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

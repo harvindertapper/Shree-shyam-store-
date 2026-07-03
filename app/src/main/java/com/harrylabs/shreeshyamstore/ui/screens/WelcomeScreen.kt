@@ -1,6 +1,7 @@
 package com.harrylabs.shreeshyamstore.ui.screens
 
 import android.media.MediaPlayer
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -82,13 +83,13 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
             mediaPlayer = null
         }
 
-        if (!settings.isUserLoggedIn) {
-            viewModel.navigateTo(Screen.Login)
-        } else if (settings.firstLaunchCompleted) {
-            viewModel.navigateTo(Screen.Home)
-        } else {
-            viewModel.navigateTo(Screen.Setup)
-        }
+        viewModel.checkSessionAndRoute(
+            context = context,
+            onSuccess = {},
+            onError = { error ->
+                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+            }
+        )
     }
 
     // Clean up if we skip or leave earlier
@@ -212,13 +213,13 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                             } catch (e: Exception) { /* ... */ }
                             mediaPlayer = null
                         }
-                        if (!settings.isUserLoggedIn) {
-                            viewModel.navigateTo(Screen.Login)
-                        } else if (settings.firstLaunchCompleted) {
-                            viewModel.navigateTo(Screen.Home)
-                        } else {
-                            viewModel.navigateTo(Screen.Setup)
-                        }
+                        viewModel.checkSessionAndRoute(
+                            context = context,
+                            onSuccess = {},
+                            onError = { error ->
+                                Toast.makeText(context, error, Toast.LENGTH_LONG).show()
+                            }
+                        )
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
                     shape = RoundedCornerShape(12.dp),

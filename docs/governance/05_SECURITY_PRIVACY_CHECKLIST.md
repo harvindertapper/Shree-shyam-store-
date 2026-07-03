@@ -7,6 +7,7 @@ Status: Governance source of truth. Review this before auth, data, payment, back
 - [ ] Shop name and owner phone are treated as sensitive business profile data.
 - [ ] Customer names and phone numbers are treated as sensitive personal/business data.
 - [ ] Sales, invoices, udhaar balances, and stock records are treated as sensitive business records.
+- [ ] Purchase prices, profit reports, stock valuation, and category-wise stock value are treated as owner-private business data.
 - [ ] QR image URIs are treated as user-selected local content.
 
 ## Credentials and Secrets
@@ -38,6 +39,8 @@ Status: Governance source of truth. Review this before auth, data, payment, back
 - [ ] Udhaar sale creates a credit ledger transaction.
 - [ ] Invoices reflect saved sale and sale-item snapshots.
 - [ ] Share/export actions require explicit user action.
+- [ ] Invoice generation is optional and user-triggered after sale.
+- [ ] WhatsApp/share reminder messages for udhaar require explicit user action and do not require Contacts permission.
 
 ## Android Permissions
 
@@ -70,8 +73,21 @@ Status: Governance source of truth. Review this before auth, data, payment, back
 - [ ] Firestore indexes, backup/export, retention, and delete/account recovery expectations are documented.
 - [ ] No customer phone numbers, sales records, invoices, QR URIs, or udhaar balances are exposed in logs, analytics, screenshots, crash reports, or public documents.
 - [ ] Offline writes, conflict handling, and restore flows are tested for clear storage, reinstall, and second device.
+- [ ] Restore gates prevent the app from showing an empty shop as successful restore when cloud restore fails.
+- [ ] Sync pending/error states are visible to the owner and do not expose sensitive data in logs.
 - [ ] Firestore offline persistence is not treated as a complete conflict solution; sales, stock, and udhaar require idempotency, append-only records, and reconciliation rules.
 - [ ] Security rules have automated or emulator-backed tests before cloud data sync is accepted.
+
+
+## FR-G Firebase Auth/Profile Status - 2026-07-01
+
+- Local Android implementation status: PASS.
+- Firestore rules emulator status: PASS, 23 tests passing.
+- Live Firebase status: Firestore `(default)` exists and rules are deployed. Manual Google Sign-In/shop-profile QA is pending.
+- Live database setting observed: Standard edition, Mumbai `asia-south1`, delete protection disabled, point-in-time recovery disabled.
+- Recommended follow-up: enable Firestore delete protection before broad sync/release.
+- Manual Google Sign-In QA is still pending: old AVD had outdated Play Services; updated Play emulator reaches the login screen and opens Google Credential UI safely, but final success proof needs account selection/authorization on a stable emulator or physical phone with Firebase Authentication Google provider enabled.
+- App Check and cost controls remain FR-G2 gates before product/category/settings sync.
 
 ## Release
 

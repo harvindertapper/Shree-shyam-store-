@@ -31,9 +31,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.harrylabs.shreeshyamstore.R
 import com.harrylabs.shreeshyamstore.data.Category
+import com.harrylabs.shreeshyamstore.data.DataDisplayUnit
+import com.harrylabs.shreeshyamstore.data.DataUnitType
 import com.harrylabs.shreeshyamstore.data.Product
+import com.harrylabs.shreeshyamstore.utils.CalculationResult
 import com.harrylabs.shreeshyamstore.utils.CurrencyUtils
 import com.harrylabs.shreeshyamstore.utils.DateTimeUtils
+import com.harrylabs.shreeshyamstore.utils.QuantityDisplayUnit
+import com.harrylabs.shreeshyamstore.utils.QuantityPriceCalculator
 import com.harrylabs.shreeshyamstore.viewmodel.Screen
 import com.harrylabs.shreeshyamstore.viewmodel.ShopViewModel
 import com.harrylabs.shreeshyamstore.ui.theme.*
@@ -401,6 +406,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
     var currentStock by remember { mutableStateOf("") }
     var lowStockQty by remember { mutableStateOf("5") }
     var isActive by remember { mutableStateOf(true) }
+    var unitType by remember { mutableStateOf(DataUnitType.PIECE) }
+    var inlineCategoryName by remember { mutableStateOf("") }
+    var pendingInlineCategoryName by remember { mutableStateOf<String?>(null) }
 
     val title = stringResource(if (productId == null) R.string.product_add_title else R.string.product_edit_title)
 
@@ -418,8 +426,10 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                 sellingPrice = prod.sellingPrice?.toString() ?: ""
                 purchasePrice = prod.purchasePrice?.toString() ?: ""
                 trackStock = prod.trackStock
-                currentStock = prod.currentStock.toString()
-                lowStockQty = prod.lowStockAlertQty.toString()
+                unitType = prod.unitType.ifBlank { DataUnitType.PIECE }
+                val displayUnit = productQuantityDisplayUnit(unitType)
+                currentStock = productBaseToInputText(prod.stockQuantityBase, displayUnit)
+                lowStockQty = productBaseToInputText(prod.lowStockAlertBase, displayUnit)
                 isActive = prod.isActive
             }
         }
@@ -517,6 +527,131 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     }
                 }
             }
+            LaunchedEffect(categories, pendingInlineCategoryName) {
+                val pendingName = pendingInlineCategoryName
+                if (!pendingName.isNullOrBlank()) {
+                    val createdCategory = categories.firstOrNull { it.name.equals(pendingName, ignoreCase = true) }
+                    if (createdCategory != null) {
+                        categoryId = createdCategory.localUuid
+                        pendingInlineCategoryName = null
+                    }
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBF2)),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFFFE0B2)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.product_new_category_title),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        OutlinedTextField(
+                            value = inlineCategoryName,
+                            onValueChange = { inlineCategoryName = it },
+                            label = { Text(stringResource(R.string.product_new_category_label)) },
+                            placeholder = { Text(stringResource(R.string.product_new_category_placeholder)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f).testTag("product_inline_category_input"),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        Button(
+                            onClick = {
+                                val trimmed = inlineCategoryName.trim()
+                                if (trimmed.isNotEmpty()) {
+                                    pendingInlineCategoryName = trimmed
+                                    viewModel.addCategory(trimmed)
+                                    inlineCategoryName = ""
+                                }
+                            },
+                            enabled = inlineCategoryName.trim().isNotEmpty(),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.testTag("product_inline_category_add")
+                        ) {
+                            Text(stringResource(R.string.action_add))
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.product_new_category_hint),
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+
+
+            val quantityDisplayUnit = productQuantityDisplayUnit(unitType)
+            val selectedStockUnitLabel = when (unitType) {
+                DataUnitType.WEIGHT -> stringResource(R.string.unit_kg_short)
+                DataUnitType.VOLUME -> stringResource(R.string.unit_liter_short)
+                else -> stringResource(R.string.unit_piece_short)
+            }
+            val unitRateHint = when (unitType) {
+                DataUnitType.WEIGHT -> stringResource(R.string.product_rate_weight_hint)
+                DataUnitType.VOLUME -> stringResource(R.string.product_rate_volume_hint)
+                else -> stringResource(R.string.product_rate_piece_hint)
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FBFF)),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFBBDEFB)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = stringResource(R.string.product_unit_type_label),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        FilterChip(
+                            selected = unitType == DataUnitType.PIECE,
+                            onClick = { unitType = DataUnitType.PIECE },
+                            label = { Text(stringResource(R.string.product_unit_piece)) },
+                            modifier = Modifier.testTag("product_unit_piece")
+                        )
+                        FilterChip(
+                            selected = unitType == DataUnitType.WEIGHT,
+                            onClick = { unitType = DataUnitType.WEIGHT },
+                            label = { Text(stringResource(R.string.product_unit_weight)) },
+                            modifier = Modifier.testTag("product_unit_weight")
+                        )
+                        FilterChip(
+                            selected = unitType == DataUnitType.VOLUME,
+                            onClick = { unitType = DataUnitType.VOLUME },
+                            label = { Text(stringResource(R.string.product_unit_volume)) },
+                            modifier = Modifier.testTag("product_unit_volume")
+                        )
+                    }
+                    Text(unitRateHint, fontSize = 12.sp, color = Color.Gray)
+                    if (unitType != DataUnitType.PIECE) {
+                        Text(
+                            text = stringResource(R.string.product_loose_item_hint),
+                            fontSize = 12.sp,
+                            color = Color(0xFF546E7A)
+                        )
+                    }
+                }
+            }
 
             // MRP
             OutlinedTextField(
@@ -526,7 +661,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     if (it.trim().toDoubleOrNull() != null) mrpError = false
                 },
                 label = { Text(stringResource(R.string.product_mrp_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 isError = mrpError,
                 supportingText = { if (mrpError) Text(stringResource(R.string.product_mrp_error), color = Color.Red) },
                 modifier = Modifier.fillMaxWidth().testTag("product_mrp_input"),
@@ -539,7 +674,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                 onValueChange = { sellingPrice = it },
                 label = { Text(stringResource(R.string.selling_price_label)) },
                 placeholder = { Text(stringResource(R.string.example_price_format, mrp.ifEmpty { "10" })) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth().testTag("product_sp_input"),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -549,7 +684,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                 value = purchasePrice,
                 onValueChange = { purchasePrice = it },
                 label = { Text(stringResource(R.string.purchase_price_label)) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -575,8 +710,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     OutlinedTextField(
                         value = currentStock,
                         onValueChange = { currentStock = it },
-                        label = { Text(stringResource(R.string.starting_stock_label)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text(stringResource(R.string.starting_stock_unit_format, selectedStockUnitLabel)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = if (unitType == DataUnitType.PIECE) KeyboardType.Number else KeyboardType.Decimal),
                         modifier = Modifier.weight(1f).testTag("product_stock_input"),
                         shape = RoundedCornerShape(10.dp)
                     )
@@ -585,8 +720,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     OutlinedTextField(
                         value = lowStockQty,
                         onValueChange = { lowStockQty = it },
-                        label = { Text(stringResource(R.string.low_alert_label)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = { Text(stringResource(R.string.low_alert_unit_format, selectedStockUnitLabel)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = if (unitType == DataUnitType.PIECE) KeyboardType.Number else KeyboardType.Decimal),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
                     )
@@ -614,8 +749,11 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     val mrpValue = mrp.trim().toDoubleOrNull()
                     val spValue = sellingPrice.trim().toDoubleOrNull()
                     val purValue = purchasePrice.trim().toDoubleOrNull()
-                    val stockValue = currentStock.trim().toIntOrNull() ?: 0
-                    val alertValue = lowStockQty.trim().toIntOrNull() ?: 5
+                    val stockBaseValue = if (trackStock) parseStockQuantityBase(currentStock, quantityDisplayUnit) else 0L
+                    val alertBaseValue = if (trackStock) parseStockQuantityBase(lowStockQty, quantityDisplayUnit) else 0L
+                    val stockValue = legacyStockInt(stockBaseValue ?: 0L, quantityDisplayUnit)
+                    val alertValue = legacyStockInt(alertBaseValue ?: 0L, quantityDisplayUnit).takeIf { it > 0 } ?: 5
+                    val stockInputValid = !trackStock || (stockBaseValue != null && alertBaseValue != null)
 
                     // Validations checks
                     if (name.trim().isEmpty()) {
@@ -627,8 +765,11 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                     if (categoryId.isBlank()) {
                         Toast.makeText(context, context.getString(R.string.product_category_error), Toast.LENGTH_SHORT).show()
                     }
+                    if (!stockInputValid) {
+                        Toast.makeText(context, context.getString(R.string.valid_stock_required_toast), Toast.LENGTH_SHORT).show()
+                    }
 
-                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0.0 && categoryId.isNotBlank()) {
+                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0.0 && categoryId.isNotBlank() && stockInputValid) {
                         viewModel.saveProduct(
                             uuid = productId,
                             name = name,
@@ -639,7 +780,16 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
                             currentStock = if (trackStock) stockValue else 0,
                             trackStock = trackStock,
                             lowStockAlertQty = alertValue,
-                            isActive = isActive
+                            isActive = isActive,
+                            unitType = unitType,
+                            displayUnit = quantityDisplayUnit.name,
+                            baseUnit = productBaseUnit(unitType),
+                            allowsDecimalQuantity = unitType != DataUnitType.PIECE,
+                            quantityScale = quantityDisplayUnit.maxFractionDigits,
+                            priceUnitBaseQty = productPriceUnitBaseQty(unitType),
+                            purchasePriceUnitBaseQty = if (purValue != null && purValue > 0) productPriceUnitBaseQty(unitType) else null,
+                            stockQuantityBase = stockBaseValue ?: 0L,
+                            lowStockAlertBase = alertBaseValue ?: 0L
                         )
                         Toast.makeText(context, context.getString(R.string.product_saved_toast, name.trim()), Toast.LENGTH_SHORT).show()
                         viewModel.navigateTo(Screen.Products)
@@ -1144,6 +1294,52 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: String) {
     }
 }
 
+private fun productQuantityDisplayUnit(unitType: String): QuantityDisplayUnit {
+    return when (unitType) {
+        DataUnitType.WEIGHT -> QuantityDisplayUnit.KILOGRAM
+        DataUnitType.VOLUME -> QuantityDisplayUnit.LITER
+        else -> QuantityDisplayUnit.PIECE
+    }
+}
+
+private fun productBaseUnit(unitType: String): String {
+    return when (unitType) {
+        DataUnitType.WEIGHT -> DataDisplayUnit.GRAM
+        DataUnitType.VOLUME -> DataDisplayUnit.MILLILITER
+        else -> DataDisplayUnit.PIECE
+    }
+}
+
+private fun productPriceUnitBaseQty(unitType: String): Long {
+    return productQuantityDisplayUnit(unitType).baseUnitsPerDisplayUnit
+}
+
+private fun productBaseToInputText(baseQuantity: Long, displayUnit: QuantityDisplayUnit): String {
+    if (baseQuantity <= 0L) return "0"
+    val scale = displayUnit.baseUnitsPerDisplayUnit
+    if (scale <= 1L) return baseQuantity.toString()
+    val whole = baseQuantity / scale
+    val fraction = (baseQuantity % scale).toString().padStart(displayUnit.maxFractionDigits, '0').trimEnd('0')
+    return if (fraction.isBlank()) whole.toString() else "$whole.$fraction"
+}
+
+private fun parseStockQuantityBase(input: String, displayUnit: QuantityDisplayUnit): Long? {
+    val trimmed = input.trim()
+    if (trimmed.isBlank() || trimmed.matches(Regex("0+(\\.0+)?"))) return 0L
+    return when (val result = QuantityPriceCalculator.parseQuantityBase(trimmed, displayUnit)) {
+        is CalculationResult.Success -> result.value
+        is CalculationResult.Failure -> null
+    }
+}
+
+private fun legacyStockInt(baseQuantity: Long, displayUnit: QuantityDisplayUnit): Int {
+    val displayQuantity = if (displayUnit.baseUnitsPerDisplayUnit <= 1L) {
+        baseQuantity
+    } else {
+        baseQuantity / displayUnit.baseUnitsPerDisplayUnit
+    }
+    return displayQuantity.coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
+}
 @Composable
 private fun localizedStockReason(reason: String): String {
     return when (reason) {

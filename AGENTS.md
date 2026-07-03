@@ -4,7 +4,7 @@
 
 Build **Shree Shyam Store** as a professional Kotlin Android shop-management app customized for a small Indian kiryana/general store.
 
-The app must feel reliable for daily kiryana shop use: cloud-backed owner access, recoverable shop data, fast billing, simple product/stock management, accurate udhaar tracking, useful reports, and easy invoice sharing.
+The app must feel reliable for daily kiryana shop use: cloud-backed owner access, recoverable shop data, fast billing, simple product/stock management, accurate udhaar tracking, owner-private business insights, useful daily close reports, and easy invoice sharing when needed.
 
 ## Product Language Rules
 
@@ -25,7 +25,7 @@ The app must feel reliable for daily kiryana shop use: cloud-backed owner access
 - Jetpack Compose
 - Room database
 - DataStore preferences
-- Firebase Auth and Firestore are now mandatory MVP foundation work, but must be planned before implementation.
+- Firebase Auth and Firestore are mandatory professional foundation work. FR-G implementation is in progress with local build/rules passing; final manual Google sign-in/shop-profile QA remains pending before broader sync work.
 - Gradle Kotlin DSL
 - Min Android: API 24 / Android 7.0
 - Do not apply assumptions from unrelated app templates or cross-platform stacks.
@@ -37,12 +37,13 @@ Future agents must baseline these documents before changing code:
 1. `AGENTS.md` - highest-priority repo operating rules.
 2. `docs/PRODUCT_SPEC.md` - product scope, users, workflows, and owner decisions.
 3. `docs/IMPLEMENTATION_PLAN.md` - module-by-module delivery sequence and task packets.
-4. `docs/DELIVERY_WORKFLOW.md` - assignment, review, evidence, and completion workflow.
-5. `docs/SCREEN_FLOW.md` - screen and navigation behavior.
-6. `docs/DATA_MODEL.md` - Room entities, DataStore settings, and migration rules.
-7. `docs/governance/*.md` - charter, scope control, decision log, definition of done, security/privacy checklist, and module acceptance guidance.
-8. `APP_BUILD_CHECKLIST.md` - app inventory, MVP checklist, and QA checklist.
-9. `README.md` - setup notes only. If README conflicts with the docs above, treat README as stale until updated.
+4. `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md` - current professional delivery route for sync, billing, owner insights, invoice/share, and release hardening.
+5. `docs/DELIVERY_WORKFLOW.md` - assignment, review, evidence, and completion workflow.
+6. `docs/SCREEN_FLOW.md` - screen and navigation behavior.
+7. `docs/DATA_MODEL.md` - Room entities, DataStore settings, and migration rules.
+8. `docs/governance/*.md` - charter, scope control, decision log, definition of done, security/privacy checklist, and module acceptance guidance.
+9. `APP_BUILD_CHECKLIST.md` - app inventory, professional delivery checklist, and QA checklist.
+10. `README.md` - setup notes only. If README conflicts with the docs above, treat README as stale until updated.
 
 `PROJECT_CONTEXT.md`, when present, is subordinate context only. It must not override the files above.
 
@@ -76,8 +77,8 @@ If source-of-truth documents disagree, stop and report the conflict instead of s
 - Treat shop data, customer names, phone numbers, invoices, udhaar balances, QR image URIs, and owner credentials as sensitive local business data.
 - Do not store tokens, API keys, signing passwords, or production secrets in Room, DataStore, strings, source code, screenshots, or docs.
 - Do not read `.env` or secret files unless the user explicitly approves it for that task. `.env.example` may be read.
-- Current local password storage is basic SHA-256. Do not worsen it. Production hardening needs an owner-approved task.
-- Room is schema version 2. The approved v1-only reset uses `fallbackToDestructiveMigrationFrom(true, 1)` because no real inventory existed. Any migration from v2 onward requires an intentional migration or a new explicit owner-approved reset; broad production destructive migration remains forbidden.
+- Legacy local password auth has been removed from the Room runtime path in FR-G/Room v4. Do not reintroduce local password storage without an owner-approved security packet.
+- Room is schema version 5. The approved early reset uses `fallbackToDestructiveMigrationFrom(true, 1, 2)` because no real inventory existed; v3 to v4 uses an intentional migration that drops the deprecated local `users` table, and v4 to v5 intentionally adds the local `sync_outbox_operations` table for retryable cloud sync. Any future migration from v5 onward requires an intentional migration or a new explicit owner-approved reset; broad production destructive migration remains forbidden.
 - UPI must remain a manual payment record unless real verification is implemented and approved.
 - Backup/export/import must protect customer and sales data and must not silently leak files to shared storage.
 - Android backup behavior must be reviewed before release because `android:allowBackup` is currently enabled.
@@ -85,13 +86,13 @@ If source-of-truth documents disagree, stop and report the conflict instead of s
 
 ## Auth, Session, API, Storage, and Permission Rules
 
-- The currently implemented auth/session flow is local: owner account in Room and non-secret session flags in DataStore. This is transitional; Firebase owner auth and cloud restore remain mandatory upcoming MVP foundation work.
+- The runtime auth/session flow uses Firebase Auth as owner identity. DataStore stores non-secret session markers such as cached owner UID/shop ID and display fields; Firebase tokens must not be stored in Room, DataStore, strings, or source code.
 - DataStore may store preferences and non-secret session state, but not passwords, tokens, API secrets, or signing data.
-- Room is the source for products, categories, sales, sale items, customers, udhaar transactions, stock adjustments, and users.
-- Owner decision on 2026-06-17: Firebase Auth and Firestore/cloud sync are mandatory MVP foundation, not deferred scope.
+- Room is the local source/cache for products, categories, sales, sale items, customers, udhaar transactions, and stock adjustments. The old local `users` table is removed from the runtime schema.
+- Owner decision on 2026-06-17: Firebase Auth and Firestore/cloud sync are mandatory professional foundation, not deferred scope.
 - Owner decision on 2026-06-17: final Android application id, namespace, Firebase app registration, Google Sign-In setup, SHA keys, and Play Store identity must be `com.harrylabs.shreeshyamstore`. Do not configure Firebase against the old random application id.
-- Owner decision on 2026-06-17: no real shop inventory has been entered yet, so Room v2 reset is allowed before real inventory entry.
-- The app currently has no implemented Firebase/backend workflow. New Firebase/network/API behavior requires architecture, security rules, privacy, migration, and QA packets before code implementation.
+- Owner decision on 2026-06-17: no real shop inventory has been entered yet, so the approved early Room reset/migration path is allowed before real inventory entry.
+- Firebase Auth/profile code and Firestore rules are implemented under FR-G. New broader Firebase sync/network behavior must follow the accepted professional delivery route, with security rules, privacy, migration, restore gates, conflict/idempotency, and QA evidence before trusted shop use.
 - Do not commit Firebase service-account keys, signing secrets, API secrets, production credentials, or real customer data. Public client Firebase config may only be added through an approved implementation packet.
 - No dangerous runtime permissions are currently declared in `AndroidManifest.xml`. Camera, location, notifications, contacts, storage, and Bluetooth require explicit approval and a privacy note before implementation.
 - QR image selection must be treated as user-selected local content. Do not assume permanent URI access without testing.
@@ -145,20 +146,22 @@ Completed foundation checkpoints:
 - `FR-C` at `f36d613`.
 - `FR-B` at `4bb4927`.
 - `FR-P` at `b7d92f2`.
+- Firebase project/config prerequisites for project `shreeshyamstore`.
+- `FR-K` Room UUID primary keys and relationship refactoring.
 
-Remaining route:
+Current professional delivery route:
 
-1. Complete Firebase project/config prerequisites.
-2. Complete `FR-K` Room UUID primary keys and relationship refactoring.
-3. Implement Firebase Auth with Android Credential Manager Sign in with Google.
-4. Create/restore owner, shop, and membership profiles.
-5. Establish Firestore rules, App Check, and cost controls.
-6. Add Product unit/rate/stock UI with inline category creation.
-7. Sync product/category/settings and pass inventory restore QA.
-8. Add weighted billing, bidirectional amount/quantity calculation, and per-line rate override.
-9. Complete billing persistence and billing restore QA.
-10. Add PDF invoice generation and WhatsApp/share-sheet sharing.
-11. Continue later approved roadmap items.
+1. `PD-01` Stabilize the current FR-G/sync/billing work and verify main-safe Room access.
+2. `PD-02` Finish/accept live Firebase owner sign-in and owner/shop/membership restore.
+3. `PD-03A/B` Implement professional sync and restore gates for settings, categories, products, customers, and udhaar.
+4. `PD-04` Finish product/stock setup for real kiryana use: piece/weight/volume units, inline category creation, stock-by-exception, and quick-added product cleanup.
+5. `PD-05` Harden billing: no forced customer/invoice, one-tap sale save, loose amount-to-quantity flow, quantity-to-amount flow, per-line rate override, smart product quick-add, and tracked-stock validation.
+6. `PD-03C` Sync sales, sale items, stock adjustments, and invoice metadata with idempotency.
+7. `PD-06` Add quick udhaar entry and WhatsApp/share reminder workflow without Contacts permission.
+8. `PD-07` Add private Owner Desk for total stock value, category-wise stock value, and profit using sale-item purchase-cost snapshots.
+9. `PD-08` Add end-of-day "Aaj ka hisaab" summary with subtle shop-close routine joy.
+10. `PD-09` Add optional PDF invoice and Android share/WhatsApp workflow.
+11. `PD-10` Complete App Check/cost controls, Android backup policy, privacy, signing, localization polish, and release hardening.
 
 ## Deferred Scope
 

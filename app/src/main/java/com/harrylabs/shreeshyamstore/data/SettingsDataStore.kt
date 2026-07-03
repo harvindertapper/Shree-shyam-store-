@@ -24,7 +24,9 @@ data class StoreSettings(
     val loggedInUsername: String,
     val loggedInEmail: String,
     val isUserLoggedIn: Boolean,
-    val selectedLanguage: String
+    val selectedLanguage: String,
+    val cachedOwnerUid: String,
+    val cachedShopId: String
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -38,6 +40,8 @@ class SettingsDataStore(private val context: Context) {
         private val LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
         private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
         private val SELECTED_LANGUAGE = stringPreferencesKey("selected_language")
+        private val CACHED_OWNER_UID = stringPreferencesKey("cached_owner_uid")
+        private val CACHED_SHOP_ID = stringPreferencesKey("cached_shop_id")
     }
 
     val settingsFlow: Flow<StoreSettings> = context.dataStore.data
@@ -58,7 +62,9 @@ class SettingsDataStore(private val context: Context) {
                 loggedInUsername = preferences[LOGGED_IN_USERNAME] ?: "",
                 loggedInEmail = preferences[LOGGED_IN_EMAIL] ?: "",
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
-                selectedLanguage = preferences[SELECTED_LANGUAGE] ?: "en"
+                selectedLanguage = preferences[SELECTED_LANGUAGE] ?: "en",
+                cachedOwnerUid = preferences[CACHED_OWNER_UID] ?: "",
+                cachedShopId = preferences[CACHED_SHOP_ID] ?: ""
             )
         }
 
@@ -100,11 +106,32 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    suspend fun saveSession(username: String, email: String, uid: String, shopId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[LOGGED_IN_USERNAME] = username
+            preferences[LOGGED_IN_EMAIL] = email
+            preferences[IS_USER_LOGGED_IN] = true
+            preferences[CACHED_OWNER_UID] = uid
+            preferences[CACHED_SHOP_ID] = shopId
+        }
+    }
+
+    suspend fun updateCachedOwnerAndShop(uid: String, shopId: String) {
+        context.dataStore.edit { preferences ->
+            preferences[CACHED_OWNER_UID] = uid
+            preferences[CACHED_SHOP_ID] = shopId
+        }
+    }
+
     suspend fun clearSession() {
         context.dataStore.edit { preferences ->
             preferences[LOGGED_IN_USERNAME] = ""
             preferences[LOGGED_IN_EMAIL] = ""
             preferences[IS_USER_LOGGED_IN] = false
+            preferences[SHOP_NAME] = "Shree Shyam General Store"
+            preferences[OWNER_PHONE] = ""
+            preferences[STATIC_PAYTM_QR_IMAGE_URI] = ""
+            // CACHED_OWNER_UID and CACHED_SHOP_ID are preserved intentionally to detect transitions on next login
         }
     }
 

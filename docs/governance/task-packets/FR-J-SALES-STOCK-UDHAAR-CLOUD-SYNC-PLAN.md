@@ -1,5 +1,7 @@
 # FR-J-SALES-STOCK-UDHAAR-CLOUD-SYNC-PLAN
 
+> Historical/Superseded as of 2026-07-02. This packet planned sales/stock/udhaar cloud sync as a later planning-only step. The current professional delivery route upgrades this into implementation track `PD-03C` after billing persistence is stable, with append-only records, restore gates, visible pending/error sync state, and idempotency requirements.
+
 ## task_id
 
 FR-J-SALES-STOCK-UDHAAR-CLOUD-SYNC-PLAN
@@ -48,4 +50,3 @@ Security/governance plus delivery manager.
 - Live Firestore sync code.
 - Billing UI/persistence implementation.
 - Returns/refunds UI, staff UI, barcode, GST, printer, PDF, WhatsApp, bulk import, welcome sound/assets.
-

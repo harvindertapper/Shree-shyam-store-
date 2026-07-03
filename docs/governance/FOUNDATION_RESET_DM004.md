@@ -1,11 +1,18 @@
 # DM-004 Foundation Reset Plan
 
-Status: Source of truth for foundation reset before real shop inventory entry and Billing Phase 2.
+Status: Historical source of truth for the DM-004 foundation reset before real shop inventory entry.
+
+Current status note (2026-07-02):
+
+- The original Room v2 foundation reset has already progressed through FR-K/FR-G/PD-03 into Room schema version 5.
+- Firebase Auth is the runtime owner identity direction; the old local Room `users` table has been removed from the runtime schema.
+- The active route is now the professional delivery sequence in `docs/IMPLEMENTATION_PLAN.md` and `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md`.
+- Older "Billing Phase 2" and Room v2 wording in this document is retained as reset history, not as the current implementation sequence.
 
 ## Owner Decisions Locked
 
 - Real shop inventory will be entered only after Firebase Auth/shop profile, Firestore rules/App Check/cost guardrails, Product Add/Edit unit/rate/stock UI, product/category/settings sync, and inventory restore QA pass.
-- Room v2 reset is allowed because no real shop inventory has been entered yet.
+- The early Room reset was allowed because no real shop inventory had been entered. Room v4 to v5 now uses an intentional migration for the local sync outbox. Future Room v5 onward schema changes require intentional migrations or a new explicit owner-approved decision.
 - Final Android app identity is `com.harrylabs.shreeshyamstore`.
 - Firebase app registration, Google Sign-In, SHA keys, and Play Store identity must use `com.harrylabs.shreeshyamstore`.
 - Do not configure Firebase with the old random application id.
@@ -21,15 +28,9 @@ Status: Source of truth for foundation reset before real shop inventory entry an
 2. `FR-C-QUANTITY-PRICE-CALCULATOR` — completed at `f36d613`.
 3. `FR-B-ROOM-V2-RESET` — completed at `4bb4927`.
 4. `FR-P-APP-IDENTITY-RENAME` — completed at `b7d92f2`.
-5. `FR-G-FIREBASE-AUTH-SHOP-PROFILE`
-6. `FR-G2-FIRESTORE-RULES-APP-CHECK-COST-GUARDRAILS`
-7. `FR-D-PRODUCT-UNIT-STOCK-UI`
-8. `FR-H-PRODUCT-CATEGORY-SETTINGS-SYNC`
-9. `FR-I1-INVENTORY-RESTORE-QA`
-10. `FR-E-BILLING-WEIGHTED-ENTRY-RATE-OVERRIDE`
-11. `FR-F-SALE-STOCK-INVOICE-UDHAAR-PERSISTENCE`
-12. `FR-I2-BILLING-RESTORE-QA`
-13. `FR-J-SALES-STOCK-UDHAAR-CLOUD-SYNC-PLAN`
+5. Firebase project/config prerequisites completed.
+6. `FR-K-ROOM-UUID-PRIMARY-KEYS` completed.
+7. Current remaining route: follow the professional delivery sequence in `docs/IMPLEMENTATION_PLAN.md`.
 
 ## Real Inventory Gate
 
@@ -169,10 +170,9 @@ This protects future profit reporting after product purchase cost changes.
 
 ## Current Foundation State
 
-- Room is schema version 2 with the approved v1-only `fallbackToDestructiveMigrationFrom(true, 1)` reset.
-- Weight/volume calculation and per-line effective-rate foundations exist in pure Kotlin and Room v2 fields.
-- Product and Billing UI integration remains pending.
-- Firebase Auth, Credential Manager Sign in with Google, Firestore integration, cloud restore, rules deployment, and App Check are not implemented.
+- Room is schema version 5. Syncable entities use UUID primary keys, the old local `users` table is removed from the runtime path, and a local sync outbox tracks retryable cloud-sync work.
+- Weight/volume calculation and per-line effective-rate foundations exist in pure Kotlin and Room fields; the professional product/billing UI route is tracked in the current implementation plan.
+- Firebase Auth, Credential Manager Sign in with Google, Firestore profile code, and rules are locally implemented under FR-G, but final live Google Sign-In/shop-profile QA, App Check posture, and broader restore/sync acceptance remain pending.
 - The welcome sound issue remains tracked separately and is not part of the Firebase or foundation cleanup route.
 
 ## Explicitly Out Of Scope For This Reset

@@ -36,8 +36,14 @@ import coil.compose.AsyncImage
 import com.harrylabs.shreeshyamstore.R
 import com.harrylabs.shreeshyamstore.data.Category
 import com.harrylabs.shreeshyamstore.data.Customer
+import com.harrylabs.shreeshyamstore.data.DataUnitType
 import com.harrylabs.shreeshyamstore.data.Product
+import com.harrylabs.shreeshyamstore.utils.CalculationResult
 import com.harrylabs.shreeshyamstore.utils.CurrencyUtils
+import com.harrylabs.shreeshyamstore.utils.QuantityDisplayUnit
+import com.harrylabs.shreeshyamstore.utils.QuantityPriceCalculator
+import com.harrylabs.shreeshyamstore.utils.ProductUnitType
+import com.harrylabs.shreeshyamstore.utils.UnitRate
 import com.harrylabs.shreeshyamstore.viewmodel.Screen
 import com.harrylabs.shreeshyamstore.viewmodel.ShopViewModel
 import com.harrylabs.shreeshyamstore.ui.theme.*
@@ -57,6 +63,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<String?>(null) }
     var showQuickAddDialog by remember { mutableStateOf(false) }
+    var showLooseQuantityDialog by remember { mutableStateOf<Product?>(null) }
 
     // Warning dialog regarding insufficient stock
     var showStockWarningProduct by remember { mutableStateOf<Product?>(null) }
@@ -194,12 +201,16 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        // Stock checks
-                                        val inCartQty = cart[product] ?: 0
-                                        if (product.trackStock && product.currentStock <= inCartQty) {
-                                            showStockWarningProduct = product
+                                        if (product.unitType != DataUnitType.PIECE) {
+                                            showLooseQuantityDialog = product
                                         } else {
-                                            viewModel.addProductToCart(product, 1)
+                                            // Stock checks
+                                            val inCartQty = cart[product]?.quantity ?: 0
+                                            if (product.trackStock && product.currentStock <= inCartQty) {
+                                                showStockWarningProduct = product
+                                            } else {
+                                                viewModel.addProductToCart(product, 1)
+                                            }
                                         }
                                     }
                             ) {
@@ -269,8 +280,8 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                     }
 
                                     // Add Indicator badge inside product list if in cart
-                                    val qtyInCart = cart[product] ?: 0
-                                    if (qtyInCart > 0) {
+                                    val lineInCart = cart[product]
+                                    if (lineInCart != null) {
                                         Box(
                                             modifier = Modifier
                                                 .background(
@@ -281,7 +292,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = "x$qtyInCart",
+                                                text = if (product.unitType == DataUnitType.PIECE) "x${lineInCart.quantity}" else billingQuantityText(product, lineInCart.quantityBase, lineInCart.enteredQuantityText),
                                                 color = Color.White,
                                                 fontSize = 14.sp,
                                                 fontWeight = FontWeight.Bold
@@ -289,11 +300,15 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                         }
                                     } else {
                                         IconButton(onClick = {
-                                            val inCartQty = cart[product] ?: 0
-                                            if (product.trackStock && product.currentStock <= inCartQty) {
-                                                showStockWarningProduct = product
+                                            if (product.unitType != DataUnitType.PIECE) {
+                                                showLooseQuantityDialog = product
                                             } else {
-                                                viewModel.addProductToCart(product, 1)
+                                                val inCartQty = cart[product]?.quantity ?: 0
+                                                if (product.trackStock && product.currentStock <= inCartQty) {
+                                                    showStockWarningProduct = product
+                                                } else {
+                                                    viewModel.addProductToCart(product, 1)
+                                                }
                                             }
                                         }) {
                                             Icon(Icons.Default.Add, stringResource(R.string.content_description_add_to_cart), tint = MaterialTheme.colorScheme.primary)
@@ -348,7 +363,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                     .padding(8.dp)
                             ) {
                                 Text(
-                                    stringResource(R.string.billing_cart_count, cart.values.sum()),
+                                    stringResource(R.string.billing_cart_count, cart.values.sumOf { line -> if (line.product.unitType == DataUnitType.PIECE) line.quantity else 1 }),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Black,
                                     color = SaffronDark
@@ -359,7 +374,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f),
                                 contentPadding = PaddingValues(4.dp)
                             ) {
-                                items(cart.entries.toList()) { (product, quantity) ->
+                                items(cart.entries.toList()) { (product, line) ->
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = Color.White),
                                         border = BorderStroke(1.dp, BorderStrong),
@@ -382,7 +397,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
                                                 Text(
-                                                    text = CurrencyUtils.formatRupees(product.getEffectivePrice() * quantity),
+                                                    text = CurrencyUtils.formatRupees(line.lineTotal),
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = SaffronDark
@@ -393,7 +408,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                 ) {
                                                     // Minus button
                                                     IconButton(
-                                                        onClick = { viewModel.addProductToCart(product, -1) },
+                                                        onClick = { if (product.unitType == DataUnitType.PIECE) viewModel.addProductToCart(product, -1) else viewModel.removeProductFromCart(product) },
                                                         modifier = Modifier.size(24.dp)
                                                     ) {
                                                         Icon(
@@ -404,14 +419,16 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                         )
                                                     }
                                                     Text(
-                                                        text = "$quantity",
+                                                        text = if (product.unitType == DataUnitType.PIECE) line.quantity.toString() else billingQuantityText(product, line.quantityBase, line.enteredQuantityText),
                                                         fontSize = 14.sp,
                                                         fontWeight = FontWeight.Black
                                                     )
                                                     // Plus button
                                                     IconButton(
                                                         onClick = {
-                                                            if (product.trackStock && product.currentStock <= quantity) {
+                                                            if (product.unitType != DataUnitType.PIECE) {
+                                                                showLooseQuantityDialog = product
+                                                            } else if (product.trackStock && product.currentStock <= line.quantity) {
                                                                 showStockWarningProduct = product
                                                             } else {
                                                                 viewModel.addProductToCart(product, 1)
@@ -515,6 +532,175 @@ fun BillingScreen(viewModel: ShopViewModel) {
             )
         }
 
+        showLooseQuantityDialog?.let { product ->
+            Dialog(onDismissRequest = { showLooseQuantityDialog = null }) {
+                var quantityInput by remember(product.localUuid) { mutableStateOf("") }
+                var amountInput by remember(product.localUuid) { mutableStateOf("") }
+                var enterByAmount by remember(product.localUuid) { mutableStateOf(false) }
+                val displayUnit = billingQuantityDisplayUnit(product)
+                val unitLabel = billingUnitLabel(product)
+                val rate = UnitRate(
+                    product.pricePerUnitPaise,
+                    product.priceUnitBaseQty.takeIf { it > 0L } ?: 1L
+                )
+                val enteredAmountPaise = if (enterByAmount) {
+                    when (val amountResult = QuantityPriceCalculator.parseAmountPaise(amountInput)) {
+                        is CalculationResult.Success -> amountResult.value
+                        is CalculationResult.Failure -> null
+                    }
+                } else {
+                    null
+                }
+                val quantityBase = if (enterByAmount) {
+                    enteredAmountPaise?.let { amountPaise ->
+                        when (val quantityResult = QuantityPriceCalculator.quantityForAmount(
+                            amountPaise = amountPaise,
+                            rate = rate,
+                            unitType = billingProductUnitType(product)
+                        )) {
+                            is CalculationResult.Success -> quantityResult.value
+                            is CalculationResult.Failure -> null
+                        }
+                    }
+                } else {
+                    billingParseQuantityBase(quantityInput, displayUnit)
+                }
+                val amountPaise = if (enterByAmount) {
+                    enteredAmountPaise
+                } else {
+                    quantityBase?.let { qtyBase ->
+                    when (val amountResult = QuantityPriceCalculator.amountForQuantity(
+                        qtyBase,
+                        rate
+                    )) {
+                        is CalculationResult.Success -> amountResult.value
+                        is CalculationResult.Failure -> null
+                    }
+                    }
+                }
+                val enteredQuantityText = if (enterByAmount) {
+                    quantityBase?.let { billingBaseToDisplayText(it, displayUnit) }.orEmpty()
+                } else {
+                    quantityInput.trim()
+                }
+                val exceedsStock = product.trackStock && quantityBase != null && quantityBase > product.stockQuantityBase
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.loose_quantity_dialog_title, product.name),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !enterByAmount,
+                                onClick = { enterByAmount = false },
+                                label = { Text(stringResource(R.string.loose_entry_mode_quantity)) }
+                            )
+                            FilterChip(
+                                selected = enterByAmount,
+                                onClick = { enterByAmount = true },
+                                label = { Text(stringResource(R.string.loose_entry_mode_amount)) }
+                            )
+                        }
+                        if (enterByAmount) {
+                            OutlinedTextField(
+                                value = amountInput,
+                                onValueChange = { amountInput = it },
+                                label = { Text(stringResource(R.string.loose_amount_label)) },
+                                placeholder = { Text(stringResource(R.string.loose_amount_placeholder)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth().testTag("loose_amount_input"),
+                                singleLine = true
+                            )
+                            Text(
+                                text = stringResource(
+                                    R.string.loose_quantity_preview_format,
+                                    quantityBase?.let { billingQuantityText(product, it, null) } ?: "-"
+                                ),
+                                fontSize = 16.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Black
+                            )
+                        } else {
+                            OutlinedTextField(
+                                value = quantityInput,
+                                onValueChange = { quantityInput = it },
+                                label = { Text(stringResource(R.string.loose_quantity_label, unitLabel)) },
+                                placeholder = { Text(stringResource(R.string.loose_quantity_placeholder)) },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                modifier = Modifier.fillMaxWidth().testTag("loose_quantity_input"),
+                                singleLine = true
+                            )
+                        }
+                        Text(
+                            text = stringResource(R.string.loose_stock_available_format, billingQuantityText(product, product.stockQuantityBase, null)),
+                            fontSize = 12.sp,
+                            color = TextMutedGray,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = stringResource(
+                                R.string.loose_amount_preview_format,
+                                amountPaise?.let { CurrencyUtils.formatRupees(it / 100.0) } ?: CurrencyUtils.formatRupees(0.0)
+                            ),
+                            fontSize = 16.sp,
+                            color = SuccessGreen,
+                            fontWeight = FontWeight.Black
+                        )
+                        if (exceedsStock) {
+                            Text(
+                                text = stringResource(R.string.loose_quantity_exceeds_stock_toast),
+                                color = ErrorRed,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            TextButton(
+                                onClick = { showLooseQuantityDialog = null },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.action_cancel))
+                            }
+                            Button(
+                                onClick = {
+                                    val qtyBase = quantityBase
+                                    val finalAmountPaise = amountPaise
+                                    if (qtyBase == null || qtyBase <= 0L) {
+                                        Toast.makeText(context, context.getString(R.string.loose_invalid_quantity_toast), Toast.LENGTH_SHORT).show()
+                                    } else if (product.trackStock && qtyBase > product.stockQuantityBase) {
+                                        Toast.makeText(context, context.getString(R.string.loose_quantity_exceeds_stock_toast), Toast.LENGTH_SHORT).show()
+                                    } else if (enterByAmount && finalAmountPaise != null && viewModel.setLooseProductAmountInCart(product, finalAmountPaise, qtyBase, enteredQuantityText)) {
+                                        showLooseQuantityDialog = null
+                                    } else if (!enterByAmount && viewModel.setLooseProductInCart(product, qtyBase, enteredQuantityText)) {
+                                        showLooseQuantityDialog = null
+                                    } else {
+                                        Toast.makeText(context, context.getString(R.string.loose_invalid_quantity_toast), Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                enabled = quantityBase != null && amountPaise != null && !exceedsStock,
+                                modifier = Modifier.weight(1.4f)
+                            ) {
+                                Text(stringResource(R.string.quick_add_save_add_to_bill))
+                            }
+                        }
+                    }
+                }
+            }
+        }
         // 2. QUICK ADD PRODUCT DIALOG
         if (showQuickAddDialog) {
             Dialog(onDismissRequest = { showQuickAddDialog = false }) {
@@ -1018,6 +1204,54 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
 // ==========================================
 // 3. INVOICE SUCCESS & RECEIPT SHARING SCREEN
 // ==========================================
+private fun billingQuantityDisplayUnit(product: Product): QuantityDisplayUnit {
+    return when (product.unitType) {
+        DataUnitType.WEIGHT -> QuantityDisplayUnit.KILOGRAM
+        DataUnitType.VOLUME -> QuantityDisplayUnit.LITER
+        else -> QuantityDisplayUnit.PIECE
+    }
+}
+
+private fun billingProductUnitType(product: Product): ProductUnitType {
+    return when (product.unitType) {
+        DataUnitType.WEIGHT -> ProductUnitType.WEIGHT
+        DataUnitType.VOLUME -> ProductUnitType.VOLUME
+        else -> ProductUnitType.PIECE
+    }
+}
+
+@Composable
+private fun billingUnitLabel(product: Product): String {
+    return when (product.unitType) {
+        DataUnitType.WEIGHT -> stringResource(R.string.unit_kg_short)
+        DataUnitType.VOLUME -> stringResource(R.string.unit_liter_short)
+        else -> stringResource(R.string.unit_piece_short)
+    }
+}
+
+@Composable
+private fun billingQuantityText(product: Product, quantityBase: Long, enteredQuantityText: String?): String {
+    val unitLabel = billingUnitLabel(product)
+    val displayUnit = billingQuantityDisplayUnit(product)
+    val quantityText = enteredQuantityText?.takeIf { it.isNotBlank() } ?: billingBaseToDisplayText(quantityBase, displayUnit)
+    return "$quantityText $unitLabel"
+}
+
+private fun billingParseQuantityBase(input: String, displayUnit: QuantityDisplayUnit): Long? {
+    return when (val result = QuantityPriceCalculator.parseQuantityBase(input.trim(), displayUnit)) {
+        is CalculationResult.Success -> result.value
+        is CalculationResult.Failure -> null
+    }
+}
+
+private fun billingBaseToDisplayText(baseQuantity: Long, displayUnit: QuantityDisplayUnit): String {
+    if (baseQuantity <= 0L) return "0"
+    val scale = displayUnit.baseUnitsPerDisplayUnit
+    if (scale <= 1L) return baseQuantity.toString()
+    val whole = baseQuantity / scale
+    val fraction = (baseQuantity % scale).toString().padStart(displayUnit.maxFractionDigits, '0').trimEnd('0')
+    return if (fraction.isBlank()) whole.toString() else "$whole.$fraction"
+}
 @Composable
 fun BillSuccessScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current

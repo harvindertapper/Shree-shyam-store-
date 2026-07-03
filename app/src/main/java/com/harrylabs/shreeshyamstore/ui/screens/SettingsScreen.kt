@@ -91,7 +91,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Session Profile display card
-            if (settings.isUserLoggedIn) {
+            if (viewModel.isUserLoggedIn) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = SaffronLight),
                     shape = RoundedCornerShape(16.dp),
@@ -124,13 +124,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                         color = SaffronDark
                                     )
                                     Text(
-                                        text = settings.loggedInUsername,
+                                        text = viewModel.currentUser?.displayName ?: "Owner",
                                         fontSize = 17.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = TextNearBlack
                                     )
                                     Text(
-                                        text = settings.loggedInEmail,
+                                        text = viewModel.currentUser?.email ?: "",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextMediumGray
@@ -138,7 +138,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 }
                             }
                             Button(
-                                onClick = { viewModel.logoutUser() },
+                                onClick = { viewModel.logoutUser(context) },
                                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.testTag("logout_button").heightIn(min = 40.dp)

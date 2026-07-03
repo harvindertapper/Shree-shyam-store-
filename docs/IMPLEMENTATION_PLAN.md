@@ -11,29 +11,35 @@ Completed checkpoints:
 3. `FR-B` Room v2 reset — `4bb4927`.
 4. `FR-P` App identity rename to `com.harrylabs.shreeshyamstore` — `b7d92f2`.
 
-Current remaining sequence:
+5. Firebase project/config prerequisites are complete for project `shreeshyamstore`.
+6. `FR-K` Room UUID primary keys and relationship refactoring is complete.
 
-1. Firebase project/config prerequisites.
-2. `FR-K` Room UUID primary keys and relationship refactoring for cross-device sync safety.
-3. `FR-G` Firebase Auth using Android Credential Manager Sign in with Google, owner/shop/membership profile creation/restore, and deprecating local auth tables.
-4. `FR-G2` Firestore rules, App Check posture, and cost controls.
-5. `FR-D` Product Add/Edit unit/rate/stock UI with inline category creation.
-6. `FR-H` Product/category/settings Firestore sync.
-7. `FR-I1` Inventory restore QA.
-8. `FR-E` Billing weighted entry, bidirectional amount/quantity calculator, and per-line rate override.
-9. `FR-F` Sale/stock/invoice/udhaar persistence.
-10. `FR-I2` Billing restore QA.
-11. `FR-J` Sales/stock/udhaar cloud sync planning.
+Current professional delivery sequence:
+
+Detailed route: `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md`.
+
+1. `PD-00` Source-of-truth and checklist sync so future agents do not follow stale Room v2/Firebase-not-implemented text.
+2. `PD-01` Stabilization checkpoint and main-safety verification for current FR-G/sync/billing changes.
+3. `PD-02` Firebase owner trust gate: final live Google Sign-In, owner/shop/membership restore, account-switch behavior, and no empty-shop false success.
+4. `PD-03A/B` Professional sync engine for settings, categories, products, customers, and udhaar with restore gate, pending/error visibility, retry, and idempotency.
+5. `PD-04` Product and stock setup for real kiryana use: piece/weight/volume, inline category creation, stock-by-exception, and quick-added product cleanup.
+6. `PD-05` Billing counter hardening: no forced customer/invoice, one-tap sale save, loose amount-to-quantity flow, quantity-to-amount flow, per-line rate override, smart product quick-add, and tracked-stock validation.
+7. `PD-03C` Sales, sale items, stock adjustments, and invoice metadata sync after billing persistence is stable.
+8. `PD-06` Quick udhaar: customer quick credit/payment entry plus WhatsApp/share reminder text without Contacts permission.
+9. `PD-07` Private Owner Desk: total stock value, category-wise stock value, profit reports from sale-item cost snapshots, and private access controls.
+10. `PD-08` End-of-day "Aaj ka hisaab": cash, UPI, udhaar, total sale, profit where allowed, low stock, top items, pending sync, and shop-close summary.
+11. `PD-09` Optional invoice PDF and Android share/WhatsApp workflow using saved sale snapshots.
+12. `PD-10` Professional release hardening: App Check/cost controls, Android backup policy, privacy, release signing, localization polish, and final QA gates.
 
 
 ## Shared Constraints
 
 - Preserve existing Room data unless an approved migration is included.
 - Do not add `fallbackToDestructiveMigration()` to new production schema work.
-- Owner decision on 2026-06-17 approves Firebase Auth/Firestore/cloud sync as mandatory MVP foundation before billing.
+- Owner decision on 2026-06-17 approves Firebase Auth/Firestore/cloud sync as mandatory foundation before trusted billing and real inventory entry.
 - Owner decision on 2026-06-17 sets final application id, namespace, Firebase app identity, and Play Store identity to `com.harrylabs.shreeshyamstore`.
-- No real inventory has been entered yet. Room v2 and the v1-only reset are already implemented; v2 onward requires intentional migrations or a new explicit owner-approved reset.
-- Real inventory entry is blocked until FR-G, FR-G2, FR-D, FR-H, and FR-I1 pass.
+- No real inventory has been entered yet. The approved early reset/migration path has already been used through Room v4; Room v4 to v5 now uses an intentional migration for the local sync outbox. Future v5 onward changes require intentional migrations or a new explicit owner-approved reset.
+- Real inventory entry is blocked until live Firebase owner restore, App Check/cost posture, product unit/stock setup, product/category/settings sync, and inventory restore gates pass.
 - Do not add random Firebase implementation without accepted architecture, security rules, privacy, migration, offline/conflict, and QA packets.
 - Do not add Bluetooth printer, multi-store implementation, staff role implementation, or real UPI verification without owner approval.
 - All user-facing text must go through English and Hindi string resources.
@@ -116,7 +122,7 @@ Review owner: QA.
 
 ### M02F-FIREBASE-CLOUD-FOUNDATION-001 — Historical/Superseded
 
-Goal: Establish Firebase Auth and Firestore as the MVP foundation before billing hardening.
+Historical goal: establish Firebase Auth and Firestore as the foundation before billing hardening. Current active route is the professional delivery sequence above.
 
 Scope paths:
 
@@ -456,8 +462,8 @@ Review owner: delivery manager plus security/governance.
 ## Known Blockers
 
 - `TBD - owner decision required`: production credential storage.
-- `TBD - owner decision required`: Firebase project/config ownership, environment separation, app registration for `com.harrylabs.shreeshyamstore`, Firestore region, SHA-1/SHA-256 keys, App Check, and cost guardrails.
-- `TBD - owner decision required`: Firebase Auth rollout details; current direction is Credential Manager Sign in with Google first.
+- Firebase project/config ownership is partially resolved: project `shreeshyamstore`, app id `com.harrylabs.shreeshyamstore`, Firestore `(default)` in `asia-south1`, and Android config are present. Remaining owner decisions: dev/prod separation, delete protection/PITR posture, App Check, and cost guardrails.
+- `TBD - owner decision required`: complete/confirm live Firebase Authentication Google provider enablement and manual owner sign-in/shop-profile QA; current direction is Credential Manager Sign in with Google first.
 - `TBD - owner decision required`: App Check enforcement timing, cost monitoring, backup/retention, and high-risk conflict policy details.
 - `TBD - owner decision required`: invoice legal/tax fields.
 - `TBD - owner decision required`: backup/export/import format and restore policy.

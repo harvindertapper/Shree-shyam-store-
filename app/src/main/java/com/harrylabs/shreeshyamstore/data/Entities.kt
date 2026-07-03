@@ -1,6 +1,7 @@
 package com.harrylabs.shreeshyamstore.data
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -11,6 +12,20 @@ object SyncStatus {
     const val SYNCED = "SYNCED"
     const val CONFLICT = "CONFLICT"
     const val FAILED = "FAILED"
+}
+
+object SyncOperationType {
+    const val SNAPSHOT_UPSERT = "SNAPSHOT_UPSERT"
+}
+
+object SyncEntityType {
+    const val SHOP_SNAPSHOT = "SHOP_SNAPSHOT"
+    const val CATEGORY = "CATEGORY"
+    const val PRODUCT = "PRODUCT"
+    const val CUSTOMER = "CUSTOMER"
+    const val UDHAAR_TRANSACTION = "UDHAAR_TRANSACTION"
+    const val SALE = "SALE"
+    const val STOCK_ADJUSTMENT = "STOCK_ADJUSTMENT"
 }
 
 object DataUnitType {
@@ -56,6 +71,26 @@ data class Category(
     val sourceDeviceId: String? = null,
     val name: String,
     val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Entity(
+    tableName = "sync_outbox_operations",
+    indices = [Index(value = ["shopId", "syncStatus", "createdAt"])]
+)
+data class SyncOutboxOperation(
+    @PrimaryKey val localUuid: String = newLocalUuid(),
+    val shopId: String,
+    val operationType: String = SyncOperationType.SNAPSHOT_UPSERT,
+    val entityType: String = SyncEntityType.SHOP_SNAPSHOT,
+    val entityUuid: String,
+    val clientOperationId: String = newLocalUuid(),
+    val sourceDeviceId: String,
+    val createdByUid: String? = null,
+    val syncStatus: String = SyncStatus.PENDING,
+    val retryCount: Int = 0,
+    val lastError: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
@@ -215,13 +250,3 @@ data class StockAdjustment(
     val reason: String, // e.g. "Opening stock entry", "Purchase added", "Manual correction", "Damaged/expired", etc.
     val createdAt: Long = System.currentTimeMillis()
 )
-
-@Entity(tableName = "users")
-data class User(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val username: String,
-    val email: String,
-    val passwordHash: String, // Plaintext or Cipher text representation
-    val createdAt: Long = System.currentTimeMillis()
-)
-
