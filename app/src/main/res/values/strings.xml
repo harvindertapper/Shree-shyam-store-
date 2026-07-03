@@ -134,6 +134,7 @@
     <string name="billing_cart_count">%1$d items in cart</string>
     <string name="billing_total">Total</string>
     <string name="billing_cart_empty_toast">Cart is empty. Add products first.</string>
+    <string name="billing_save_cash_sale">Save cash sale</string>
     <string name="billing_checkout">Continue to payment</string>
     <string name="billing_low_stock_dialog_title">Low stock</string>
     <string name="billing_low_stock_dialog_message">%1$s has only %2$d units left. Do you still want to add it to the cart?</string>

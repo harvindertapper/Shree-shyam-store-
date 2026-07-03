@@ -133,6 +133,7 @@
     <string name="billing_cart_count">कार्ट में %1$d आइटम</string>
     <string name="billing_total">कुल</string>
     <string name="billing_cart_empty_toast">कार्ट खाली है। पहले प्रोडक्ट जोड़ें।</string>
+    <string name="billing_save_cash_sale">नकद बिक्री सेव करें</string>
     <string name="billing_checkout">भुगतान पर जाएं</string>
     <string name="billing_low_stock_dialog_title">कम स्टॉक</string>
     <string name="billing_low_stock_dialog_message">%1$s का स्टॉक केवल %2$d यूनिट बचा है। क्या आप इसे फिर भी कार्ट में जोड़ना चाहते हैं?</string>

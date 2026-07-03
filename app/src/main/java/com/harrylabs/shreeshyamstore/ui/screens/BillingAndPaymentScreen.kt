@@ -478,25 +478,51 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         )
                     }
 
-                    Button(
-                        onClick = {
-                            if (cart.isEmpty()) {
-                                Toast.makeText(context, cartEmptyToast, Toast.LENGTH_SHORT).show()
-                            } else {
-                                viewModel.navigateTo(Screen.Payment(cartTotal))
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .height(56.dp)
-                            .widthIn(min = 160.dp)
-                            .testTag("checkout_payment_button")
+                    Column(
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(stringResource(R.string.billing_checkout), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Icon(Icons.Default.ArrowForward, contentDescription = null)
+                        Button(
+                            onClick = {
+                                if (cart.isEmpty()) {
+                                    Toast.makeText(context, cartEmptyToast, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    viewModel.completeBill(paymentMode = "CASH")
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .height(50.dp)
+                                .widthIn(min = 160.dp)
+                                .testTag("save_cash_sale_button")
+                        ) {
+                            Text(
+                                stringResource(R.string.billing_save_cash_sale),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                if (cart.isEmpty()) {
+                                    Toast.makeText(context, cartEmptyToast, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    viewModel.navigateTo(Screen.Payment(cartTotal))
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .height(44.dp)
+                                .widthIn(min = 160.dp)
+                                .testTag("checkout_payment_button")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.billing_checkout), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(Icons.Default.ArrowForward, contentDescription = null)
+                            }
                         }
                     }
                 }
