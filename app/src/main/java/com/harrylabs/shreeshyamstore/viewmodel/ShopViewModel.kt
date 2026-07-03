@@ -11,7 +11,11 @@ import com.harrylabs.shreeshyamstore.R
 import com.harrylabs.shreeshyamstore.data.*
 import com.harrylabs.shreeshyamstore.utils.CalculationResult
 import com.harrylabs.shreeshyamstore.utils.CurrencyUtils
+import com.harrylabs.shreeshyamstore.utils.DateTimeUtils
+import com.harrylabs.shreeshyamstore.utils.OwnerInsightsCalculator
+import com.harrylabs.shreeshyamstore.utils.ProfitSummary
 import com.harrylabs.shreeshyamstore.utils.QuantityPriceCalculator
+import com.harrylabs.shreeshyamstore.utils.StockValueSummary
 import com.harrylabs.shreeshyamstore.utils.UnitRate
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -32,6 +36,7 @@ sealed class Screen {
     object Udhaar : Screen()
     data class CustomerDetail(val customerUuid: String) : Screen()
     object Reports : Screen()
+    object OwnerDesk : Screen()
     object Settings : Screen()
 }
 
@@ -63,6 +68,11 @@ sealed class SyncState {
     object Synced : SyncState()
     data class Error(val message: String) : SyncState()
 }
+
+data class OwnerDeskState(
+    val stockValue: StockValueSummary,
+    val profit: ProfitSummary
+)
 
 class ShopViewModel(
     private val repository: ShopRepository,
@@ -898,6 +908,59 @@ class ShopViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
+
+    private val saleItemsHistory: StateFlow<List<SaleItem>> = repository.allSaleItems
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val ownerDeskState: StateFlow<OwnerDeskState> = combine(
+        products,
+        categories,
+        salesHistory,
+        saleItemsHistory
+    ) { productList, categoryList, saleList, saleItemList ->
+        val now = System.currentTimeMillis()
+        OwnerDeskState(
+            stockValue = OwnerInsightsCalculator.stockValue(
+                products = productList,
+                categories = categoryList
+            ),
+            profit = OwnerInsightsCalculator.profit(
+                sales = saleList,
+                saleItems = saleItemList,
+                todayStart = DateTimeUtils.getStartOfDay(now),
+                todayEnd = DateTimeUtils.getEndOfDay(now),
+                monthStart = DateTimeUtils.getStartOfMonth(now),
+                monthEnd = now
+            )
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = OwnerDeskState(
+            stockValue = StockValueSummary(
+                totalSellingValuePaise = 0L,
+                totalPurchaseValuePaise = 0L,
+                potentialMarginPaise = 0L,
+                categoryValues = emptyList(),
+                trackedProductCount = 0,
+                untrackedProductCount = 0,
+                missingPurchasePriceProductCount = 0
+            ),
+            profit = ProfitSummary(
+                todayProfitPaise = 0L,
+                monthProfitPaise = 0L,
+                todaySalesValuePaise = 0L,
+                todayPurchaseCostPaise = 0L,
+                monthSalesValuePaise = 0L,
+                monthPurchaseCostPaise = 0L,
+                missingPurchaseCostLineCount = 0
+            )
+        )
+    )
 
     fun getSaleItems(saleUuid: String): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleUuid)
 

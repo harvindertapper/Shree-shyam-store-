@@ -402,7 +402,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: String?) {
     var mrp by remember { mutableStateOf("") }
     var sellingPrice by remember { mutableStateOf("") }
     var purchasePrice by remember { mutableStateOf("") }
-    var trackStock by remember { mutableStateOf(true) }
+    var trackStock by remember { mutableStateOf(false) }
     var currentStock by remember { mutableStateOf("") }
     var lowStockQty by remember { mutableStateOf("5") }
     var isActive by remember { mutableStateOf(true) }

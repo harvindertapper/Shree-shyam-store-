@@ -138,6 +138,7 @@ class MainActivity : ComponentActivity() {
                                 is Screen.Udhaar -> UdhaarScreen(viewModel)
                                 is Screen.CustomerDetail -> CustomerDetailScreen(viewModel, screen.customerUuid)
                                 is Screen.Reports -> ReportsScreen(viewModel)
+                                is Screen.OwnerDesk -> OwnerDeskScreen(viewModel)
                                 is Screen.Settings -> SettingsScreen(viewModel)
                             }
                         }

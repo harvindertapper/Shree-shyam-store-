@@ -74,9 +74,30 @@
     <string name="home_opening_stock_subtitle">Rapid inventory entry</string>
     <string name="home_udhaar_ledger">Credit ledger</string>
     <string name="home_udhaar_ledger_subtitle">Track credits and payments</string>
+    <string name="home_owner_desk">Owner Desk</string>
+    <string name="home_owner_desk_subtitle">Private stock and profit</string>
+    <string name="home_reports_subtitle">Bills and sale history</string>
     <string name="sync_status_syncing">Syncing shop data…</string>
     <string name="sync_status_error_title">Cloud sync needs attention</string>
     <string name="sync_status_error_message">Saved locally. Tap retry so it reaches cloud backup.</string>
+
+    <string name="owner_desk_title">Owner Desk</string>
+    <string name="owner_desk_private_badge">Private owner section</string>
+    <string name="owner_desk_private_note">Stock value, purchase cost, and profit are kept away from customer billing screens.</string>
+    <string name="owner_desk_selling_stock_value">Stock value at selling price</string>
+    <string name="owner_desk_purchase_stock_value">Stock value at purchase price</string>
+    <string name="owner_desk_potential_margin">Potential stock margin</string>
+    <string name="owner_desk_tracked_items">%1$d tracked items</string>
+    <string name="owner_desk_untracked_items">%1$d untracked items</string>
+    <string name="owner_desk_missing_purchase_price">%1$d items missing purchase price</string>
+    <string name="owner_desk_profit_title">Profit summary</string>
+    <string name="owner_desk_today_profit">Today profit</string>
+    <string name="owner_desk_month_profit">This month profit</string>
+    <string name="owner_desk_sales_value">Sales: %1$s</string>
+    <string name="owner_desk_purchase_cost">Cost: %1$s</string>
+    <string name="owner_desk_category_stock_value">Category-wise stock value</string>
+    <string name="owner_desk_no_category_values">No tracked stock value yet. Enable stock tracking on important products to see values here.</string>
+    <string name="owner_desk_missing_profit_costs">%1$d sold lines are missing purchase cost, so profit is partial.</string>
 
     <string name="settings_title">Settings</string>
     <string name="settings_active_owner">Active owner:</string>

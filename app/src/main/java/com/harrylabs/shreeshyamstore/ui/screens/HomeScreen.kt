@@ -366,6 +366,34 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         onClick = { viewModel.navigateTo(Screen.Udhaar) }
                     )
                 }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HomeMenuButton(
+                        title = stringResource(R.string.home_owner_desk),
+                        subtitle = stringResource(R.string.home_owner_desk_subtitle),
+                        icon = Icons.Default.Lock,
+                        backgroundColor = Color(0xFFF3E8FF),
+                        iconColor = Color(0xFF6A1B9A),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("quick_owner_desk_button"),
+                        onClick = { viewModel.navigateTo(Screen.OwnerDesk) }
+                    )
+
+                    HomeMenuButton(
+                        title = stringResource(R.string.nav_reports),
+                        subtitle = stringResource(R.string.home_reports_subtitle),
+                        icon = Icons.Default.TrendingUp,
+                        backgroundColor = Color(0xFFE0F2F1),
+                        iconColor = Color(0xFF00695C),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("quick_reports_button"),
+                        onClick = { viewModel.navigateTo(Screen.Reports) }
+                    )
+                }
             }
         }
     }

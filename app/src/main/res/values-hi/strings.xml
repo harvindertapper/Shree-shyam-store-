@@ -73,9 +73,30 @@
     <string name="home_opening_stock_subtitle">तेज़ इन्वेंटरी एंट्री</string>
     <string name="home_udhaar_ledger">उधार खाता</string>
     <string name="home_udhaar_ledger_subtitle">उधार और भुगतान ट्रैक करें</string>
+    <string name="home_owner_desk">मालिक डेस्क</string>
+    <string name="home_owner_desk_subtitle">निजी स्टॉक और लाभ</string>
+    <string name="home_reports_subtitle">बिल और बिक्री इतिहास</string>
     <string name="sync_status_syncing">दुकान का डेटा सिंक हो रहा है…</string>
     <string name="sync_status_error_title">क्लाउड सिंक पर ध्यान दें</string>
     <string name="sync_status_error_message">डेटा फोन में सेव है। क्लाउड बैकअप के लिए फिर से कोशिश करें।</string>
+
+    <string name="owner_desk_title">मालिक डेस्क</string>
+    <string name="owner_desk_private_badge">निजी मालिक सेक्शन</string>
+    <string name="owner_desk_private_note">स्टॉक वैल्यू, खरीद लागत और लाभ ग्राहक वाली बिलिंग स्क्रीन से अलग रखे गए हैं।</string>
+    <string name="owner_desk_selling_stock_value">बिक्री मूल्य पर स्टॉक वैल्यू</string>
+    <string name="owner_desk_purchase_stock_value">खरीद मूल्य पर स्टॉक वैल्यू</string>
+    <string name="owner_desk_potential_margin">संभावित स्टॉक मार्जिन</string>
+    <string name="owner_desk_tracked_items">%1$d ट्रैक किए गए आइटम</string>
+    <string name="owner_desk_untracked_items">%1$d अनट्रैक्ड आइटम</string>
+    <string name="owner_desk_missing_purchase_price">%1$d आइटम में खरीद मूल्य नहीं है</string>
+    <string name="owner_desk_profit_title">लाभ सारांश</string>
+    <string name="owner_desk_today_profit">आज का लाभ</string>
+    <string name="owner_desk_month_profit">इस महीने का लाभ</string>
+    <string name="owner_desk_sales_value">बिक्री: %1$s</string>
+    <string name="owner_desk_purchase_cost">लागत: %1$s</string>
+    <string name="owner_desk_category_stock_value">कैटेगरी अनुसार स्टॉक वैल्यू</string>
+    <string name="owner_desk_no_category_values">अभी कोई ट्रैक्ड स्टॉक वैल्यू नहीं है। जरूरी प्रोडक्ट पर स्टॉक ट्रैकिंग चालू करें।</string>
+    <string name="owner_desk_missing_profit_costs">%1$d बिक्री लाइन में खरीद लागत नहीं है, इसलिए लाभ आंशिक है।</string>
 
     <string name="settings_title">सेटिंग्स</string>
     <string name="settings_active_owner">सक्रिय मालिक:</string>

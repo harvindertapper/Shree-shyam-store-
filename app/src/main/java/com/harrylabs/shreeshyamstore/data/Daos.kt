@@ -150,6 +150,9 @@ interface SaleDao {
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND deletedAt IS NULL")
     fun getSaleItemsForSale(saleId: String): Flow<List<SaleItem>>
 
+    @Query("SELECT * FROM sale_items WHERE deletedAt IS NULL")
+    fun getAllSaleItems(): Flow<List<SaleItem>>
+
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND deletedAt IS NULL")
     suspend fun getSaleItemsForSaleList(saleId: String): List<SaleItem>
 

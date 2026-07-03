@@ -97,6 +97,7 @@ class ShopRepository(
 
     // Sales
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
+    val allSaleItems: Flow<List<SaleItem>> = saleDao.getAllSaleItems()
 
     suspend fun getSaleById(uuid: String): Sale? = withContext(Dispatchers.IO) {
         saleDao.getSaleById(uuid)
