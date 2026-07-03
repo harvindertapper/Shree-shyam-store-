@@ -18,7 +18,7 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE deletedAt IS NULL ORDER BY name ASC")
     suspend fun getAllCategoriesOnce(): List<Category>
 
-    @Query("SELECT * FROM categories WHERE name = :name AND deletedAt IS NULL LIMIT 1")
+    @Query("SELECT * FROM categories WHERE lower(name) = lower(:name) AND deletedAt IS NULL LIMIT 1")
     suspend fun getCategoryByName(name: String): Category?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

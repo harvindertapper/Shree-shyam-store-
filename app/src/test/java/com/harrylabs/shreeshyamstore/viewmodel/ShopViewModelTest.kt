@@ -98,6 +98,18 @@ class ShopViewModelTest {
     }
 
     @Test
+    fun addCategoryPreventsCaseInsensitiveDuplicates() = runTest {
+        shopRepository.insertCategory(Category(localUuid = "cat-grocery", name = "Grocery"))
+
+        viewModel.addCategory(" grocery ")
+        flushTasks()
+
+        val categories = database.categoryDao().getAllCategories().first()
+        assertEquals(1, categories.count { it.name.equals("grocery", ignoreCase = true) })
+        assertEquals("Grocery", categories.first { it.localUuid == "cat-grocery" }.name)
+    }
+
+    @Test
     fun signInWithNewUserRoutesToSetupScreen() = runTest {
         val identity = OwnerIdentity("uid-new", "new@gmail.com", "New User")
         fakeFirebaseOwnerRepo.signInResult = Result.success(identity)
