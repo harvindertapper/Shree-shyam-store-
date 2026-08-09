@@ -1,0 +1,332 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isShopOwner(shopId) {
+      return isSignedIn()
+        && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid;
+    }
+
+    function isActiveShopMember(shopId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid))
+        && get(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function canAccessShop(shopId) {
+      return isShopOwner(shopId) || isActiveShopMember(shopId);
+    }
+
+    function validString(value, min, max) {
+      return value is string && value.size() >= min && value.size() <= max;
+    }
+
+    function validOptionalString(value, max) {
+      return value == null || (value is string && value.size() <= max);
+    }
+
+    function validMoney(value) {
+      return value is number && value >= 0 && value <= 100000000;
+    }
+
+    function validNonNegativeInt(value) {
+      return value is int && value >= 0 && value <= 1000000000;
+    }
+
+    function validNonNegativeNumber(value) {
+      return value is number && value >= 0 && value <= 1000000000000;
+    }
+
+    function validLocalDocBase(data, docId, shopId, allowedFields) {
+      return data.keys().hasOnly(allowedFields)
+        && data.localUuid == docId
+        && data.shopId == shopId
+        && data.syncStatus == 'SYNCED'
+        && data.createdByUid is string
+        && data.createdByUid.size() > 0
+        && data.createdByUid.size() <= 128
+        && data.updatedByUid == request.auth.uid;
+    }
+
+    function validCategory(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'name', 'isActive', 'createdAt', 'updatedAt'
+        ])
+        && validString(data.name, 1, 80)
+        && data.isActive is bool
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    function validProduct(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'name', 'categoryId', 'mrp', 'sellingPrice', 'purchasePrice',
+          'unitType', 'displayUnit', 'baseUnit', 'allowsDecimalQuantity', 'quantityScale',
+          'pricePerUnitPaise', 'priceUnitBaseQty', 'purchasePricePerUnitPaise', 'purchasePriceUnitBaseQty',
+          'currentStock', 'stockQuantityBase', 'trackStock', 'lowStockAlertQty', 'lowStockAlertBase',
+          'isActive', 'createdAt', 'updatedAt'
+        ])
+        && validString(data.name, 1, 120)
+        && validString(data.categoryId, 1, 128)
+        && validMoney(data.mrp)
+        && (data.sellingPrice == null || validMoney(data.sellingPrice))
+        && (data.purchasePrice == null || validMoney(data.purchasePrice))
+        && data.unitType in ['PIECE', 'WEIGHT', 'VOLUME']
+        && data.displayUnit in ['PIECE', 'GRAM', 'KILOGRAM', 'MILLILITER', 'LITER']
+        && data.baseUnit in ['PIECE', 'GRAM', 'KILOGRAM', 'MILLILITER', 'LITER']
+        && data.allowsDecimalQuantity is bool
+        && validNonNegativeInt(data.quantityScale)
+        && validNonNegativeNumber(data.pricePerUnitPaise)
+        && data.priceUnitBaseQty is number && data.priceUnitBaseQty > 0
+        && (data.purchasePricePerUnitPaise == null || validNonNegativeNumber(data.purchasePricePerUnitPaise))
+        && (data.purchasePriceUnitBaseQty == null || (data.purchasePriceUnitBaseQty is number && data.purchasePriceUnitBaseQty > 0))
+        && data.currentStock is number
+        && data.stockQuantityBase is number
+        && data.trackStock is bool
+        && validNonNegativeInt(data.lowStockAlertQty)
+        && data.lowStockAlertBase is number
+        && data.isActive is bool
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    function validCustomer(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'name', 'phone', 'isActive', 'createdAt', 'updatedAt'
+        ])
+        && validString(data.name, 1, 120)
+        && validOptionalString(data.phone, 20)
+        && data.isActive is bool
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    function validUdhaarTransaction(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'customerId', 'saleId', 'type', 'amount', 'amountPaise', 'note', 'createdAt'
+        ])
+        && validString(data.customerId, 1, 128)
+        && validOptionalString(data.saleId, 128)
+        && data.type in ['CREDIT', 'PAYMENT']
+        && validMoney(data.amount)
+        && validNonNegativeNumber(data.amountPaise)
+        && validOptionalString(data.note, 300)
+        && data.createdAt is number;
+    }
+
+    function validSale(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'idempotencyKey', 'billNumber', 'totalAmount', 'totalAmountPaise',
+          'paymentMode', 'saleStatus', 'customerId', 'note', 'createdAt'
+        ])
+        && validString(data.idempotencyKey, 1, 128)
+        && validString(data.billNumber, 1, 80)
+        && validMoney(data.totalAmount)
+        && validNonNegativeNumber(data.totalAmountPaise)
+        && data.paymentMode in ['CASH', 'UPI', 'UDHAAR']
+        && data.saleStatus in ['COMPLETED', 'CANCELLED', 'RETURNED', 'REFUNDED']
+        && validOptionalString(data.customerId, 128)
+        && validOptionalString(data.note, 500)
+        && data.createdAt is number;
+    }
+
+    function validSaleItem(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'saleId', 'productId', 'productNameSnapshot', 'quantity',
+          'unitTypeSnapshot', 'displayUnitSnapshot', 'baseUnitSnapshot', 'enteredQuantityText',
+          'quantityBase', 'unitPrice', 'originalPricePerUnitPaise', 'originalPriceUnitBaseQty',
+          'effectivePricePerUnitPaise', 'effectivePriceUnitBaseQty', 'rateOverridden',
+          'lineTotal', 'lineTotalPaise', 'purchasePricePerUnitPaiseSnapshot',
+          'purchasePriceUnitBaseQtySnapshot'
+        ])
+        && validString(data.saleId, 1, 128)
+        && validString(data.productId, 1, 128)
+        && validString(data.productNameSnapshot, 1, 120)
+        && validNonNegativeInt(data.quantity)
+        && data.unitTypeSnapshot in ['PIECE', 'WEIGHT', 'VOLUME']
+        && data.displayUnitSnapshot in ['PIECE', 'GRAM', 'KILOGRAM', 'MILLILITER', 'LITER']
+        && data.baseUnitSnapshot in ['PIECE', 'GRAM', 'KILOGRAM', 'MILLILITER', 'LITER']
+        && validString(data.enteredQuantityText, 1, 40)
+        && data.quantityBase is number && data.quantityBase > 0
+        && validMoney(data.unitPrice)
+        && validNonNegativeNumber(data.originalPricePerUnitPaise)
+        && data.originalPriceUnitBaseQty is number && data.originalPriceUnitBaseQty > 0
+        && validNonNegativeNumber(data.effectivePricePerUnitPaise)
+        && data.effectivePriceUnitBaseQty is number && data.effectivePriceUnitBaseQty > 0
+        && data.rateOverridden is bool
+        && validMoney(data.lineTotal)
+        && validNonNegativeNumber(data.lineTotalPaise)
+        && (data.purchasePricePerUnitPaiseSnapshot == null || validNonNegativeNumber(data.purchasePricePerUnitPaiseSnapshot))
+        && (data.purchasePriceUnitBaseQtySnapshot == null || (data.purchasePriceUnitBaseQtySnapshot is number && data.purchasePriceUnitBaseQtySnapshot > 0));
+    }
+
+    function validStockAdjustment(data, docId, shopId) {
+      return validLocalDocBase(data, docId, shopId, [
+          'localUuid', 'shopId', 'syncStatus', 'createdByUid', 'updatedByUid',
+          'productId', 'oldStock', 'oldQuantityBase', 'newStock', 'newQuantityBase',
+          'difference', 'differenceBase', 'displayUnitSnapshot', 'reason', 'createdAt'
+        ])
+        && validString(data.productId, 1, 128)
+        && data.oldStock is number
+        && data.oldQuantityBase is number
+        && data.newStock is number
+        && data.newQuantityBase is number
+        && data.difference is number
+        && data.differenceBase is number
+        && data.displayUnitSnapshot in ['PIECE', 'GRAM', 'KILOGRAM', 'MILLILITER', 'LITER']
+        && validString(data.reason, 1, 160)
+        && data.createdAt is number;
+    }
+
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'activeShopId', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'activeShopId', 'createdAt'])
+                    && request.resource.data.uid == uid
+                    && request.resource.data.email == request.auth.token.email
+                    && request.resource.data.displayName is string
+                    && request.resource.data.displayName.size() > 0
+                    && request.resource.data.displayName.size() <= 100
+                    && request.resource.data.createdAt == request.time
+                    && (request.resource.data.activeShopId == null || (
+                        request.resource.data.activeShopId is string
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)).data.ownerUid == uid
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)/members/$(uid)).data.role == 'owner'
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)/members/$(uid)).data.status == 'active'
+                    ));
+
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasAll(['uid', 'email', 'displayName', 'activeShopId', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['uid', 'email', 'displayName', 'activeShopId', 'createdAt'])
+                    && request.resource.data.uid == resource.data.uid
+                    && request.resource.data.email == resource.data.email
+                    && request.resource.data.displayName == resource.data.displayName
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activeShopId'])
+                    && (request.resource.data.activeShopId == null || (
+                        request.resource.data.activeShopId is string
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)).data.ownerUid == uid
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)/members/$(uid)).data.role == 'owner'
+                        && getAfter(/databases/$(database)/documents/shops/$(request.resource.data.activeShopId)/members/$(uid)).data.status == 'active'
+                    ));
+
+      allow delete: if false;
+    }
+
+    match /shops/{shopId} {
+      allow read: if request.auth != null && (
+                    resource.data.ownerUid == request.auth.uid
+                    || exists(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid))
+                  );
+
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasAll(['shopId', 'name', 'ownerPhone', 'ownerUid', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['shopId', 'name', 'ownerPhone', 'ownerUid', 'createdAt'])
+                    && request.resource.data.shopId == shopId
+                    && request.resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.ownerPhone is string
+                    && request.resource.data.ownerPhone.matches('^[0-9]{10,15}$')
+                    && request.resource.data.createdAt == request.time
+                    && getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.activeShopId == shopId
+                    && getAfter(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid)).data.role == 'owner'
+                    && getAfter(/databases/$(database)/documents/shops/$(shopId)/members/$(request.auth.uid)).data.status == 'active';
+
+      allow update: if request.auth != null
+                    && resource.data.ownerUid == request.auth.uid
+                    && request.resource.data.keys().hasAll(['shopId', 'name', 'ownerPhone', 'ownerUid', 'createdAt'])
+                    && request.resource.data.keys().hasOnly(['shopId', 'name', 'ownerPhone', 'ownerUid', 'createdAt'])
+                    && request.resource.data.shopId == resource.data.shopId
+                    && request.resource.data.ownerUid == resource.data.ownerUid
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'ownerPhone'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.name.size() <= 100
+                    && request.resource.data.ownerPhone is string
+                    && request.resource.data.ownerPhone.matches('^[0-9]{10,15}$');
+
+      allow delete: if false;
+
+      match /members/{memberUid} {
+        allow read: if request.auth != null && (
+                      request.auth.uid == memberUid
+                      || get(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid == request.auth.uid
+                    );
+
+        allow create: if request.auth != null
+                      && request.auth.uid == memberUid
+                      && request.resource.data.keys().hasAll(['uid', 'shopId', 'role', 'status', 'createdAt'])
+                      && request.resource.data.keys().hasOnly(['uid', 'shopId', 'role', 'status', 'createdAt'])
+                      && request.resource.data.uid == memberUid
+                      && request.resource.data.shopId == shopId
+                      && request.resource.data.role == 'owner'
+                      && request.resource.data.status == 'active'
+                      && request.resource.data.createdAt == request.time
+                      && getAfter(/databases/$(database)/documents/users/$(memberUid)).data.activeShopId == shopId
+                      && getAfter(/databases/$(database)/documents/shops/$(shopId)).data.ownerUid == memberUid;
+
+        allow update: if false;
+        allow delete: if false;
+      }
+
+      match /categories/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validCategory(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /products/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validProduct(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /customers/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validCustomer(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /udhaarTransactions/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validUdhaarTransaction(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /sales/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validSale(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /saleItems/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validSaleItem(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+
+      match /stockAdjustments/{docId} {
+        allow read: if canAccessShop(shopId);
+        allow create, update: if canAccessShop(shopId) && validStockAdjustment(request.resource.data, docId, shopId);
+        allow delete: if false;
+      }
+    }
+  }
+}

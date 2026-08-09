@@ -1,21 +1,61 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Shree Shyam Store
 
-# Run and deploy your AI Studio app
+Shree Shyam Store is a Kotlin Android shop-management app customized for a small Indian kiryana/general store.
 
-This contains everything you need to run your app locally.
+The product goal is reliable daily shop use:
 
-View your app in AI Studio: https://ai.studio/apps/50ff1855-47a9-43b9-ac89-665c572737b1
+- Fast billing.
+- Product and stock management.
+- Cash, manual UPI, and udhaar sale records.
+- Customer udhaar ledger.
+- Basic reports.
+- Private owner reports for stock value/profit are planned in the professional delivery route.
+- Invoice generation and sharing.
+- English default UI with Hindi as the second supported language.
 
-## Run Locally
+Future work should follow the Shree Shyam Store kiryana-shop scope and native Kotlin Android stack.
 
-**Prerequisites:**  [Android Studio](https://developer.android.com/studio)
+## Stack
 
+- Kotlin
+- Jetpack Compose
+- Room database
+- DataStore preferences
+- Gradle Kotlin DSL
+- Min Android API 24
 
-1. Open Android Studio
-2. Select **Open** and choose the directory containing this project
-3. Allow Android Studio to fix any incompatibilities as it imports the project.
-4. Create a file named `.env` in the project directory and set `GEMINI_API_KEY` in that file to your Gemini API key (see `.env.example` for an example)
-5. Remove this line from the app's `build.gradle.kts` file: `signingConfig = signingConfigs.getByName("debugConfig")`
-6. Run the app on an emulator or physical device
+## Source Of Truth
+
+Read these before implementation work:
+
+- `AGENTS.md`
+- `docs/PRODUCT_SPEC.md`
+- `docs/IMPLEMENTATION_PLAN.md`
+- `docs/superpowers/plans/2026-07-02-professional-delivery-plan.md`
+- `docs/DELIVERY_WORKFLOW.md`
+- `docs/SCREEN_FLOW.md`
+- `docs/DATA_MODEL.md`
+- `docs/governance/*.md`
+- `APP_BUILD_CHECKLIST.md`
+
+## Build
+
+```powershell
+.\gradlew.bat :app:assembleDebug --stacktrace --console=plain --no-daemon
+.\gradlew.bat :app:testDebugUnitTest --stacktrace --console=plain --no-daemon
+```
+
+For Android/emulator-facing changes:
+
+```powershell
+.\gradlew.bat :app:assembleDebugAndroidTest --stacktrace --console=plain --no-daemon
+.\gradlew.bat :app:connectedDebugAndroidTest --stacktrace --console=plain --no-daemon
+```
+
+## Notes
+
+- The app is offline-capable today, but Firebase Auth/Firestore cloud recovery is mandatory professional foundation work before trusted real inventory and billing hardening.
+- Current professional route prioritizes restore/sync trust, fast optional-customer billing, loose item calculation, quick udhaar, private stock/profit views, daily close summary, and optional invoice/share.
+- UPI is only a manually recorded payment mode unless a future approved integration verifies payment.
+- Do not commit secrets, signing passwords, real customer data, or production API keys.
+- Legacy AI Studio/Gemini scaffolding may exist from project creation and should not define product scope.
