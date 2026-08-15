@@ -1,30 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path android:pathData="M31,63.928c0,0 6.4,-11 12.1,-13.1c7.2,-2.6 26,-1.4 26,-1.4l38.1,38.1L107,108.928l-32,-1L31,63.928z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:endX="85.84757"
-                android:endY="92.4963"
-                android:startX="42.9492"
-                android:startY="49.59793"
-                android:type="linear">
-                <item
-                    android:color="#44000000"
-                    android:offset="0.0" />
-                <item
-                    android:color="#00000000"
-                    android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillType="nonZero"
-        android:pathData="M65.3,45.828l3.8,-6.6c0.2,-0.4 0.1,-0.9 -0.3,-1.1c-0.4,-0.2 -0.9,-0.1 -1.1,0.3l-3.9,6.7c-6.3,-2.8 -13.4,-2.8 -19.7,0l-3.9,-6.7c-0.2,-0.4 -0.7,-0.5 -1.1,-0.3C38.8,38.328 38.7,38.828 38.9,39.228l3.8,6.6C36.2,49.428 31.7,56.028 31,63.928h46C76.3,56.028 71.8,49.428 65.3,45.828zM43.4,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2c-0.3,-0.7 -0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C45.3,56.528 44.5,57.328 43.4,57.328L43.4,57.328zM64.6,57.328c-0.8,0 -1.5,-0.5 -1.8,-1.2s-0.1,-1.5 0.4,-2.1c0.5,-0.5 1.4,-0.7 2.1,-0.4c0.7,0.3 1.2,1 1.2,1.8C66.5,56.528 65.6,57.328 64.6,57.328L64.6,57.328z"
-        android:strokeWidth="1"
-        android:strokeColor="#00000000" />
+    
+    <!-- Outer Safe-Zone Centralization -->
+    <group
+        android:translateX="14"
+        android:translateY="14">
+        
+        <!-- Traditional Sunbeam Aura -->
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M40,6 L38,13 L42,13 Z" />
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M23,12 L28,16 L25,19 Z" />
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M57,12 L52,16 L55,19 Z" />
+
+        <!-- Store Awning Roof -->
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M15,28 L65,28 L60,18 L20,18 Z" />
+
+        <!-- Saffron Stripes on the Awning Roof -->
+        <path
+            android:fillColor="#C2410C"
+            android:pathData="M22,20 L28,20 L27,26 L21,26 Z" />
+        <path
+            android:fillColor="#C2410C"
+            android:pathData="M34,20 L40,20 L39,26 L33,26 Z" />
+        <path
+            android:fillColor="#C2410C"
+            android:pathData="M46,20 L52,20 L51,26 L45,26 Z" />
+
+        <!-- Store Columns -->
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M18,28 L23,28 L23,55 L18,55 Z" />
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M30,28 L35,28 L35,55 L30,55 Z" />
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M42,28 L47,28 L47,55 L42,55 Z" />
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M54,28 L59,28 L59,55 L54,55 Z" />
+
+        <!-- Traditional Puja Diya representing Shree Shyam's Blessings -->
+        <path
+            android:fillColor="#FFEA79"
+            android:pathData="M35,46 C35,50 45,50 45,46 C45,44 41,38 40,38 C39,38 35,44 35,46 Z" />
+        <path
+            android:fillColor="#FFB300"
+            android:pathData="M37,47 C37,49 43,49 43,47 C43,46 41,41 40,41 C39,41 37,46 37,47 Z" />
+
+        <!-- Store Platform Foundation Base -->
+        <path
+            android:fillColor="#FFEDD5"
+            android:pathData="M10,55 L70,55 L70,61 L10,61 Z" />
+            
+    </group>
 </vector>
