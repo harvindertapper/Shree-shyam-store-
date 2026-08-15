@@ -8,9 +8,9 @@ import androidx.compose.runtime.Composable
 
 private val DarkColorScheme = darkColorScheme(
     primary = SaffronPrimary,
-    secondary = BrownSecondary,
+    secondary = SlateSecondary,
     tertiary = SaffronDark,
-    background = WarmCreamBg, // Force light background for a clean, consistent daylight layout
+    background = WarmCreamBg,
     surface = SurfaceWhite,
     onPrimary = SurfaceWhite,
     onSecondary = SurfaceWhite,
@@ -23,25 +23,28 @@ private val LightColorScheme = lightColorScheme(
     onPrimary = SurfaceWhite,
     primaryContainer = SaffronLight,
     onPrimaryContainer = SaffronDark,
-    secondary = BrownSecondary,
+    secondary = SlateSecondary,
     onSecondary = SurfaceWhite,
-    secondaryContainer = BrownContainer,
+    secondaryContainer = SlateContainer,
     onSecondaryContainer = TextNearBlack,
     background = WarmCreamBg,
     surface = SurfaceWhite,
     onBackground = TextNearBlack,
     onSurface = TextNearBlack,
-    surfaceVariant = BrownContainer,
-    onSurfaceVariant = TextNearBlack,
+    surfaceVariant = SlateContainer,
+    onSurfaceVariant = TextMediumGray,
     outline = BorderStrong,
+    outlineVariant = SurfaceCardBorder,
     error = ErrorRed,
-    onError = SurfaceWhite
+    errorContainer = ErrorRedLight,
+    onError = SurfaceWhite,
+    onErrorContainer = ErrorRed
 )
 
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Force disabled to maintain high contrast and custom branding
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
@@ -52,3 +55,4 @@ fun MyApplicationTheme(
         content = content
     )
 }
+

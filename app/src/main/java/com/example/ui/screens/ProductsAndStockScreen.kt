@@ -161,7 +161,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 
                         Card(
                             colors = CardDefaults.cardColors(
-                                containerColor = if (prod.isActive) Color.White else BrownContainer
+                                containerColor = if (prod.isActive) Color.White else SlateContainer
                             ),
                             border = BorderStroke(1.2.dp, BorderStrong),
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),

@@ -2,19 +2,37 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val SaffronPrimary = Color(0xFFC2410C) // Standard rich Saffron (C2410C)
-val SaffronDark = Color(0xFF7C2D12) // Rich dark saffron
-val SaffronLight = Color(0xFFFFEDD5) // Warm light saffron container
-val BrownSecondary = Color(0xFF374151) // Secondary text gray/brown
-val BrownContainer = Color(0xFFF3F4F6) // Neutral light gray/brown container
+// Primary Brand Palette - Rich Warm Indian Saffron & Warm Amber
+val SaffronPrimary = Color(0xFFD9480F) // Vivid energetic Indian Saffron (Warm & Trustworthy)
+val SaffronDark = Color(0xFF9C3400) // Deep royal saffron
+val SaffronLight = Color(0xFFFFE8D6) // Soft warm saffron container
+val SaffronGradientStart = Color(0xFFE8590C)
+val SaffronGradientEnd = Color(0xFFC92A2A)
 
-val WarmCreamBg = Color(0xFFFFFDF7) // Very clean white/cream background
-val SurfaceWhite = Color(0xFFFFFFFF) // Surface card white
-val TextNearBlack = Color(0xFF111827) // Strict #111827 main text (very high contrast)
-val TextMediumGray = Color(0xFF374151) // Secondary deep gray/brown #374151
-val TextMutedGray = Color(0xFF4B5563) // Muted neutral gray #4B5563
-val BorderStrong = Color(0xFF9CA3AF) // Strong visible border/outline #9CA3AF
+// Secondary & Dark Neutrals
+val SlateSecondary = Color(0xFF1E293B) // High-contrast modern Slate
+val SlateContainer = Color(0xFFF1F5F9) // Clean slate container
 
-val ErrorRed = Color(0xFFB91C1C) // Pure danger red #B91C1C
-val SuccessGreen = Color(0xFF15803D) // Pure success green #15803D
-val WarningOrange = Color(0xFFB45309) // Udhaar/Warning Saffron #B45309
+// Background & Surfaces
+val WarmCreamBg = Color(0xFFF8F9FA) // Crisp, ultra-clean neutral background
+val SurfaceWhite = Color(0xFFFFFFFF) // Pure white card surface
+val SurfaceCardBorder = Color(0xFFE2E8F0) // Subtle refined border
+
+// Typography Colors
+val TextNearBlack = Color(0xFF0F172A) // 900 slate high contrast text
+val TextMediumGray = Color(0xFF334155) // 700 slate readable secondary text
+val TextMutedGray = Color(0xFF64748B) // 500 slate muted captions/labels
+val BorderStrong = Color(0xFFCBD5E1) // 300 slate for visible outlines
+
+// Semantic & Status Accents
+val ErrorRed = Color(0xFFDC2626) // Vivid danger/Udhaar red
+val ErrorRedLight = Color(0xFFFEE2E2) // Light red container
+val SuccessGreen = Color(0xFF16A34A) // Crisp cash/paid green
+val SuccessGreenLight = Color(0xFFDCFCE7) // Light green container
+val WarningOrange = Color(0xFFEA580C) // Warning amber
+val WarningOrangeLight = Color(0xFFFFEDD5)
+val InfoBlue = Color(0xFF2563EB) // Info blue for UPI/Digital
+val InfoBlueLight = Color(0xFFDBEAFE)
+val PurpleAccent = Color(0xFF7C3AED)
+val PurpleAccentLight = Color(0xFFEDE9FE)
+
