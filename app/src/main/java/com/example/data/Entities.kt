@@ -96,8 +96,10 @@ data class SaleItem(
     }
 }
 
-// Alias for BillItem to ensure full compatibility with POS billing terminology
+// Aliases to ensure full compatibility with POS billing & ledger terminology
+typealias Bill = Sale
 typealias BillItem = SaleItem
+typealias Transaction = UdhaarTransaction
 
 @Entity(tableName = "customers")
 data class Customer(

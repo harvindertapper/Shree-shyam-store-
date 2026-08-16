@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.example.utils.AppLanguage
+import com.example.utils.SecurityUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -88,7 +89,7 @@ class SettingsDataStore(private val context: Context) {
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
                 biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
-                securityPin = preferences[SECURITY_PIN] ?: "1234",
+                securityPin = preferences[SECURITY_PIN] ?: SecurityUtils.hashPin("1234"),
                 firebaseUrl = preferences[FIREBASE_URL] ?: "",
                 firebasePrefix = preferences[FIREBASE_PREFIX] ?: "shreeshyam_sync",
                 lastSyncTime = preferences[LAST_SYNC_TIME] ?: "Never Synced",
@@ -104,8 +105,13 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun updateSecurityPin(pin: String) {
+        val hashToStore = if (pin.length == 64) {
+            pin
+        } else {
+            SecurityUtils.hashPin(pin)
+        }
         context.dataStore.edit { preferences ->
-            preferences[SECURITY_PIN] = pin
+            preferences[SECURITY_PIN] = hashToStore
         }
     }
 

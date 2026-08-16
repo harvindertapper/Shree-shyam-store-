@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.data.Product
+import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.theme.*
 import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
@@ -57,6 +58,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
     var showQuickAddDialog by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
 
     // Warning dialog regarding insufficient stock
     var showStockWarningProduct by remember { mutableStateOf<Product?>(null) }
@@ -67,7 +69,8 @@ fun BillingScreen(viewModel: ShopViewModel) {
     val filteredProducts = remember(activeProducts, searchQuery, selectedCategoryId) {
         activeProducts.filter { prod ->
             val matchesCategory = selectedCategoryId == null || prod.categoryId == selectedCategoryId
-            val matchesSearch = prod.name.contains(searchQuery, ignoreCase = true)
+            val matchesSearch = prod.name.contains(searchQuery, ignoreCase = true) ||
+                    (prod.barcode.isNotEmpty() && prod.barcode.contains(searchQuery, ignoreCase = true))
             matchesCategory && matchesSearch
         }
     }
@@ -124,9 +127,21 @@ fun BillingScreen(viewModel: ShopViewModel) {
                 placeholder = { Text(strings.searchProduct, color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
                 trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, null, tint = TextNearBlack)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, null, tint = TextNearBlack)
+                            }
+                        }
+                        IconButton(
+                            onClick = { showBarcodeScanner = true },
+                            modifier = Modifier.testTag("billing_scan_barcode_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = "Scan Barcode",
+                                tint = SaffronPrimary
+                            )
                         }
                     }
                 },
@@ -544,7 +559,41 @@ fun BillingScreen(viewModel: ShopViewModel) {
             )
         }
 
-        // 2. QUICK ADD PRODUCT DIALOG
+        // 2. BARCODE SCANNER DIALOG
+        if (showBarcodeScanner) {
+            BarcodeScannerDialog(
+                onDismiss = { showBarcodeScanner = false },
+                onBarcodeScanned = { scannedCode ->
+                    showBarcodeScanner = false
+                    val matchedProduct = activeProducts.find { 
+                        it.barcode.isNotBlank() && it.barcode.equals(scannedCode.trim(), ignoreCase = true)
+                    }
+                    if (matchedProduct != null) {
+                        if (matchedProduct.trackStock && matchedProduct.currentStock <= 0.0) {
+                            showStockWarningProduct = matchedProduct
+                        } else {
+                            viewModel.addProductToCart(matchedProduct)
+                            val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                "✓ ${matchedProduct.name} बिल में जोड़ा गया"
+                            } else {
+                                "✓ ${matchedProduct.name} added to cart"
+                            }
+                            Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
+                        }
+                    } else {
+                        searchQuery = scannedCode.trim()
+                        val notFoundMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "बारकोड: $scannedCode (उत्पाद नहीं मिला - नया उत्पाद जोड़ें)"
+                        } else {
+                            "Barcode: $scannedCode (Product not found in inventory)"
+                        }
+                        Toast.makeText(context, notFoundMsg, Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+        }
+
+        // 3. QUICK ADD PRODUCT DIALOG
         if (showQuickAddDialog) {
             Dialog(onDismissRequest = { showQuickAddDialog = false }) {
                 var newName by remember { mutableStateOf("") }

@@ -345,7 +345,8 @@ class ShopViewModel(
         unit: String = "pcs",
         trackStock: Boolean,
         lowStockAlertQty: Double,
-        isActive: Boolean
+        isActive: Boolean,
+        barcode: String = ""
     ) {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -361,6 +362,7 @@ class ShopViewModel(
                     unit = unit.trim().ifEmpty { "pcs" },
                     trackStock = trackStock,
                     lowStockAlertQty = lowStockAlertQty,
+                    barcode = barcode.trim(),
                     isActive = isActive,
                     createdAt = now,
                     updatedAt = now
@@ -397,6 +399,7 @@ class ShopViewModel(
                         unit = unit.trim().ifEmpty { existing.unit },
                         trackStock = trackStock,
                         lowStockAlertQty = lowStockAlertQty,
+                        barcode = barcode.trim(),
                         isActive = isActive,
                         updatedAt = now
                     )
@@ -483,7 +486,7 @@ class ShopViewModel(
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
      */
-    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs") {
+    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs", barcode: String = "") {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val prod = Product(
@@ -494,6 +497,7 @@ class ShopViewModel(
                 currentStock = currentStock,
                 unit = unit.trim().ifEmpty { "pcs" },
                 trackStock = trackStock,
+                barcode = barcode.trim(),
                 isActive = true,
                 createdAt = now,
                 updatedAt = now

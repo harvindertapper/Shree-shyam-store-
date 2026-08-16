@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.Category
 import com.example.data.Product
+import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.theme.*
 import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
@@ -55,6 +56,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
     var filterOnlyLowStock by remember { mutableStateOf(false) }
     var showCategoryManagerDialog by remember { mutableStateOf(false) }
     var showReorderDialog by remember { mutableStateOf(false) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
 
     val lowStockProducts = remember(products) {
         products.filter { it.isActive && it.trackStock && it.currentStock <= it.lowStockAlertQty }
@@ -63,7 +65,8 @@ fun ProductsScreen(viewModel: ShopViewModel) {
     val filteredProducts = remember(products, searchQuery, selectedCategoryId, filterOnlyLowStock) {
         products.filter { prod ->
             val matchesCategory = selectedCategoryId == null || prod.categoryId == selectedCategoryId
-            val matchesSearch = prod.name.contains(searchQuery, ignoreCase = true)
+            val matchesSearch = prod.name.contains(searchQuery, ignoreCase = true) ||
+                    (prod.barcode.isNotEmpty() && prod.barcode.contains(searchQuery, ignoreCase = true))
             val matchesLowStock = !filterOnlyLowStock || (prod.isActive && prod.trackStock && prod.currentStock <= prod.lowStockAlertQty)
             matchesCategory && matchesSearch && matchesLowStock
         }
@@ -147,6 +150,25 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                 onValueChange = { searchQuery = it },
                 placeholder = { Text(strings.searchProductPlaceholder, color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Close, null, tint = TextNearBlack)
+                            }
+                        }
+                        IconButton(
+                            onClick = { showBarcodeScanner = true },
+                            modifier = Modifier.testTag("product_scan_barcode_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.QrCodeScanner,
+                                contentDescription = "Scan Barcode",
+                                tint = SaffronPrimary
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -161,6 +183,22 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                     unfocusedTextColor = TextNearBlack
                 )
             )
+
+            if (showBarcodeScanner) {
+                BarcodeScannerDialog(
+                    onDismiss = { showBarcodeScanner = false },
+                    onBarcodeScanned = { scannedCode ->
+                        showBarcodeScanner = false
+                        searchQuery = scannedCode.trim()
+                        val scannedMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "बारकोड स्कैन हुआ: $scannedCode"
+                        } else {
+                            "Barcode Scanned: $scannedCode"
+                        }
+                        Toast.makeText(context, scannedMsg, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            }
 
             // Low Stock Re-order Quick Alert Banner
             if (lowStockProducts.isNotEmpty()) {
@@ -567,7 +605,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
     var trackStock by remember { mutableStateOf(true) }
     var currentStock by remember { mutableStateOf("") }
     var lowStockQty by remember { mutableStateOf("5") }
+    var barcode by remember { mutableStateOf("") }
     var isActive by remember { mutableStateOf(true) }
+    var showBarcodeScanner by remember { mutableStateOf(false) }
 
     val screenTitle = if (productId != null) strings.editProduct else strings.addProductTitle
 
@@ -587,6 +627,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 trackStock = prod.trackStock
                 currentStock = prod.currentStock.toString()
                 lowStockQty = prod.lowStockAlertQty.toString()
+                barcode = prod.barcode
                 isActive = prod.isActive
             }
         }
@@ -629,6 +670,29 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     }
                 },
                 modifier = Modifier.fillMaxWidth().testTag("product_name_input"),
+                shape = RoundedCornerShape(10.dp)
+            )
+
+            // Barcode Input with Scan Button
+            val barcodeLabel = if (settings.appLanguage == AppLanguage.HINDI) "बारकोड (वैकल्पिक / Optional)" else "Barcode (Optional)"
+            OutlinedTextField(
+                value = barcode,
+                onValueChange = { barcode = it },
+                label = { Text(barcodeLabel) },
+                placeholder = { Text("EAN / UPC / QR Code") },
+                trailingIcon = {
+                    IconButton(
+                        onClick = { showBarcodeScanner = true },
+                        modifier = Modifier.testTag("add_product_scan_barcode_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = "Scan Barcode",
+                            tint = SaffronPrimary
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().testTag("product_barcode_input"),
                 shape = RoundedCornerShape(10.dp)
             )
 
@@ -805,7 +869,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                             currentStock = if (trackStock) stockValue else 0.0,
                             trackStock = trackStock,
                             lowStockAlertQty = alertValue,
-                            isActive = isActive
+                            isActive = isActive,
+                            barcode = barcode
                         )
                         val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} सुरक्षित हो गया!" else "${name.trim()} saved successfully!"
                         Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
@@ -819,6 +884,22 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     .testTag("save_product_button")
             ) {
                 Text(strings.saveProduct, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            }
+
+            if (showBarcodeScanner) {
+                BarcodeScannerDialog(
+                    onDismiss = { showBarcodeScanner = false },
+                    onBarcodeScanned = { scannedCode ->
+                        showBarcodeScanner = false
+                        barcode = scannedCode.trim()
+                        val msg = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "बारकोड दर्ज हुआ: $scannedCode"
+                        } else {
+                            "Barcode set: $scannedCode"
+                        }
+                        Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         }
     }

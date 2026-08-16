@@ -17,13 +17,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StockAdjustment::class,
         User::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun productDao(): ProductDao
     abstract fun saleDao(): SaleDao
+    fun billDao(): SaleDao = saleDao()
     abstract fun customerDao(): CustomerDao
     abstract fun udhaarDao(): UdhaarDao
     abstract fun stockAdjustmentDao(): StockAdjustmentDao

@@ -43,94 +43,29 @@ class ShopRepository(
     fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>> = saleDao.getSalesForDateRange(start, end)
 
     /**
-     * Executes the major invoice lock transaction:
-     * 1. Saves invoice (Sale)
-     * 2. Saves line items (SaleItems)
-     * 3. Subtracts stock for tracked items
-     * 4. Logs a Stock Adjustment for tracking history
-     * 5. Spawns an Udhaar CREDIT record if payment is selected as UDHAAR.
-     * Guaranteed atomic via Room database transaction.
+     * Executes atomic bill checkout transaction in Room:
+     * 1. Inserts Bill/Sale record
+     * 2. Inserts all BillItems/SaleItems line entries
+     * 3. Deducts sold quantity from Product.currentStock for tracked products
+     * 4. Logs StockAdjustment audit history record
+     * 5. If payment method is UDHAAR, logs UdhaarTransaction credit record & updates customer
+     * 
+     * Uses Room's @Transaction on the DAO layer to guarantee zero partial writes.
      */
+    suspend fun completeBillCheckout(
+        sale: Sale,
+        items: List<SaleItem>,
+        selectedCustomerId: Long? = null
+    ): Long {
+        return saleDao.completeBillCheckout(sale, items, selectedCustomerId)
+    }
+
     suspend fun insertSaleWithItems(
         sale: Sale,
         items: List<SaleItem>,
         selectedCustomerId: Long? = null
     ): Long {
-        val block: suspend () -> Long = {
-            val now = System.currentTimeMillis()
-            // 1. Insert Sale
-            val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
-            val finalizedSale = sale.copy(
-                customerId = finalCustomerId,
-                createdAt = if (sale.createdAt > 0) sale.createdAt else now,
-                updatedAt = now,
-                isSynced = false
-            )
-            val saleId = saleDao.insertSale(finalizedSale)
-
-            // 2. Loop and save each item
-            for (item in items) {
-                val itemToSave = item.copy(
-                    saleId = saleId,
-                    updatedAt = now,
-                    isSynced = false
-                )
-                saleDao.insertSaleItem(itemToSave)
-
-                // 3. Stock handling
-                val product = productDao.getProductById(item.productId)
-                if (product != null && product.trackStock) {
-                    val oldStock = product.currentStock
-                    val newStock = oldStock - item.quantity
-                    
-                    // Update product stock
-                    val updatedProduct = product.copy(
-                        currentStock = newStock,
-                        updatedAt = now,
-                        isSynced = false
-                    )
-                    productDao.update(updatedProduct)
-
-                    // Create stock adjustment history record
-                    val adj = StockAdjustment(
-                        productId = product.id,
-                        oldStock = oldStock,
-                        newStock = newStock,
-                        difference = -item.quantity,
-                        reason = "Bill Sale (No: ${sale.billNumber})",
-                        isSynced = false,
-                        createdAt = now,
-                        updatedAt = now
-                    )
-                    stockAdjustmentDao.insertAdjustment(adj)
-                }
-            }
-
-            // 4. Udhaar Transaction handling if payment mode is UDHAAR
-            if (sale.paymentMode == "UDHAAR" && finalCustomerId != null) {
-                val udhaarTx = UdhaarTransaction(
-                    customerId = finalCustomerId,
-                    saleId = saleId,
-                    type = "CREDIT",
-                    amount = sale.totalAmount,
-                    note = "Bill No: ${sale.billNumber}",
-                    isSynced = false,
-                    createdAt = now,
-                    updatedAt = now
-                )
-                udhaarDao.insertTransaction(udhaarTx)
-            }
-
-            saleId
-        }
-
-        return if (database != null) {
-            database.withTransaction {
-                block()
-            }
-        } else {
-            block()
-        }
+        return completeBillCheckout(sale, items, selectedCustomerId)
     }
 
     // Customers

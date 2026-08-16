@@ -46,7 +46,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
 
     var shopName by remember { mutableStateOf("") }
     var ownerPhone by remember { mutableStateOf("") }
-    var securityPin by remember { mutableStateOf("1234") }
+    var securityPin by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
     var qrUriString by remember { mutableStateOf("") }
     var autoSyncEnabled by remember { mutableStateOf(false) }
@@ -58,7 +58,6 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     LaunchedEffect(settings) {
         shopName = settings.shopName
         ownerPhone = settings.ownerPhone
-        securityPin = settings.securityPin
         welcomeChantEnabled = settings.welcomeChantEnabled
         qrUriString = settings.staticPaytmQrImageUri
         autoSyncEnabled = settings.autoSyncEnabled
@@ -742,12 +741,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         val nameReq = if (settings.appLanguage == AppLanguage.HINDI) "दुकान का नाम आवश्यक है!" else "Shop name is required!"
                         Toast.makeText(context, nameReq, Toast.LENGTH_SHORT).show()
                     } else {
+                        val pinToSave = if (securityPin.length == 4) securityPin else settings.securityPin
                         viewModel.updateSettings(
                             shopName = shopName.trim(),
                             ownerPhone = ownerPhone.trim(),
                             welcomeChantEnabled = welcomeChantEnabled,
                             qrImageUri = qrUriString,
-                            securityPin = if (securityPin.length == 4) securityPin else "1234"
+                            securityPin = pinToSave
                         )
                         viewModel.updateFirebaseSettings(
                             url = "",

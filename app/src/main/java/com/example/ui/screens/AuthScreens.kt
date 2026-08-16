@@ -39,6 +39,7 @@ import com.example.utils.AppLanguage
 import com.example.utils.AppStrings
 import com.example.utils.AuthManager
 import com.example.utils.LocaleHelper
+import com.example.utils.SecurityUtils
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 import kotlinx.coroutines.launch
@@ -386,7 +387,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
     var showForgotPinDialog by remember { mutableStateOf(false) }
 
     fun checkPin(pin: String) {
-        if (pin == settings.securityPin || (settings.securityPin.isEmpty() && pin == "1234")) {
+        if (SecurityUtils.verifyPin(pin, settings.securityPin)) {
             pinError = null
             Toast.makeText(context, strings.storeUnlocked, Toast.LENGTH_SHORT).show()
             if (settings.firstLaunchCompleted) {

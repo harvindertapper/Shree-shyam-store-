@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
@@ -75,54 +76,141 @@ interface ProductDao {
 }
 
 @Dao
-interface SaleDao {
+abstract class SaleDao {
     @Query("SELECT * FROM sales WHERE isDeleted = 0 ORDER BY createdAt DESC")
-    fun getAllSales(): Flow<List<Sale>>
+    abstract fun getAllSales(): Flow<List<Sale>>
 
     @Query("SELECT * FROM sales WHERE id = :id")
-    suspend fun getSaleById(id: Long): Sale?
+    abstract suspend fun getSaleById(id: Long): Sale?
 
     @Query("SELECT * FROM sales WHERE createdAt >= :start AND createdAt <= :end AND isDeleted = 0 ORDER BY createdAt DESC")
-    fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>>
+    abstract fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>>
 
     @Query("SELECT * FROM sales WHERE isSynced = 0")
-    suspend fun getUnsyncedSales(): List<Sale>
+    abstract suspend fun getUnsyncedSales(): List<Sale>
 
     @Query("UPDATE sales SET isSynced = 1 WHERE id IN (:ids)")
-    suspend fun markSalesSynced(ids: List<Long>)
+    abstract suspend fun markSalesSynced(ids: List<Long>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSale(sale: Sale): Long
+    abstract suspend fun insertSale(sale: Sale): Long
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND isDeleted = 0")
-    fun getSaleItemsForSale(saleId: Long): Flow<List<SaleItem>>
+    abstract fun getSaleItemsForSale(saleId: Long): Flow<List<SaleItem>>
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId")
-    suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem>
+    abstract suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem>
 
     @Query("SELECT * FROM sale_items")
-    suspend fun getAllSaleItemsList(): List<SaleItem>
+    abstract suspend fun getAllSaleItemsList(): List<SaleItem>
 
     @Query("SELECT * FROM sale_items WHERE isSynced = 0")
-    suspend fun getUnsyncedSaleItems(): List<SaleItem>
+    abstract suspend fun getUnsyncedSaleItems(): List<SaleItem>
 
     @Query("UPDATE sale_items SET isSynced = 1 WHERE id IN (:ids)")
-    suspend fun markSaleItemsSynced(ids: List<Long>)
+    abstract suspend fun markSaleItemsSynced(ids: List<Long>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertSaleItem(saleItem: SaleItem): Long
+    abstract suspend fun insertSaleItem(saleItem: SaleItem): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllSales(sales: List<Sale>)
+    abstract suspend fun insertAllSales(sales: List<Sale>)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertAllSaleItems(items: List<SaleItem>)
+    abstract suspend fun insertAllSaleItems(items: List<SaleItem>)
 
     @Query("DELETE FROM sales")
-    suspend fun clearAllSales()
+    abstract suspend fun clearAllSales()
 
     @Query("DELETE FROM sale_items")
-    suspend fun clearAllSaleItems()
+    abstract suspend fun clearAllSaleItems()
+
+    // Helper database operations for atomic transactions
+    @Query("SELECT * FROM products WHERE id = :productId LIMIT 1")
+    abstract suspend fun getProductById(productId: Long): Product?
+
+    @Query("UPDATE products SET currentStock = currentStock - :quantity, updatedAt = :updatedAt, isSynced = 0 WHERE id = :productId")
+    abstract suspend fun deductProductStock(productId: Long, quantity: Double, updatedAt: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long
+
+    @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
+    abstract suspend fun touchCustomer(customerId: Long, updatedAt: Long)
+
+    /**
+     * Executes atomic bill checkout transaction in local SQLite:
+     * 1. Inserts Bill/Sale record
+     * 2. Inserts all BillItems/SaleItems line entries
+     * 3. Deducts sold quantity from Product.currentStock for tracked products
+     * 4. Logs StockAdjustment audit history record
+     * 5. If payment method is UDHAAR, logs UdhaarTransaction credit record & touches customer
+     */
+    @Transaction
+    open suspend fun completeBillCheckout(
+        sale: Sale,
+        items: List<SaleItem>,
+        selectedCustomerId: Long? = null
+    ): Long {
+        val now = System.currentTimeMillis()
+        val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
+        val finalizedSale = sale.copy(
+            customerId = finalCustomerId,
+            createdAt = if (sale.createdAt > 0) sale.createdAt else now,
+            updatedAt = now,
+            isSynced = false
+        )
+        val saleId = insertSale(finalizedSale)
+
+        for (item in items) {
+            val itemToSave = item.copy(
+                saleId = saleId,
+                updatedAt = now,
+                isSynced = false
+            )
+            insertSaleItem(itemToSave)
+
+            val product = getProductById(item.productId)
+            if (product != null && product.trackStock) {
+                val oldStock = product.currentStock
+                val newStock = oldStock - item.quantity
+
+                deductProductStock(product.id, item.quantity, now)
+
+                val adj = StockAdjustment(
+                    productId = product.id,
+                    oldStock = oldStock,
+                    newStock = newStock,
+                    difference = -item.quantity,
+                    reason = "Bill Sale (No: ${sale.billNumber})",
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+                insertStockAdjustment(adj)
+            }
+        }
+
+        if (sale.paymentMode == "UDHAAR" && finalCustomerId != null) {
+            val udhaarTx = UdhaarTransaction(
+                customerId = finalCustomerId,
+                saleId = saleId,
+                type = "CREDIT",
+                amount = sale.totalAmount,
+                note = "Bill No: ${sale.billNumber}",
+                isSynced = false,
+                createdAt = now,
+                updatedAt = now
+            )
+            insertUdhaarTransaction(udhaarTx)
+            touchCustomer(finalCustomerId, now)
+        }
+
+        return saleId
+    }
 }
 
 @Dao
@@ -259,4 +347,7 @@ interface UserDao {
     @Query("DELETE FROM users")
     suspend fun clearAllUsers()
 }
+
+// Alias for BillDao to support direct POS billing terminology
+typealias BillDao = SaleDao
 
