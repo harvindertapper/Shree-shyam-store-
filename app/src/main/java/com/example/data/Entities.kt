@@ -106,6 +106,7 @@ data class Customer(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val phone: String? = null,
+    val creditLimit: Double = 5000.0,
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

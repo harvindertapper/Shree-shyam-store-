@@ -34,6 +34,7 @@ import com.example.ui.components.AppPrimaryButton
 import com.example.ui.theme.*
 import com.example.utils.AppLanguage
 import com.example.utils.LocaleHelper
+import com.example.utils.SyncManager
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 
@@ -624,6 +625,35 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 color = SaffronDark
                             )
                         }
+                    }
+
+                    // Action Button: Manual Sync Now
+                    Button(
+                        onClick = {
+                            SyncManager.triggerImmediateSync(context)
+                            val toastMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                "सिंक शुरू हो गया है... (Sync started)"
+                            } else {
+                                "Sync started in background..."
+                            }
+                            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .testTag("sync_now_button")
+                    ) {
+                        Icon(Icons.Default.Sync, null, modifier = Modifier.size(20.dp), tint = Color.White)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        val syncBtnLabel = if (settings.appLanguage == AppLanguage.HINDI) "🔄 सिंक करें (Sync Now)" else "🔄 Sync Now"
+                        Text(
+                            text = syncBtnLabel,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color.White
+                        )
                     }
 
                     if (syncInProgress) {

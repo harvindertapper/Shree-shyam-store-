@@ -27,7 +27,7 @@ object SyncManager {
             connectivityManager.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     super.onAvailable(network)
-                    scheduleInstantSync(context.applicationContext)
+                    triggerImmediateSync(context.applicationContext)
                 }
             })
             isNetworkCallbackRegistered = true
@@ -37,10 +37,9 @@ object SyncManager {
     }
 
     /**
-     * Triggers an immediate background sync with exponential retry when network is available.
-     * Called whenever a sale is completed, udhaar transaction is made, or product is modified.
+     * Triggers an immediate background sync with exponential retry when network is connected.
      */
-    fun scheduleInstantSync(context: Context) {
+    fun triggerImmediateSync(context: Context) {
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -64,6 +63,13 @@ object SyncManager {
         } catch (e: Throwable) {
             // Defensive handling if WorkManager is not initialized or in testing
         }
+    }
+
+    /**
+     * Alias for triggerImmediateSync for seamless backward compatibility.
+     */
+    fun scheduleInstantSync(context: Context) {
+        triggerImmediateSync(context)
     }
 
     /**
@@ -96,7 +102,7 @@ object SyncManager {
     }
 
     /**
-     * Returns LiveData/Flow of WorkInfo for the instant sync work
+     * Returns Flow of WorkInfo for the instant sync work
      */
     fun getInstantSyncWorkInfoFlow(context: Context) =
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(UNIQUE_ONE_TIME_WORK)

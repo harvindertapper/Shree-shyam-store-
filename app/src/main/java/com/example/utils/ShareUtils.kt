@@ -62,21 +62,42 @@ object ShareUtils {
     }
 
     /**
-     * Generate Udhaar reminder text in Hindi & English
+     * Generate Udhaar reminder text with dynamic clickable UPI payment link
      */
-    fun generateUdhaarReminderText(
+    fun formatUdhaarReminder(
         shopName: String,
         customerName: String,
         balance: Double,
         ownerPhone: String? = null,
-        ownerName: String? = null
+        ownerName: String? = null,
+        upiId: String? = null
     ): String {
         val formattedAmount = CurrencyUtils.formatRupees(balance)
         val sb = StringBuilder()
         sb.append("नमस्ते $customerName जी 🙏\n\n")
         sb.append("यह *$shopName* की तरफ से विनम्र सूचना है।\n")
         sb.append("आपके खाते में कुल बकाया उधार: *$formattedAmount* है।\n\n")
-        sb.append("कृपया सुविधानुसार जल्द से जल्द भुगतान करने का कष्ट करें।\n")
+
+        // Dynamic UPI Payment Link
+        val effectiveUpiPa = when {
+            !upiId.isNullOrBlank() -> upiId.trim()
+            !ownerPhone.isNullOrBlank() -> {
+                val cleanPhone = ownerPhone.replace(Regex("[^0-9]"), "")
+                if (cleanPhone.isNotEmpty()) "$cleanPhone@upi" else null
+            }
+            else -> null
+        }
+
+        if (effectiveUpiPa != null && balance > 0.0) {
+            val encodedShop = Uri.encode(shopName.trim())
+            val amountFormatted = "%.2f".format(Locale.ENGLISH, balance)
+            val upiUri = "upi://pay?pa=$effectiveUpiPa&pn=$encodedShop&am=$amountFormatted&cu=INR"
+            sb.append("कृपया नीचे दिए गए UPI लिंक पर क्लिक करके भुगतान करें:\n")
+            sb.append("$upiUri\n\n")
+        } else {
+            sb.append("कृपया सुविधानुसार जल्द से जल्द भुगतान करने का कष्ट करें।\n\n")
+        }
+
         if (!ownerPhone.isNullOrBlank()) {
             sb.append("संपर्क / UPI नंबर: $ownerPhone\n")
         }
@@ -86,6 +107,20 @@ object ShareUtils {
         sb.append("\nधन्यवाद!\n")
         sb.append("— $shopName")
         return sb.toString()
+    }
+
+    /**
+     * Legacy alias for formatUdhaarReminder
+     */
+    fun generateUdhaarReminderText(
+        shopName: String,
+        customerName: String,
+        balance: Double,
+        ownerPhone: String? = null,
+        ownerName: String? = null,
+        upiId: String? = null
+    ): String {
+        return formatUdhaarReminder(shopName, customerName, balance, ownerPhone, ownerName, upiId)
     }
 
     /**

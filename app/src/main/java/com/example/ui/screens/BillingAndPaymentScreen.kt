@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.example.data.Customer
 import com.example.data.Product
 import com.example.ui.components.BarcodeScannerDialog
 import com.example.ui.theme.*
@@ -743,8 +744,18 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val customers by viewModel.customers.collectAsState()
+    val allUdhaarTransactions by viewModel.allUdhaarTransactions.collectAsState()
+
+    val customerBalanceMap = remember(allUdhaarTransactions) {
+        allUdhaarTransactions.groupBy { it.customerId }.mapValues { (_, list) ->
+            list.sumOf { if (it.type == "CREDIT") it.amount else -it.amount }
+        }
+    }
 
     var showUdhaarCustomerDialog by remember { mutableStateOf(false) }
+    var showCreditLimitWarningDialog by remember { mutableStateOf(false) }
+    var pendingCreditLimitCustomer by remember { mutableStateOf<Customer?>(null) }
+    var pendingProjectedBalance by remember { mutableDoubleStateOf(0.0) }
 
     Scaffold(
         topBar = {
