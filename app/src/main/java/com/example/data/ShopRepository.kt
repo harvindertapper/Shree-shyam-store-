@@ -48,7 +48,7 @@ class ShopRepository(
      * 2. Saves line items (SaleItems)
      * 3. Subtracts stock for tracked items
      * 4. Logs a Stock Adjustment for tracking history
-     * 5. Spawns an Udhaar CREDIT record if payment is selected as UPI/Cash but deferred, or specifically marked as Udhaar.
+     * 5. Spawns an Udhaar CREDIT record if payment is selected as UDHAAR.
      * Guaranteed atomic via Room database transaction.
      */
     suspend fun insertSaleWithItems(
@@ -57,14 +57,24 @@ class ShopRepository(
         selectedCustomerId: Long? = null
     ): Long {
         val block: suspend () -> Long = {
+            val now = System.currentTimeMillis()
             // 1. Insert Sale
             val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
-            val finalizedSale = sale.copy(customerId = finalCustomerId)
+            val finalizedSale = sale.copy(
+                customerId = finalCustomerId,
+                createdAt = if (sale.createdAt > 0) sale.createdAt else now,
+                updatedAt = now,
+                isSynced = false
+            )
             val saleId = saleDao.insertSale(finalizedSale)
 
             // 2. Loop and save each item
             for (item in items) {
-                val itemToSave = item.copy(saleId = saleId)
+                val itemToSave = item.copy(
+                    saleId = saleId,
+                    updatedAt = now,
+                    isSynced = false
+                )
                 saleDao.insertSaleItem(itemToSave)
 
                 // 3. Stock handling
@@ -76,7 +86,8 @@ class ShopRepository(
                     // Update product stock
                     val updatedProduct = product.copy(
                         currentStock = newStock,
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = now,
+                        isSynced = false
                     )
                     productDao.update(updatedProduct)
 
@@ -87,7 +98,9 @@ class ShopRepository(
                         newStock = newStock,
                         difference = -item.quantity,
                         reason = "Bill Sale (No: ${sale.billNumber})",
-                        createdAt = System.currentTimeMillis()
+                        isSynced = false,
+                        createdAt = now,
+                        updatedAt = now
                     )
                     stockAdjustmentDao.insertAdjustment(adj)
                 }
@@ -101,7 +114,9 @@ class ShopRepository(
                     type = "CREDIT",
                     amount = sale.totalAmount,
                     note = "Bill No: ${sale.billNumber}",
-                    createdAt = System.currentTimeMillis()
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
                 )
                 udhaarDao.insertTransaction(udhaarTx)
             }
@@ -165,16 +180,18 @@ class ShopRepository(
     }
 
     /**
-     * Corrects a product stock level manually and lists history
+     * Corrects a product stock level manually and logs history
      */
-    suspend fun adjustProductStock(productId: Long, actualStockCounted: Int, reason: String) {
+    suspend fun adjustProductStock(productId: Long, actualStockCounted: Double, reason: String) {
         val product = productDao.getProductById(productId) ?: return
         val oldStock = product.currentStock
         val diff = actualStockCounted - oldStock
+        val now = System.currentTimeMillis()
         
         val updatedProduct = product.copy(
             currentStock = actualStockCounted,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = now,
+            isSynced = false
         )
         productDao.update(updatedProduct)
 
@@ -184,7 +201,9 @@ class ShopRepository(
             newStock = actualStockCounted,
             difference = diff,
             reason = reason,
-            createdAt = System.currentTimeMillis()
+            isSynced = false,
+            createdAt = now,
+            updatedAt = now
         )
         stockAdjustmentDao.insertAdjustment(adjustment)
     }
@@ -197,6 +216,31 @@ class ShopRepository(
     suspend fun getUserById(userId: Long): User? = userDao.getUserById(userId)
     suspend fun getAllUsers(): List<User> = userDao.getAllUsersList()
     suspend fun getAllStockAdjustmentsList(): List<StockAdjustment> = stockAdjustmentDao.getAllAdjustmentsList()
+
+    // --- Sync Engine Queries & Operations ---
+    suspend fun getUnsyncedCategories(): List<Category> = categoryDao.getUnsyncedCategories()
+    suspend fun markCategoriesSynced(ids: List<Long>) = categoryDao.markCategoriesSynced(ids)
+
+    suspend fun getUnsyncedProducts(): List<Product> = productDao.getUnsyncedProducts()
+    suspend fun markProductsSynced(ids: List<Long>) = productDao.markProductsSynced(ids)
+
+    suspend fun getUnsyncedSales(): List<Sale> = saleDao.getUnsyncedSales()
+    suspend fun markSalesSynced(ids: List<Long>) = saleDao.markSalesSynced(ids)
+
+    suspend fun getUnsyncedSaleItems(): List<SaleItem> = saleDao.getUnsyncedSaleItems()
+    suspend fun markSaleItemsSynced(ids: List<Long>) = saleDao.markSaleItemsSynced(ids)
+
+    suspend fun getUnsyncedCustomers(): List<Customer> = customerDao.getUnsyncedCustomers()
+    suspend fun markCustomersSynced(ids: List<Long>) = customerDao.markCustomersSynced(ids)
+
+    suspend fun getUnsyncedUdhaarTransactions(): List<UdhaarTransaction> = udhaarDao.getUnsyncedTransactions()
+    suspend fun markUdhaarTransactionsSynced(ids: List<Long>) = udhaarDao.markTransactionsSynced(ids)
+
+    suspend fun getUnsyncedStockAdjustments(): List<StockAdjustment> = stockAdjustmentDao.getUnsyncedAdjustments()
+    suspend fun markStockAdjustmentsSynced(ids: List<Long>) = stockAdjustmentDao.markAdjustmentsSynced(ids)
+
+    suspend fun getUnsyncedUsers(): List<User> = userDao.getUnsyncedUsers()
+    suspend fun markUsersSynced(ids: List<Long>) = userDao.markUsersSynced(ids)
 
     suspend fun clearAllLocalTables() {
         categoryDao.clearAllCategories()

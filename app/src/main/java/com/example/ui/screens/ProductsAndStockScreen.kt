@@ -1,8 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,17 +24,18 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.Category
 import com.example.data.Product
+import com.example.ui.theme.*
+import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
+import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
-import com.example.ui.theme.*
 
 // ==========================================
 // 1. PRODUCTS MASTER LIST SCREEN
@@ -43,6 +44,9 @@ import com.example.ui.theme.*
 @Composable
 fun ProductsScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     val products by viewModel.products.collectAsState()
     val categories by viewModel.categories.collectAsState()
 
@@ -77,7 +81,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("स्टॉक लिस्ट (Inventory) 📦", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.productsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -127,7 +131,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                 containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.testTag("fab_add_product")
             ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Product", tint = Color.White)
+                Icon(Icons.Default.Add, contentDescription = strings.addProductTitle, tint = Color.White)
             }
         }
     ) { innerPadding ->
@@ -141,7 +145,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("सामान का नाम खोजें (Search products)...", color = TextMutedGray) },
+                placeholder = { Text(strings.searchProductPlaceholder, color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -184,14 +188,24 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(20.dp))
                             Column {
+                                val lowStockBannerTitle = if (settings.appLanguage == AppLanguage.HINDI) {
+                                    "कम स्टॉक चेतावनी: ${lowStockProducts.size} सामान"
+                                } else {
+                                    "Low Stock Warning: ${lowStockProducts.size} items"
+                                }
+                                val lowStockBannerSub = if (settings.appLanguage == AppLanguage.HINDI) {
+                                    "थोक खरीदारी लिस्ट देखें"
+                                } else {
+                                    "View wholesale re-order list"
+                                }
                                 Text(
-                                    text = "कम स्टॉक चेतावनी (Low Stock): ${lowStockProducts.size} सामान",
+                                    text = lowStockBannerTitle,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Black,
                                     color = ErrorRed
                                 )
                                 Text(
-                                    text = "थोक ऑर्डर लिस्ट तैयार करें 📋",
+                                    text = lowStockBannerSub,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = TextNearBlack
@@ -206,7 +220,8 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                             modifier = Modifier.height(34.dp)
                         ) {
-                            Text("ऑर्डर लिस्ट", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            val orderListBtn = if (settings.appLanguage == AppLanguage.HINDI) "ऑर्डर लिस्ट" else "Order List"
+                            Text(orderListBtn, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -227,7 +242,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             selectedCategoryId = null
                             filterOnlyLowStock = false
                         },
-                        label = { Text("सभी (All)", fontWeight = FontWeight.Bold) }
+                        label = { Text(strings.allCategories, fontWeight = FontWeight.Bold) }
                     )
                 }
                 item {
@@ -243,7 +258,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     modifier = Modifier.size(16.dp)
                                 )
                                 Text(
-                                    "कम स्टॉक (${lowStockProducts.size})",
+                                    "${strings.lowStock} (${lowStockProducts.size})",
                                     fontWeight = FontWeight.Black,
                                     color = if (filterOnlyLowStock) Color.White else ErrorRed
                                 )
@@ -285,12 +300,13 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.Inbox, null, modifier = Modifier.size(54.dp), tint = BorderStrong)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("कोई सामान उपलब्ध नहीं है!", color = TextMediumGray, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                            val noProductsMsg = if (settings.appLanguage == AppLanguage.HINDI) "कोई सामान उपलब्ध नहीं है!" else "No products available!"
+                            Text(noProductsMsg, color = TextMediumGray, fontWeight = FontWeight.Black, fontSize = 16.sp)
                         }
                     }
                 } else {
                     items(filteredProducts) { prod ->
-                        val catName = categories.find { it.id == prod.categoryId }?.name ?: "Miscellaneous"
+                        val catName = categories.find { it.id == prod.categoryId }?.name ?: "General"
 
                         Card(
                             colors = CardDefaults.cardColors(
@@ -319,12 +335,13 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                             color = if (prod.isActive) TextNearBlack else TextMutedGray
                                         )
                                         if (!prod.isActive) {
-                                            SuggestionChip(onClick = {}, label = { Text("Inactive", fontWeight = FontWeight.Bold) })
+                                            val inactiveLabel = if (settings.appLanguage == AppLanguage.HINDI) "निष्क्रिय" else "Inactive"
+                                            SuggestionChip(onClick = {}, label = { Text(inactiveLabel, fontWeight = FontWeight.Bold) })
                                         }
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Category: $catName",
+                                        text = "${strings.category}: $catName",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = TextMediumGray
@@ -339,8 +356,9 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                             fontWeight = FontWeight.Bold,
                                             color = TextMediumGray
                                         )
+                                        val spLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री" else "SP"
                                         Text(
-                                            text = "SP: ${CurrencyUtils.formatRupees(prod.getEffectivePrice())}",
+                                            text = "$spLabel: ${CurrencyUtils.formatRupees(prod.getEffectivePrice())}",
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Black,
                                             color = SaffronPrimary
@@ -351,28 +369,39 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     if (prod.trackStock) {
                                         if (prod.currentStock <= 0) {
                                             Text(
-                                                "स्टॉक ख़त्म (Out of Stock) ❌",
+                                                strings.outOfStock,
                                                 color = ErrorRed,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else if (prod.currentStock <= prod.lowStockAlertQty) {
+                                            val lowStockMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                                "कम स्टॉक: ${prod.currentStock} बचा है"
+                                            } else {
+                                                "Low Stock: ${prod.currentStock} left"
+                                            }
                                             Text(
-                                                "कम स्टॉक (Low Stock): ${prod.currentStock} बचा है ⚠️",
+                                                lowStockMsg,
                                                 color = WarningOrange,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else {
+                                            val stockMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                                "स्टॉक: ${prod.currentStock} उपलब्ध"
+                                            } else {
+                                                "Stock: ${prod.currentStock} available"
+                                            }
                                             Text(
-                                                "स्टॉक: ${prod.currentStock} पीस 👍",
+                                                stockMsg,
                                                 color = SuccessGreen,
                                                 fontSize = 13.sp,
                                                 fontWeight = FontWeight.Black
                                             )
                                         }
                                     } else {
-                                        Text(text = "स्टॉक अनट्रैक्ड (No limit)", color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        val untrackedMsg = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक अनट्रैक्ड" else "Stock untracked"
+                                        Text(text = untrackedMsg, color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     }
                                 }
 
@@ -391,7 +420,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         onClick = { viewModel.navigateTo(Screen.AddEditProduct(prod.id)) },
                                         modifier = Modifier.testTag("edit_product_${prod.id}")
                                     ) {
-                                        Icon(Icons.Default.Edit, contentDescription = "Edit Product", tint = MaterialTheme.colorScheme.primary)
+                                        Icon(Icons.Default.Edit, contentDescription = strings.editProduct, tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -418,8 +447,9 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        val catManagerTitle = if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी प्रबंधन" else "Category Management"
                         Text(
-                            "कैटेगरी मैनेजमेंट (Categories) 🗂️",
+                            catManagerTitle,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -431,27 +461,30 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            val newCatPlaceholder = if (settings.appLanguage == AppLanguage.HINDI) "नई कैटेगरी का नाम" else "New Category Name"
                             OutlinedTextField(
                                 value = newCatName,
                                 onValueChange = { newCatName = it },
-                                placeholder = { Text("विविध कैटेगरी नाम (e.g. Rice)") },
+                                placeholder = { Text(newCatPlaceholder) },
                                 modifier = Modifier.weight(1f).testTag("category_add_input")
                             )
+                            val addBtnText = if (settings.appLanguage == AppLanguage.HINDI) "जोड़ें" else "Add"
                             Button(onClick = {
                                 if (newCatName.trim().isNotEmpty()) {
                                     viewModel.addCategory(newCatName)
                                     newCatName = ""
                                 }
                             }) {
-                                Text("जोड़ें")
+                                Text(addBtnText)
                             }
                         }
 
-                        Divider()
+                        HorizontalDivider()
 
                         // Editing listing dialog line
                         if (renamingCat != null) {
-                            Text("कैटेगरी का नाम बदलें:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            val renameTitle = if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी का नाम बदलें:" else "Rename Category:"
+                            Text(renameTitle, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -462,6 +495,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                     onValueChange = { renameText = it },
                                     modifier = Modifier.weight(1f)
                                 )
+                                val changeBtn = if (settings.appLanguage == AppLanguage.HINDI) "बदलें" else "Update"
                                 Button(onClick = {
                                     renamingCat?.let {
                                         viewModel.renameCategory(it, renameText)
@@ -469,7 +503,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         renameText = ""
                                     }
                                 }) {
-                                    Text("बदलें")
+                                    Text(changeBtn)
                                 }
                             }
                         }
@@ -484,7 +518,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(cat.name, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                        if (cat.name != "Miscellaneous") {
+                                        if (cat.name != "Miscellaneous" && cat.name != "General") {
                                             Row {
                                                 IconButton(onClick = {
                                                     renamingCat = cat
@@ -499,11 +533,12 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             }
                         }
 
+                        val doneText = if (settings.appLanguage == AppLanguage.HINDI) "पूर्ण" else "Done"
                         Button(
                             onClick = { showCategoryManagerDialog = false },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Done (पूर्ण)")
+                            Text(doneText)
                         }
                     }
                 }
@@ -520,6 +555,8 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 @Composable
 fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val categories by viewModel.categories.collectAsState()
 
     var name by remember { mutableStateOf("") }
@@ -532,7 +569,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
     var lowStockQty by remember { mutableStateOf("5") }
     var isActive by remember { mutableStateOf(true) }
 
-    var title by remember { mutableStateOf("नया सामान जोड़ें (New Product)") }
+    val screenTitle = if (productId != null) strings.editProduct else strings.addProductTitle
 
     // Validation flags
     var nameError by remember { mutableStateOf(false) }
@@ -540,7 +577,6 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
 
     LaunchedEffect(productId) {
         if (productId != null) {
-            title = "सामान बदलाव (Edit Product) ✏️"
             val prod = viewModel.getProduct(productId)
             if (prod != null) {
                 name = prod.name
@@ -559,7 +595,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title, fontWeight = FontWeight.Bold) },
+                title = { Text(screenTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Products) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -584,9 +620,14 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     name = it
                     if (it.trim().isNotEmpty()) nameError = false
                 },
-                label = { Text("Product Name * (सामान का नाम)") },
+                label = { Text(strings.productName) },
                 isError = nameError,
-                supportingText = { if (nameError) Text("Name cannot be empty!", color = Color.Red) },
+                supportingText = {
+                    if (nameError) {
+                        val err = if (settings.appLanguage == AppLanguage.HINDI) "नाम आवश्यक है!" else "Name is required!"
+                        Text(err, color = Color.Red)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().testTag("product_name_input"),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -594,7 +635,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             // Category Selection Spinner Box
             var catDropdownExpanded by remember { mutableStateOf(false) }
             val selectedCategoryName = remember(categoryId, categories) {
-                categories.find { it.id == categoryId }?.name ?: "Miscellaneous"
+                categories.find { it.id == categoryId }?.name ?: "General"
             }
 
             Box(
@@ -606,7 +647,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     value = selectedCategoryName,
                     onValueChange = {},
                     readOnly = true,
-                    label = { Text("Category (कैटेगरी चुनें)", fontWeight = FontWeight.Bold) },
+                    label = { Text(strings.category, fontWeight = FontWeight.Bold) },
                     trailingIcon = { Icon(Icons.Default.ArrowDropDown, null, tint = MaterialTheme.colorScheme.primary) },
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -617,7 +658,6 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
-                // Transparent overlay to safely capture taps
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -646,10 +686,15 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     mrp = it
                     if (it.trim().toDoubleOrNull() != null) mrpError = false
                 },
-                label = { Text("MRP * (अधिकतम प्रिंट रेट - ₹)") },
+                label = { Text(strings.mrpPrice) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 isError = mrpError,
-                supportingText = { if (mrpError) Text("Provide a valid numeric MRP!", color = Color.Red) },
+                supportingText = {
+                    if (mrpError) {
+                        val err = if (settings.appLanguage == AppLanguage.HINDI) "वैध MRP संख्या दर्ज करें!" else "Enter valid numeric MRP!"
+                        Text(err, color = Color.Red)
+                    }
+                },
                 modifier = Modifier.fillMaxWidth().testTag("product_mrp_input"),
                 shape = RoundedCornerShape(10.dp)
             )
@@ -658,8 +703,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             OutlinedTextField(
                 value = sellingPrice,
                 onValueChange = { sellingPrice = it },
-                label = { Text("Selling Price (बिक्री रेट - ₹, blank assumes MRP)") },
-                placeholder = { Text("e.g. ${mrp.ifEmpty { "10" }}") },
+                label = { Text(strings.sellingPrice) },
+                placeholder = { Text(mrp.ifEmpty { "10" }) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth().testTag("product_sp_input"),
                 shape = RoundedCornerShape(10.dp)
@@ -669,13 +714,13 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             OutlinedTextField(
                 value = purchasePrice,
                 onValueChange = { purchasePrice = it },
-                label = { Text("Purchase Price (ख़रीद रेट - ₹ - optional)") },
+                label = { Text(strings.purchasePrice) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp)
             )
 
-            Divider()
+            HorizontalDivider()
 
             // Track stock panel switches
             Row(
@@ -684,8 +729,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
-                    Text("Track Stock (स्टॉक की गिनती करें)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("स्टॉक ऑटोमैटिक घटेगा बिक्री होने पर।", fontSize = 11.sp, color = Color.Gray)
+                    Text(strings.trackStock, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    val trackSub = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री पर स्टॉक स्वतः घटेगा" else "Stock reduces automatically on billing"
+                    Text(trackSub, fontSize = 11.sp, color = Color.Gray)
                 }
                 Switch(checked = trackStock, onCheckedChange = { trackStock = it })
             }
@@ -696,7 +742,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     OutlinedTextField(
                         value = currentStock,
                         onValueChange = { currentStock = it },
-                        label = { Text("Starting Stock *(शुरुआती स्टॉक)") },
+                        label = { Text(strings.currentStock) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f).testTag("product_stock_input"),
                         shape = RoundedCornerShape(10.dp)
@@ -706,7 +752,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     OutlinedTextField(
                         value = lowStockQty,
                         onValueChange = { lowStockQty = it },
-                        label = { Text("Low Alert *(अलर्ट सीमा)") },
+                        label = { Text(strings.lowStockAlertQty) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)
@@ -721,8 +767,10 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column {
-                    Text("Product Active (चालू स्थिति)", fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text("बंद करने पर यह बिलिंग में छिप जाएगा।", fontSize = 11.sp, color = Color.Gray)
+                    val activeLabel = if (settings.appLanguage == AppLanguage.HINDI) "सक्रिय सामान" else "Active Product"
+                    val activeSub = if (settings.appLanguage == AppLanguage.HINDI) "निष्क्रिय करने पर बिलिंग में नहीं दिखेगा" else "Inactive items are hidden from billing"
+                    Text(activeLabel, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(activeSub, fontSize = 11.sp, color = Color.Gray)
                 }
                 Switch(checked = isActive, onCheckedChange = { isActive = it })
             }
@@ -735,8 +783,8 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     val mrpValue = mrp.trim().toDoubleOrNull()
                     val spValue = sellingPrice.trim().toDoubleOrNull()
                     val purValue = purchasePrice.trim().toDoubleOrNull()
-                    val stockValue = currentStock.trim().toIntOrNull() ?: 0
-                    val alertValue = lowStockQty.trim().toIntOrNull() ?: 5
+                    val stockValue = currentStock.trim().toDoubleOrNull() ?: 0.0
+                    val alertValue = lowStockQty.trim().toDoubleOrNull() ?: 5.0
 
                     // Validations checks
                     if (name.trim().isEmpty()) {
@@ -754,12 +802,13 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                             mrp = mrpValue,
                             sellingPrice = if (spValue != null && spValue > 0.0) spValue else null,
                             purchasePrice = if (purValue != null && purValue > 0) purValue else null,
-                            currentStock = if (trackStock) stockValue else 0,
+                            currentStock = if (trackStock) stockValue else 0.0,
                             trackStock = trackStock,
                             lowStockAlertQty = alertValue,
                             isActive = isActive
                         )
-                        Toast.makeText(context, "${name.trim()} Saved successfully!", Toast.LENGTH_SHORT).show()
+                        val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} सुरक्षित हो गया!" else "${name.trim()} saved successfully!"
+                        Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
                         viewModel.navigateTo(Screen.Products)
                     }
                 },
@@ -769,7 +818,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     .height(56.dp)
                     .testTag("save_product_button")
             ) {
-                Text("सुरक्षित करें (Save Product) 💾", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(strings.saveProduct, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -783,6 +832,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
 @Composable
 fun OpeningStockScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     val categories by viewModel.categories.collectAsState()
     val products by viewModel.products.collectAsState()
 
@@ -808,7 +860,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("शुरुआती स्टॉक (Opening Stock) 📚", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.openingStockTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -823,9 +875,9 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                 .padding(innerPadding)
                 .background(Color(0xFFF7F9FC))
         ) {
-            // Select category header scroll
+            val chooseCatLabel = if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी चुनें:" else "Choose Category:"
             Text(
-                "कैटेगरी चुनें (Choose Category):",
+                chooseCatLabel,
                 fontSize = 14.sp,
                 color = Color.DarkGray,
                 fontWeight = FontWeight.Bold,
@@ -849,7 +901,6 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
             }
 
             selectedCatId?.let { catId ->
-                // Fast Entry Card Layout
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
@@ -862,8 +913,13 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        val fastAddHeader = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "त्वरित सामान जोड़ें: ${categories.find { it.id == catId }?.name}"
+                        } else {
+                            "Fast Add: ${categories.find { it.id == catId }?.name}"
+                        }
                         Text(
-                            "Fast Add: '${categories.find { it.id == catId }?.name}' category",
+                            fastAddHeader,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -872,7 +928,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            placeholder = { Text("Item Name - (e.g. Parle G 100g)") },
+                            placeholder = { Text(strings.productName) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("opening_stock_item_name"),
@@ -883,8 +939,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = mrp,
                                 onValueChange = { mrp = it },
-                                placeholder = { Text("MRP Code Price") },
-                                label = { Text("MRP *") },
+                                label = { Text(strings.mrpPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
                                     .weight(1f)
@@ -895,8 +950,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = sp,
                                 onValueChange = { sp = it },
-                                placeholder = { Text("Selling Price") },
-                                label = { Text("SP (Blank=MRP)") },
+                                label = { Text(strings.sellingPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
                                     .weight(1f)
@@ -913,8 +967,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = stock,
                                 onValueChange = { stock = it },
-                                placeholder = { Text("Qty") },
-                                label = { Text("Stock Quantity *") },
+                                label = { Text(strings.currentStock) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1.2f).testTag("opening_stock_item_qty"),
                                 shape = RoundedCornerShape(10.dp),
@@ -926,35 +979,37 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                Text("Count Stock?", fontSize = 11.sp, color = Color.Gray)
+                                Text(strings.trackStock, fontSize = 11.sp, color = Color.Gray)
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Switch(checked = trackStock, onCheckedChange = { trackStock = it })
                             }
                         }
 
+                        val addNextBtn = if (settings.appLanguage == AppLanguage.HINDI) "सामान जोड़ें" else "Add Product"
                         Button(
                             onClick = {
                                 val mrpValue = mrp.trim().toDoubleOrNull()
                                 val spValue = sp.trim().toDoubleOrNull()
-                                val stockValue = stock.trim().toIntOrNull() ?: 0
+                                val stockValue = stock.trim().toDoubleOrNull() ?: 0.0
 
                                 if (name.trim().isEmpty() || mrpValue == null) {
-                                    Toast.makeText(context, "Item Name and MRP Price required!", Toast.LENGTH_SHORT).show()
+                                    val err = if (settings.appLanguage == AppLanguage.HINDI) "नाम और कीमत आवश्यक है!" else "Name and MRP price required!"
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.saveProduct(
-                                        id = 0L, // insert new
+                                        id = 0L,
                                         name = name,
                                         categoryId = catId,
                                         mrp = mrpValue,
                                         sellingPrice = if (spValue != null && spValue > 0) spValue else null,
                                         purchasePrice = null,
-                                        currentStock = if (trackStock) stockValue else 0,
+                                        currentStock = if (trackStock) stockValue else 0.0,
                                         trackStock = trackStock,
-                                        lowStockAlertQty = 5,
+                                        lowStockAlertQty = 5.0,
                                         isActive = true
                                     )
-                                    Toast.makeText(context, "'${name.trim()}' added successfully!", Toast.LENGTH_SHORT).show()
-                                    // Reset fields to trigger rapid sequential entries!
+                                    val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} जुड़ गया!" else "${name.trim()} added!"
+                                    Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
                                     name = ""
                                     mrp = ""
                                     sp = ""
@@ -969,7 +1024,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("जोड़ें (Add Product & Next)")
+                                Text(addNextBtn)
                             }
                         }
                     }
@@ -977,17 +1032,17 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Shows recently added product list headers
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Recently Created Items:", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
-                    Text("Total: ${productsInSelectedCategory.size}", fontSize = 12.sp, color = Color.Gray)
+                    val recentItemsTitle = if (settings.appLanguage == AppLanguage.HINDI) "हाल में जोड़े गए सामान:" else "Recently Added Items:"
+                    val totalLabel = if (settings.appLanguage == AppLanguage.HINDI) "कुल" else "Total"
+                    Text(recentItemsTitle, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.Gray)
+                    Text("$totalLabel: ${productsInSelectedCategory.size}", fontSize = 12.sp, color = Color.Gray)
                 }
 
-                // Listing rows
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(16.dp),
@@ -995,8 +1050,9 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                 ) {
                     if (productsInSelectedCategory.isEmpty()) {
                         item {
+                            val emptyCategoryMsg = if (settings.appLanguage == AppLanguage.HINDI) "इस कैटेगरी में कोई सामान नहीं है।" else "No items in this category yet."
                             Text(
-                                "इस कैटेगरी में कोई सामान नहीं जुड़ा है। ऊपर दर्ज करें!",
+                                emptyCategoryMsg,
                                 fontSize = 14.sp,
                                 color = Color.Gray,
                                 textAlign = TextAlign.Center,
@@ -1015,16 +1071,17 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                 ) {
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(itemInfo.name, fontWeight = FontWeight.Bold)
+                                        val priceLabel = if (settings.appLanguage == AppLanguage.HINDI) "कीमत" else "Price"
                                         Text(
-                                            "Price: ${CurrencyUtils.formatRupees(itemInfo.getEffectivePrice())}",
+                                            "$priceLabel: ${CurrencyUtils.formatRupees(itemInfo.getEffectivePrice())}",
                                             fontSize = 12.sp, color = Color.DarkGray
                                         )
                                     }
 
                                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                         if (itemInfo.trackStock) {
-                                            Text("Stock: ${itemInfo.currentStock}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                            // Edit counts indicator to change errors quickly
+                                            val stockLabel = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक" else "Stock"
+                                            Text("$stockLabel: ${itemInfo.currentStock}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             IconButton(onClick = {
                                                 viewModel.saveProduct(
                                                     id = itemInfo.id,
@@ -1042,7 +1099,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                                 Icon(Icons.Default.AddCircleOutline, "Plus 1 to Stock", tint = Color.Gray)
                                             }
                                         } else {
-                                            Text("Stock Uncounted", fontSize = 11.sp, color = Color.Gray)
+                                            val untracked = if (settings.appLanguage == AppLanguage.HINDI) "अनट्रैक्ड" else "Untracked"
+                                            Text(untracked, fontSize = 11.sp, color = Color.Gray)
                                         }
                                     }
                                 }
@@ -1063,19 +1121,19 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
 @Composable
 fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     var product by remember { mutableStateOf<Product?>(null) }
     var countedStock by remember { mutableStateOf("") }
-    var selectedReason by remember { mutableStateOf("Manual correction") }
+    var selectedReason by remember { mutableStateOf(if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक मिलान" else "Stock count correction") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
-    val reasons = listOf(
-        "Opening stock entry",
-        "Purchase added",
-        "Manual correction",
-        "Damaged/expired",
-        "Stock count correction",
-        "Other"
-    )
+    val reasons = if (settings.appLanguage == AppLanguage.HINDI) {
+        listOf("स्टॉक मिलान", "नया माल आया", "खराब या एक्सपायर सामान", "ओपनिंग स्टॉक प्रविष्टि", "अन्य")
+    } else {
+        listOf("Stock count correction", "Purchase added", "Damaged or expired", "Opening stock entry", "Other")
+    }
 
     val adjustmentHistory = viewModel.getAdjustmentsForProduct(productId).collectAsState(initial = emptyList())
 
@@ -1089,7 +1147,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("स्टॉक सुधारे (Adjustment) 🔧", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.stockAdjustmentTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Products) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -1114,10 +1172,11 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(text = "सामान (Product): ${prod.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "${strings.productName}: ${prod.name}", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
+                        val currentStockMsg = if (settings.appLanguage == AppLanguage.HINDI) "वर्तमान स्टॉक: ${prod.currentStock}" else "Current Stock: ${prod.currentStock}"
                         Text(
-                            text = "अभी दर्ज स्टॉक Amount: ${prod.currentStock} पीस",
+                            text = currentStockMsg,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.DarkGray
@@ -1135,12 +1194,13 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                         modifier = Modifier.padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("सच्चा स्टॉक संख्या डालें (Actual stock physical count):", fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        val enterActualLabel = if (settings.appLanguage == AppLanguage.HINDI) "दुकान में मौजूद वास्तविक स्टॉक संख्या दर्ज करें:" else "Enter actual physical stock count:"
+                        Text(enterActualLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold)
 
                         OutlinedTextField(
                             value = countedStock,
                             onValueChange = { countedStock = it },
-                            label = { Text("Physical Stock Counted") },
+                            label = { Text(strings.currentStock) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_stock_input"),
                             shape = RoundedCornerShape(10.dp)
@@ -1148,11 +1208,12 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
 
                         // Reason dropdown
                         Box(modifier = Modifier.fillMaxWidth()) {
+                            val reasonLabel = if (settings.appLanguage == AppLanguage.HINDI) "कारण" else "Reason"
                             OutlinedButton(
                                 onClick = { dropdownExpanded = true },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Reason: $selectedReason")
+                                Text("$reasonLabel: $selectedReason")
                                 Icon(Icons.Default.ArrowDropDown, null)
                             }
                             DropdownMenu(
@@ -1171,32 +1232,35 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                             }
                         }
 
+                        val saveCorrectionBtn = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक सुधार सुरक्षित करें" else "Save Stock Adjustment"
                         Button(
                             onClick = {
-                                val countVal = countedStock.toIntOrNull()
-                                if (countVal == null || countVal < 0) {
-                                    Toast.makeText(context, "Valid stock quantity is required!", Toast.LENGTH_SHORT).show()
+                                val countVal = countedStock.toDoubleOrNull()
+                                if (countVal == null || countVal < 0.0) {
+                                    val err = if (settings.appLanguage == AppLanguage.HINDI) "वैध स्टॉक संख्या आवश्यक है!" else "Valid stock quantity required!"
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.adjustStock(
                                         productId = productId,
                                         actualStockCounted = countVal,
                                         reason = selectedReason
                                     )
-                                    // Refresh details UI
                                     product = prod.copy(currentStock = countVal)
-                                    Toast.makeText(context, "Adjustment Saved!", Toast.LENGTH_SHORT).show()
+                                    val success = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक सुधार सुरक्षित हो गया!" else "Stock adjustment saved!"
+                                    Toast.makeText(context, success, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_save_button")
                         ) {
-                            Text("स्टॉक दर्ज करें (Save Correction)")
+                            Text(saveCorrectionBtn)
                         }
                     }
                 }
 
                 // History adjustments lists logger
-                Text("स्टॉक सुधार इतिहास (Log History):", fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
+                val historyTitle = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक सुधार इतिहास:" else "Stock Adjustment History:"
+                Text(historyTitle, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Color.Gray)
 
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1217,7 +1281,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     )
                                     val prefix = if (record.difference >= 0) "+" else ""
                                     Text(
-                                        text = "$prefix${record.difference} पीस",
+                                        text = "$prefix${record.difference}",
                                         fontWeight = FontWeight.ExtraBold,
                                         color = if (record.difference >= 0) Color(0xFF2E7D32) else Color(0xFFC62828)
                                     )
@@ -1226,8 +1290,13 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
+                                    val changeMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                        "स्टॉक: ${record.oldStock} ➔ ${record.newStock}"
+                                    } else {
+                                        "Stock: ${record.oldStock} ➔ ${record.newStock}"
+                                    }
                                     Text(
-                                        "स्टॉक बदला: ${record.oldStock} ➔ ${record.newStock}",
+                                        changeMsg,
                                         fontSize = 12.sp, color = Color.Gray
                                     )
                                     Text(
@@ -1255,6 +1324,8 @@ fun LowStockReorderDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val categoryMap = remember(categories) { categories.associate { it.id to it.name } }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -1285,14 +1356,19 @@ fun LowStockReorderDialog(
                         ) {
                             Icon(Icons.Default.ListAlt, contentDescription = null, tint = SaffronPrimary, modifier = Modifier.size(24.dp))
                             Text(
-                                text = "थोक आर्डर लिस्ट (Re-order)",
+                                text = strings.wholesaleReorderList,
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Black,
                                 color = TextNearBlack
                             )
                         }
+                        val countMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "कुल ${lowStockProducts.size} सामान कम हैं"
+                        } else {
+                            "Total ${lowStockProducts.size} items low in stock"
+                        }
                         Text(
-                            text = "कुल ${lowStockProducts.size} सामान कम हैं",
+                            text = countMsg,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = ErrorRed
@@ -1326,7 +1402,8 @@ fun LowStockReorderDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("WhatsApp ऑर्डर 📱", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            val whatsappOrder = if (settings.appLanguage == AppLanguage.HINDI) "WhatsApp ऑर्डर" else "WhatsApp Order"
+                            Text(whatsappOrder, fontSize = 13.sp, fontWeight = FontWeight.Black)
                         }
                     }
 
@@ -1346,7 +1423,8 @@ fun LowStockReorderDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("कॉपी 📋", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            val copyBtn = if (settings.appLanguage == AppLanguage.HINDI) "कॉपी" else "Copy"
+                            Text(copyBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1365,14 +1443,16 @@ fun LowStockReorderDialog(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(54.dp))
                             Spacer(modifier = Modifier.height(8.dp))
+                            val noLowStockHeader = if (settings.appLanguage == AppLanguage.HINDI) "कोई सामान कम नहीं है!" else "No low stock items!"
+                            val noLowStockSub = if (settings.appLanguage == AppLanguage.HINDI) "दुकान में पर्याप्त स्टॉक मौजूद है।" else "Store inventory is well stocked."
                             Text(
-                                text = "बधाई हो! कोई सामान कम नहीं है 🎉",
+                                text = noLowStockHeader,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp,
                                 color = SuccessGreen
                             )
                             Text(
-                                text = "दुकान में पर्याप्त स्टॉक मौजूद है।",
+                                text = noLowStockSub,
                                 fontSize = 13.sp,
                                 color = TextMediumGray
                             )
@@ -1410,7 +1490,7 @@ fun LowStockReorderDialog(
                                                 color = TextNearBlack
                                             )
                                             Text(
-                                                text = "$catName | MRP: ₹${item.mrp}",
+                                                text = "$catName | MRP: ${CurrencyUtils.formatRupees(item.mrp)}",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = TextMediumGray
@@ -1423,8 +1503,13 @@ fun LowStockReorderDialog(
                                             color = if (item.currentStock <= 0) ErrorRedLight else WarningOrangeLight,
                                             border = BorderStroke(1.dp, if (item.currentStock <= 0) ErrorRed else WarningOrange)
                                         ) {
+                                            val pillText = if (item.currentStock <= 0) {
+                                                strings.outOfStock
+                                            } else {
+                                                if (settings.appLanguage == AppLanguage.HINDI) "बचा: ${item.currentStock}" else "Left: ${item.currentStock}"
+                                            }
                                             Text(
-                                                text = if (item.currentStock <= 0) "ख़त्म (0)" else "बचा: ${item.currentStock} पीस",
+                                                text = pillText,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Black,
                                                 color = if (item.currentStock <= 0) ErrorRed else WarningOrange,
@@ -1441,8 +1526,9 @@ fun LowStockReorderDialog(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
+                                        val restockLabel = if (settings.appLanguage == AppLanguage.HINDI) "माल जोड़ें:" else "Add stock:"
                                         Text(
-                                            text = "नया माल आया:",
+                                            text = restockLabel,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.ExtraBold,
                                             color = TextNearBlack
@@ -1451,8 +1537,9 @@ fun LowStockReorderDialog(
                                         listOf(5, 10, 25, 50).forEach { qty ->
                                             OutlinedButton(
                                                 onClick = {
-                                                    viewModel.bulkRestockProduct(item, qty)
-                                                    Toast.makeText(context, "+$qty स्टॉक जोड़ा गया (${item.name})", Toast.LENGTH_SHORT).show()
+                                                    viewModel.bulkRestockProduct(item, qty.toDouble())
+                                                    val toastMsg = if (settings.appLanguage == AppLanguage.HINDI) "+$qty स्टॉक जोड़ा गया (${item.name})" else "+$qty stock added (${item.name})"
+                                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                                 },
                                                 shape = RoundedCornerShape(8.dp),
                                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
@@ -1472,6 +1559,7 @@ fun LowStockReorderDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                val closeBtn = if (settings.appLanguage == AppLanguage.HINDI) "बंद करें" else "Close"
                 Button(
                     onClick = onDismiss,
                     colors = ButtonDefaults.buttonColors(containerColor = SlateContainer, contentColor = TextNearBlack),
@@ -1480,7 +1568,7 @@ fun LowStockReorderDialog(
                         .fillMaxWidth()
                         .height(46.dp)
                 ) {
-                    Text("बंद करें (Close)", fontWeight = FontWeight.Bold)
+                    Text(closeBtn, fontWeight = FontWeight.Bold)
                 }
             }
         }

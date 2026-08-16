@@ -1,8 +1,8 @@
 package com.example.ui.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -19,25 +19,29 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.data.Customer
 import com.example.data.Sale
-import com.example.data.SaleItem
+import com.example.ui.theme.*
+import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
+import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
-import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(viewModel: ShopViewModel) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     val sales by viewModel.salesHistory.collectAsState()
     val customers by viewModel.customers.collectAsState()
 
@@ -68,7 +72,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("दुकान रिपोर्ट (Business Reports) 📈", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.reportsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -99,19 +103,19 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                 Tab(
                     selected = selectedIntervalTab == 0,
                     onClick = { selectedIntervalTab = 0 },
-                    text = { Text("आज (Today)", fontSize = 14.sp) },
+                    text = { Text(strings.today, fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_today")
                 )
                 Tab(
                     selected = selectedIntervalTab == 1,
                     onClick = { selectedIntervalTab = 1 },
-                    text = { Text("महीना (This Month)", fontSize = 14.sp) },
+                    text = { Text(strings.thisMonth, fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_month")
                 )
                 Tab(
                     selected = selectedIntervalTab == 2,
                     onClick = { selectedIntervalTab = 2 },
-                    text = { Text("सब (All Time)", fontSize = 14.sp) },
+                    text = { Text(strings.allTime, fontSize = 14.sp) },
                     modifier = Modifier.testTag("report_tab_all")
                 )
             }
@@ -129,7 +133,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color.White), border = BorderStroke(2.dp, SaffronPrimary),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(2.dp, SaffronPrimary),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Column(
@@ -138,7 +143,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text("कुल बिक्री (Total Sales Volume)", fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
+                                val salesVolumeTitle = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total Sales"
+                                Text(salesVolumeTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                                 Text(
                                     text = CurrencyUtils.formatRupees(totalRevenue),
                                     fontSize = 32.sp,
@@ -146,7 +152,12 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     color = SaffronDark
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                Text("$invoicesCount bills generated", fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                val billCountMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                                    "$invoicesCount बिल बनाए गए"
+                                } else {
+                                    "$invoicesCount bills generated"
+                                }
+                                Text(billCountMsg, fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -161,7 +172,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Cash Paid", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(strings.cash, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(cashRevenue),
                                         fontSize = 14.sp,
@@ -178,7 +189,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("UPI Paid", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(strings.upiPaytm, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(upiRevenue),
                                         fontSize = 14.sp,
@@ -195,7 +206,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("Udhaar", fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+                                    Text(strings.udhaar, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
                                         CurrencyUtils.formatRupees(udhaarRevenue),
                                         fontSize = 14.sp,
@@ -209,6 +220,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         Spacer(modifier = Modifier.height(12.dp))
 
                         PaymentDistributionDonutChart(
+                            viewModel = viewModel,
                             cashAmount = cashRevenue,
                             upiAmount = upiRevenue,
                             udhaarAmount = udhaarRevenue,
@@ -217,14 +229,18 @@ fun ReportsScreen(viewModel: ShopViewModel) {
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        WeeklySalesBarChart(salesHistory = sales)
+                        WeeklySalesBarChart(
+                            viewModel = viewModel,
+                            salesHistory = sales
+                        )
                     }
                 }
 
                 // Header lists title
                 item {
+                    val salesHistoryTitle = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री का इतिहास:" else "Sales History:"
                     Text(
-                        text = "बिक्री का इतिहास (Sales History):",
+                        text = salesHistoryTitle,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
                         color = TextMediumGray,
@@ -242,7 +258,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.History, null, modifier = Modifier.size(48.dp), tint = BorderStrong)
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("कोई रिकॉर्ड नहीं मिला!", color = TextMediumGray, fontWeight = FontWeight.Bold)
+                            val noRecordMsg = if (settings.appLanguage == AppLanguage.HINDI) "कोई रिकॉर्ड नहीं मिला!" else "No records found!"
+                            Text(noRecordMsg, color = TextMediumGray, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
@@ -280,8 +297,9 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                     // Customer name if Udhaar
                                     if (sale.paymentMode == "UDHAAR") {
                                         val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
+                                        val udhaarCustLabel = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक" else "Udhaar Client"
                                         Text(
-                                            text = "👤 Udhaar client: $custName",
+                                            text = "$udhaarCustLabel: $custName",
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Black,
                                             color = ErrorRed
@@ -297,6 +315,11 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                         fontSize = 16.sp
                                     )
                                     // Color tag for modes
+                                    val modeDisplay = when (sale.paymentMode) {
+                                        "UPI" -> "UPI"
+                                        "UDHAAR" -> strings.udhaar
+                                        else -> strings.cash
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .padding(top = 4.dp)
@@ -311,7 +334,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = sale.paymentMode,
+                                            text = modeDisplay,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Black,
                                             color = when (sale.paymentMode) {
@@ -347,28 +370,30 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            "🚩 SHREE SHYAM STORE",
-                            fontSize = 14.sp,
+                            settings.shopName.ifEmpty { "SHREE SHYAM STORE" },
+                            fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             color = SaffronDark,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Divider()
+                        HorizontalDivider()
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Bill No: ${sale.billNumber}", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
+                            val billNoLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिल नं:" else "Bill No:"
+                            Text("$billNoLabel ${sale.billNumber}", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
                             Text(DateTimeUtils.formatDateOnly(sale.createdAt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }
 
                         if (sale.paymentMode == "UDHAAR") {
-                            Text("client: $custName", fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
+                            val clientLabel = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक:" else "Client:"
+                            Text("$clientLabel $custName", fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
                         }
 
-                        Divider()
+                        HorizontalDivider()
 
                         // Itemized summary inside Dialog
                         Box(modifier = Modifier.heightIn(max = 160.dp).fillMaxWidth()) {
@@ -397,13 +422,13 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             }
                         }
 
-                        Divider()
+                        HorizontalDivider()
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Total Amount:", fontWeight = FontWeight.Black, color = TextNearBlack)
+                            Text(strings.totalAmount, fontWeight = FontWeight.Black, color = TextNearBlack)
                             Text(CurrencyUtils.formatRupees(sale.totalAmount), fontWeight = FontWeight.Black, color = SuccessGreen)
                         }
 
@@ -411,8 +436,14 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text("Payment Mode:", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
-                            Text(sale.paymentMode, fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
+                            val modeLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम:" else "Payment Mode:"
+                            Text(modeLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                            val modeVal = when (sale.paymentMode) {
+                                "UPI" -> "UPI"
+                                "UDHAAR" -> strings.udhaar
+                                else -> strings.cash
+                            }
+                            Text(modeVal, fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -458,7 +489,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Copy 📋", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    val copyInvoiceText = if (settings.appLanguage == AppLanguage.HINDI) "कॉपी" else "Copy"
+                                    Text(copyInvoiceText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -469,7 +501,8 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            Text("Close (बंद करें)", fontWeight = FontWeight.Bold)
+                            val closeText = if (settings.appLanguage == AppLanguage.HINDI) "बंद करें" else "Close"
+                            Text(closeText, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -480,11 +513,15 @@ fun ReportsScreen(viewModel: ShopViewModel) {
 
 @Composable
 fun PaymentDistributionDonutChart(
+    viewModel: ShopViewModel,
     cashAmount: Double,
     upiAmount: Double,
     udhaarAmount: Double,
     totalAmount: Double
 ) {
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     if (totalAmount <= 0.0) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -498,8 +535,13 @@ fun PaymentDistributionDonutChart(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
+                val noDataMsg = if (settings.appLanguage == AppLanguage.HINDI) {
+                    "वितरण चार्ट के लिए कोई बिक्री डेटा उपलब्ध नहीं है।"
+                } else {
+                    "No sales data available for distribution chart."
+                }
                 Text(
-                    text = "वितरण चार्ट के लिए कोई बिक्री डेटा उपलब्ध नहीं है। 👍",
+                    text = noDataMsg,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = TextMediumGray,
@@ -528,8 +570,9 @@ fun PaymentDistributionDonutChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val chartTitle = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम वितरण" else "Payment Mode Split"
             Text(
-                text = "भुगतान माध्यम वितरण (Payment Mode Split) 📊",
+                text = chartTitle,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Black,
                 color = TextNearBlack,
@@ -613,8 +656,9 @@ fun PaymentDistributionDonutChart(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        val totalSalesLabel = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total"
                         Text(
-                            text = "कुल बिक्री",
+                            text = totalSalesLabel,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextMutedGray
@@ -645,12 +689,12 @@ fun PaymentDistributionDonutChart(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(10.dp).background(cashColor, shape = androidx.compose.foundation.shape.CircleShape))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "नकद (Cash): $formattedCashPct%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextNearBlack)
+                        Text(text = "${strings.cash}: $formattedCashPct%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextNearBlack)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(modifier = Modifier.size(10.dp).background(udhaarColor, shape = androidx.compose.foundation.shape.CircleShape))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(text = "उधार (Udhaar): $formattedUdhaarPct%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextNearBlack)
+                        Text(text = "${strings.udhaar}: $formattedUdhaarPct%", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextNearBlack)
                     }
                 }
             }
@@ -660,17 +704,18 @@ fun PaymentDistributionDonutChart(
 
 @Composable
 fun WeeklySalesBarChart(
+    viewModel: ShopViewModel,
     salesHistory: List<Sale>
 ) {
+    val settings by viewModel.storeSettings.collectAsState()
+
     if (salesHistory.isEmpty()) return
 
     // Get sales over the last 7 days
     val last7Days = remember(salesHistory) {
-        val calendar = java.util.Calendar.getInstance()
         val daysList = mutableListOf<String>()
         val dayTotals = mutableListOf<Double>()
         
-        // Let's group last 7 days
         val format = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
         for (i in 6 downTo 0) {
             val cal = java.util.Calendar.getInstance()
@@ -678,7 +723,6 @@ fun WeeklySalesBarChart(
             val dayStr = format.format(cal.time)
             daysList.add(dayStr)
             
-            // Start & End of that specific day
             cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
             cal.set(java.util.Calendar.MINUTE, 0)
             cal.set(java.util.Calendar.SECOND, 0)
@@ -711,8 +755,9 @@ fun WeeklySalesBarChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val weeklyTitle = if (settings.appLanguage == AppLanguage.HINDI) "पिछले 7 दिनों की बिक्री" else "Weekly Sales Trend"
             Text(
-                text = "पिछले 7 दिनों की बिक्री (Weekly Sales Trend) 📈",
+                text = weeklyTitle,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Black,
                 color = TextNearBlack,
@@ -734,7 +779,6 @@ fun WeeklySalesBarChart(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        // Value label
                         if (total > 0) {
                             Text(
                                 text = if (total >= 1000) String.format("%.1fk", total / 1000.0) else total.toInt().toString(),
@@ -745,7 +789,6 @@ fun WeeklySalesBarChart(
                             Spacer(modifier = Modifier.height(2.dp))
                         }
 
-                        // Chart Column
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight(fraction * 0.7f)

@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -27,8 +26,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
+import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 
@@ -36,6 +37,7 @@ import com.example.viewmodel.ShopViewModel
 fun HomeScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val sales by viewModel.salesHistory.collectAsState()
     val products by viewModel.products.collectAsState()
 
@@ -59,12 +61,12 @@ fun HomeScreen(viewModel: ShopViewModel) {
     val lowStockCount = remember(lowStockProducts) { lowStockProducts.size }
 
     val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
-    val timeGreeting = remember(hour) {
+    val timeGreeting = remember(hour, settings.appLanguage) {
         when (hour) {
-            in 4..11 -> "शुभ प्रभात / Good Morning! ☀️"
-            in 12..16 -> "शुभ दोपहर / Good Afternoon! 🌤️"
-            in 17..20 -> "शुभ संध्या / Good Evening! 🌅"
-            else -> "शुभ रात्रि / Good Night! 🌙"
+            in 4..11 -> strings.greetingMorning
+            in 12..16 -> strings.greetingAfternoon
+            in 17..20 -> strings.greetingEvening
+            else -> strings.greetingNight
         }
     }
 
@@ -76,7 +78,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
             .padding(bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // --- PREMIUM DEVOTIONAL SHOP HEADER ---
+        // --- SHOP HEADER ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -99,7 +101,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                     modifier = Modifier.padding(bottom = 8.dp)
                 ) {
                     Text(
-                        text = "|| श्री गणेशाय नमः ||  जय श्री श्याम 🙏",
+                        text = strings.godBlessing,
                         color = Color.White,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
@@ -109,7 +111,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
 
                 // Shop Name
                 Text(
-                    text = settings.shopName.ifEmpty { "मेरी दुकान (Smart Kirana)" },
+                    text = settings.shopName.ifEmpty { strings.defaultShopName },
                     color = Color.White,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Black,
@@ -128,14 +130,15 @@ fun HomeScreen(viewModel: ShopViewModel) {
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Cloud Auto-Sync Indicator Badge (Interactive)
+                // Cloud Auto-Sync Indicator Badge
                 Surface(
                     shape = RoundedCornerShape(50),
                     color = Color.Black.copy(alpha = 0.25f),
                     modifier = Modifier
                         .clickable {
                             viewModel.triggerAutoSync()
-                            Toast.makeText(context, "⚡ Background Cloud Sync Triggered", Toast.LENGTH_SHORT).show()
+                            val syncToast = if (settings.appLanguage == AppLanguage.HINDI) "⚡ क्लाउड सिंक शुरू हुआ" else "⚡ Cloud Sync Triggered"
+                            Toast.makeText(context, syncToast, Toast.LENGTH_SHORT).show()
                         }
                 ) {
                     Row(
@@ -148,8 +151,9 @@ fun HomeScreen(viewModel: ShopViewModel) {
                                 .background(Color(0xFF22C55E), CircleShape)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        val syncLabel = if (settings.appLanguage == AppLanguage.HINDI) "क्लाउड बैकअप सक्रिय ⚡" else "Cloud Backup Active ⚡"
                         Text(
-                            text = if (settings.lastSyncTime.isNotEmpty()) "Cloud Synced: ${settings.lastSyncTime}" else "Cloud Auto-Sync Active ⚡ (Tap to Sync)",
+                            text = if (settings.lastSyncTime.isNotEmpty() && settings.lastSyncTime != "Never Synced") "${settings.lastSyncTime}" else syncLabel,
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -200,7 +204,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
-                                text = "आज का कुल गल्ला (Today's Total Sale)",
+                                text = strings.todaySales,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextMediumGray
@@ -239,8 +243,9 @@ fun HomeScreen(viewModel: ShopViewModel) {
                                         tint = SaffronDark,
                                         modifier = Modifier.size(16.dp)
                                     )
+                                    val billsSuffix = if (settings.appLanguage == AppLanguage.HINDI) "बिल बने" else "Bills cut"
                                     Text(
-                                        text = "$billsCount Bills Cut Today",
+                                        text = "$billsCount $billsSuffix",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = SaffronDark
@@ -252,104 +257,14 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 }
             }
 
-            // --- DAILY REVENUE TARGET TRACKER ---
-            val dailyGoal = 5000.0
-            val targetProgress = if (dailyGoal > 0) (totalToday / dailyGoal).toFloat().coerceIn(0f, 1f) else 1f
-
-            Card(
-                colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceCardBorder),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .background(WarningOrangeLight, RoundedCornerShape(8.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.EmojiEvents,
-                                    contentDescription = null,
-                                    tint = WarningOrange,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            Text(
-                                text = "दैनिक बिक्री लक्ष्य (Daily Target)",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextNearBlack
-                            )
-                        }
-
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = if (targetProgress >= 1f) SuccessGreenLight else SaffronLight
-                        ) {
-                            Text(
-                                text = "${(targetProgress * 100).toInt()}% Done",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (targetProgress >= 1f) SuccessGreen else SaffronDark,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-
-                    LinearProgressIndicator(
-                        progress = { targetProgress },
-                        color = if (targetProgress >= 1f) SuccessGreen else SaffronPrimary,
-                        trackColor = SlateContainer,
-                        strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "गल्ला: ${CurrencyUtils.formatRupees(totalToday)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextMediumGray
-                        )
-                        Text(
-                            text = "लक्ष्य: ${CurrencyUtils.formatRupees(dailyGoal)}",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = TextMutedGray
-                        )
-                    }
-                }
-            }
-
-            // --- PAYMENT METHOD SUMMARY PILLS ---
+            // --- PAYMENT METHOD SUMMARY TILES ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Cash Tile
                 MetricSummaryTile(
-                    title = "नकद (Cash)",
+                    title = strings.cashSales,
                     amount = cashToday,
                     accentColor = SuccessGreen,
                     containerColor = SuccessGreenLight,
@@ -359,7 +274,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
 
                 // UPI Tile
                 MetricSummaryTile(
-                    title = "UPI / Online",
+                    title = strings.upiSales,
                     amount = upiToday,
                     accentColor = InfoBlue,
                     containerColor = InfoBlueLight,
@@ -369,7 +284,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
 
                 // Udhaar Tile
                 MetricSummaryTile(
-                    title = "उधार (Udhaar)",
+                    title = strings.udhaarSales,
                     amount = udhaarToday,
                     accentColor = ErrorRed,
                     containerColor = ErrorRedLight,
@@ -408,13 +323,14 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "कम स्टॉक चेतावनी (Low Stock Alert)",
+                                text = strings.lowStockAlert,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Black,
                                 color = ErrorRed
                             )
+                            val restockMsg = if (settings.appLanguage == AppLanguage.HINDI) "$lowStockCount सामान जल्द ख़त्म होने वाले हैं।" else "$lowStockCount items need restock."
                             Text(
-                                text = "$lowStockCount सामान जल्द ख़त्म होने वाले हैं। ऑर्डर करें!",
+                                text = restockMsg,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = TextNearBlack
@@ -447,14 +363,16 @@ fun HomeScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.size(28.dp)
                         )
                         Column {
+                            val safeStock = if (settings.appLanguage == AppLanguage.HINDI) "दुकान का स्टॉक सुरक्षित है 👍" else "Store stock is optimal 👍"
+                            val sufficientStock = if (settings.appLanguage == AppLanguage.HINDI) "सभी जरूरी सामान पर्याप्त मात्रा में उपलब्ध हैं।" else "All key products are well stocked."
                             Text(
-                                text = "दुकान का स्टॉक सुरक्षित है 👍",
+                                text = safeStock,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = SuccessGreen
                             )
                             Text(
-                                text = "सभी जरूरी सामान पर्याप्त मात्रा में उपलब्ध हैं।",
+                                text = sufficientStock,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = TextMediumGray
@@ -466,7 +384,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
 
             // --- QUICK ACTION GRID ---
             Text(
-                text = "दुकान के जरूरी काम (Quick Shortcuts)",
+                text = strings.quickActions,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Black,
                 color = TextNearBlack,
@@ -479,9 +397,10 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    val billSub = if (settings.appLanguage == AppLanguage.HINDI) "नकद / UPI / उधार" else "Cash / UPI / Udhaar"
                     ModernQuickActionCard(
-                        title = "नया बिल बनाएं",
-                        subtitle = "Instant Counter POS",
+                        title = strings.createNewBill,
+                        subtitle = billSub,
                         icon = Icons.Default.AddShoppingCart,
                         badgeColor = SaffronPrimary,
                         containerColor = SaffronLight,
@@ -491,9 +410,10 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         onClick = { viewModel.navigateTo(Screen.Billing) }
                     )
 
+                    val prodSub = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक एंट्री" else "Stock Inventory"
                     ModernQuickActionCard(
-                        title = "नया सामान जोड़ें",
-                        subtitle = "Add Product Stock",
+                        title = strings.addNewProduct,
+                        subtitle = prodSub,
                         icon = Icons.Default.AddBox,
                         badgeColor = SuccessGreen,
                         containerColor = SuccessGreenLight,
@@ -507,9 +427,10 @@ fun HomeScreen(viewModel: ShopViewModel) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    val udhaarSub = if (settings.appLanguage == AppLanguage.HINDI) "खाता व WhatsApp तगादा" else "Ledger & WhatsApp"
                     ModernQuickActionCard(
-                        title = "उधार खाता बही",
-                        subtitle = "Customer Khata Book",
+                        title = strings.customerUdhaar,
+                        subtitle = udhaarSub,
                         icon = Icons.Default.ImportContacts,
                         badgeColor = ErrorRed,
                         containerColor = ErrorRedLight,
@@ -519,9 +440,10 @@ fun HomeScreen(viewModel: ShopViewModel) {
                         onClick = { viewModel.navigateTo(Screen.Udhaar) }
                     )
 
+                    val reportSub = if (settings.appLanguage == AppLanguage.HINDI) "दैनिक व मासिक बिक्री" else "Sales & Profit"
                     ModernQuickActionCard(
-                        title = "बिक्री रिपोर्ट देखें",
-                        subtitle = "Analytics & Profit",
+                        title = strings.dailyReports,
+                        subtitle = reportSub,
                         icon = Icons.AutoMirrored.Filled.TrendingUp,
                         badgeColor = PurpleAccent,
                         containerColor = PurpleAccentLight,
@@ -644,4 +566,3 @@ fun ModernQuickActionCard(
         }
     }
 }
-

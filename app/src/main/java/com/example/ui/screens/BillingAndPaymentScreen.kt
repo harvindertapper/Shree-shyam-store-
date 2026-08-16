@@ -1,9 +1,8 @@
 package com.example.ui.screens
 
 import android.widget.Toast
-import androidx.compose.animation.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,21 +31,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
-import com.example.data.Category
-import com.example.data.Customer
 import com.example.data.Product
+import com.example.ui.theme.*
+import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
+import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
-import com.example.ui.theme.*
 
 // ==========================================
-// 1. BILLING SCREEN (ENTRY & CART PANEL)
+// 1. BILLING / POINT OF SALE SCREEN
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillingScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+
     val products by viewModel.products.collectAsState()
     val categories by viewModel.categories.collectAsState()
     val cart by viewModel.cartState.collectAsState()
@@ -73,7 +75,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("नया बिल (New Bill) 🛒", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.newBill, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -86,7 +88,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Quick Add")
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Quick Add Product", fontWeight = FontWeight.Bold)
+                        Text(strings.quickAddProduct, fontWeight = FontWeight.Bold)
                     }
                 }
             )
@@ -102,7 +104,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("सामान का नाम खोजें (Search product name)...", color = TextMutedGray) },
+                placeholder = { Text(strings.searchProduct, color = TextMutedGray) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = SaffronPrimary) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
@@ -138,7 +140,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                     FilterChip(
                         selected = selectedCategoryId == null,
                         onClick = { selectedCategoryId = null },
-                        label = { Text("सभी (All)", fontWeight = FontWeight.Bold) }
+                        label = { Text(strings.allCategories, fontWeight = FontWeight.Bold) }
                     )
                 }
                 items(categories) { cat ->
@@ -162,138 +164,142 @@ fun BillingScreen(viewModel: ShopViewModel) {
                 ) {
                     if (filteredProducts.isEmpty()) {
                         item {
-                            Box(
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(32.dp),
-                                contentAlignment = Alignment.Center
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
+                                Icon(
+                                    Icons.Default.SearchOff,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(48.dp),
+                                    tint = BorderStrong
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val noProductFound = if (settings.appLanguage == AppLanguage.HINDI) "कोई सामान नहीं मिला!" else "No product found!"
                                 Text(
-                                    "कोई प्रोडक्ट नहीं मिला! Quick Add से तुरंत जोड़ें।",
-                                    color = TextMediumGray,
-                                    fontSize = 15.sp,
+                                    noProductFound,
                                     fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
+                                    color = TextMutedGray
                                 )
                             }
                         }
-                    } else {
-                        items(filteredProducts) { product ->
-                            val stockWarning = product.trackStock && product.currentStock <= 0
-                            val lowStock = product.trackStock && product.currentStock <= product.lowStockAlertQty
+                    }
 
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                                border = BorderStroke(1.2.dp, BorderStrong),
-                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-                                shape = RoundedCornerShape(12.dp),
+                    items(filteredProducts, key = { it.id }) { product ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(1.2.dp, BorderStrong),
+                            shape = RoundedCornerShape(12.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val inCartQty = cart[product] ?: 0.0
+                                    if (product.trackStock && product.currentStock <= inCartQty) {
+                                        showStockWarningProduct = product
+                                    } else {
+                                        viewModel.addProductToCart(product, 1.0)
+                                    }
+                                }
+                        ) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable {
-                                        // Stock checks
-                                        val inCartQty = cart[product] ?: 0
-                                        if (product.trackStock && product.currentStock <= inCartQty) {
-                                            showStockWarningProduct = product
-                                        } else {
-                                            viewModel.addProductToCart(product, 1)
-                                        }
-                                    }
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = product.name,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = TextNearBlack
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
                                         Text(
-                                            text = product.name,
-                                            fontWeight = FontWeight.Black,
-                                            fontSize = 16.sp,
-                                            color = TextNearBlack
+                                            text = CurrencyUtils.formatRupees(product.getEffectivePrice()),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = SaffronDark
                                         )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Row(
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
+                                        if (product.sellingPrice != null && product.sellingPrice < product.mrp) {
                                             Text(
-                                                text = CurrencyUtils.formatRupees(product.getEffectivePrice()),
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = SaffronPrimary
+                                                text = CurrencyUtils.formatRupees(product.mrp),
+                                                fontSize = 11.sp,
+                                                color = TextMutedGray,
+                                                fontWeight = FontWeight.Normal
                                             )
-                                            if (product.sellingPrice != null && product.sellingPrice != product.mrp) {
-                                                Text(
-                                                    text = "MRP ${CurrencyUtils.formatRupees(product.mrp)}",
-                                                    fontSize = 11.sp,
-                                                    color = TextMutedGray,
-                                                    style = MaterialTheme.typography.bodySmall.copy(
-                                                        textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                                                    )
-                                                )
-                                            }
-                                        }
-                                        Spacer(modifier = Modifier.height(4.dp))
-                                        // Stock Indicator badge
-                                        if (product.trackStock) {
-                                            if (product.currentStock <= 0) {
-                                                Text(
-                                                    "स्टॉक ख़त्म (Out of Stock)",
-                                                    color = ErrorRed,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Black
-                                                )
-                                            } else if (product.currentStock <= product.lowStockAlertQty) {
-                                                Text(
-                                                    "कम स्टॉक: ${product.currentStock} बचा है",
-                                                    color = WarningOrange,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Black
-                                                )
-                                            } else {
-                                                Text(
-                                                    "स्टॉक: ${product.currentStock} उपलब्ध",
-                                                    color = SuccessGreen,
-                                                    fontSize = 11.sp,
-                                                    fontWeight = FontWeight.Black
-                                                )
-                                            }
-                                        } else {
-                                            Text("स्टॉक अनट्रैक्ड", color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                         }
                                     }
 
-                                    // Add Indicator badge inside product list if in cart
-                                    val qtyInCart = cart[product] ?: 0
-                                    if (qtyInCart > 0) {
-                                        Box(
-                                            modifier = Modifier
-                                                .background(
-                                                    SaffronPrimary,
-                                                    shape = CircleShape
-                                                )
-                                                .padding(horizontal = 10.dp, vertical = 6.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    if (product.trackStock) {
+                                        if (product.currentStock <= 0) {
                                             Text(
-                                                text = "x$qtyInCart",
-                                                color = Color.White,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Bold
+                                                strings.outOfStock,
+                                                color = ErrorRed,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        } else if (product.currentStock <= product.lowStockAlertQty) {
+                                            val lowStockMsg = if (settings.appLanguage == AppLanguage.HINDI) "कम स्टॉक: ${product.currentStock} बचा है" else "Low stock: ${product.currentStock} left"
+                                            Text(
+                                                lowStockMsg,
+                                                color = WarningOrange,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black
+                                            )
+                                        } else {
+                                            val stockMsg = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक: ${product.currentStock} उपलब्ध" else "Stock: ${product.currentStock} available"
+                                            Text(
+                                                stockMsg,
+                                                color = SuccessGreen,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black
                                             )
                                         }
                                     } else {
-                                        IconButton(onClick = {
-                                            val inCartQty = cart[product] ?: 0
-                                            if (product.trackStock && product.currentStock <= inCartQty) {
-                                                showStockWarningProduct = product
-                                            } else {
-                                                viewModel.addProductToCart(product, 1)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.Add, "Add to Basket", tint = MaterialTheme.colorScheme.primary)
+                                        val untrackedMsg = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक अनट्रैक्ड" else "Stock untracked"
+                                        Text(untrackedMsg, color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    }
+                                }
+
+                                // Add Indicator badge inside product list if in cart
+                                val qtyInCart = cart[product] ?: 0.0
+                                if (qtyInCart > 0.0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .background(
+                                                SaffronPrimary,
+                                                shape = CircleShape
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = if (qtyInCart % 1.0 == 0.0) "x${qtyInCart.toLong()}" else "x$qtyInCart",
+                                            color = Color.White,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                } else {
+                                    IconButton(onClick = {
+                                        val inCartQty = cart[product] ?: 0.0
+                                        if (product.trackStock && product.currentStock <= inCartQty) {
+                                            showStockWarningProduct = product
+                                        } else {
+                                            viewModel.addProductToCart(product, 1.0)
                                         }
+                                    }) {
+                                        Icon(Icons.Default.Add, "Add to Basket", tint = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -327,7 +333,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             Icon(Icons.Default.ShoppingBasket, null, tint = BorderStrong, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "खाली थैला\n(Basket is empty)",
+                                text = strings.emptyCart,
                                 fontSize = 12.sp,
                                 color = TextMutedGray,
                                 fontWeight = FontWeight.Bold,
@@ -337,14 +343,17 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         }
                     } else {
                         Column(modifier = Modifier.fillMaxSize()) {
+                            val totalQty = cart.values.sum()
+                            val qtyLabel = if (totalQty % 1.0 == 0.0) "${totalQty.toLong()}" else "$totalQty"
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .background(SaffronLight)
                                     .padding(8.dp)
                             ) {
+                                val basketHeader = if (settings.appLanguage == AppLanguage.HINDI) "थैला: $qtyLabel सामान" else "Cart: $qtyLabel items"
                                 Text(
-                                    "थैला (${cart.values.sum()} चीज़ें)",
+                                    basketHeader,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Black,
                                     color = SaffronDark
@@ -389,7 +398,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                 ) {
                                                     // Minus button
                                                     IconButton(
-                                                        onClick = { viewModel.addProductToCart(product, -1) },
+                                                        onClick = { viewModel.addProductToCart(product, -1.0) },
                                                         modifier = Modifier.size(24.dp)
                                                     ) {
                                                         Icon(
@@ -400,7 +409,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                         )
                                                     }
                                                     Text(
-                                                        text = "$quantity",
+                                                        text = if (quantity % 1.0 == 0.0) "${quantity.toLong()}" else "$quantity",
                                                         fontSize = 14.sp,
                                                         fontWeight = FontWeight.Black
                                                     )
@@ -410,7 +419,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                             if (product.trackStock && product.currentStock <= quantity) {
                                                                 showStockWarningProduct = product
                                                             } else {
-                                                                viewModel.addProductToCart(product, 1)
+                                                                viewModel.addProductToCart(product, 1.0)
                                                             }
                                                         },
                                                         modifier = Modifier.size(24.dp)
@@ -433,22 +442,22 @@ fun BillingScreen(viewModel: ShopViewModel) {
                 }
             }
 
-            // Checkout Footer
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .border(1.5.dp, BorderStrong)
-                    .padding(16.dp)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
+            // Bottom Settlement Bar
+            Surface(
+                color = Color.White,
+                shadowElevation = 8.dp,
+                border = BorderStroke(1.dp, BorderStrong),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("कुल बिल (Total)", fontSize = 12.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
+                        Text(strings.totalAmount, fontSize = 12.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                         Text(
                             text = CurrencyUtils.formatRupees(cartTotal),
                             fontSize = 26.sp,
@@ -460,7 +469,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                     Button(
                         onClick = {
                             if (cart.isEmpty()) {
-                                Toast.makeText(context, "थैला खाली है! सामान जोड़ें।", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, strings.emptyCart, Toast.LENGTH_SHORT).show()
                             } else {
                                 viewModel.navigateTo(Screen.Payment(cartTotal))
                             }
@@ -473,7 +482,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             .testTag("checkout_payment_button")
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("हिसाब करें 👍", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Text(strings.checkoutBill, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                             Spacer(modifier = Modifier.width(4.dp))
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
                         }
@@ -486,26 +495,33 @@ fun BillingScreen(viewModel: ShopViewModel) {
 
         // 1. Incomplete Stock alert confirmation
         showStockWarningProduct?.let { product ->
+            val dialogTitle = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक कम है ⚠️" else "Low Stock Warning ⚠️"
+            val dialogBody = if (settings.appLanguage == AppLanguage.HINDI) {
+                "प्रोडक्ट '${product.name}' का स्टॉक केवल ${product.currentStock} बचा है। क्या आप इस बिक्री को फिर भी थैले में जोड़ना चाहते हैं?"
+            } else {
+                "Product '${product.name}' only has ${product.currentStock} in stock. Do you still want to add it to the cart?"
+            }
+            val confirmAdd = if (settings.appLanguage == AppLanguage.HINDI) "हाँ, जोड़ें" else "Yes, Add"
+            val cancelAdd = if (settings.appLanguage == AppLanguage.HINDI) "नहीं" else "No"
+
             AlertDialog(
                 onDismissRequest = { showStockWarningProduct = null },
-                title = { Text("स्टॉक कम है ⚠️") },
-                text = {
-                    Text("प्रोडक्ट '${product.name}' का स्टॉक केवल ${product.currentStock} बचा है। क्या आप इस बिक्री को फिर भी थैले में जोड़ना चाहते हैं?")
-                },
+                title = { Text(dialogTitle) },
+                text = { Text(dialogBody) },
                 confirmButton = {
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
                         onClick = {
-                            viewModel.addProductToCart(product, 1)
+                            viewModel.addProductToCart(product, 1.0)
                             showStockWarningProduct = null
                         }
                     ) {
-                        Text("हाँ, जोड़ें")
+                        Text(confirmAdd)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showStockWarningProduct = null }) {
-                        Text("नहीं")
+                        Text(cancelAdd)
                     }
                 }
             )
@@ -531,7 +547,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            "Fast Quick Add 📦",
+                            strings.quickAddProduct,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.primary
@@ -540,7 +556,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         OutlinedTextField(
                             value = newName,
                             onValueChange = { newName = it },
-                            label = { Text("Product Name (e.g. Marie Biscuits)") },
+                            label = { Text(strings.productName) },
                             modifier = Modifier.fillMaxWidth().testTag("quick_add_product_name")
                         )
 
@@ -548,7 +564,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = newMrp,
                                 onValueChange = { newMrp = it },
-                                label = { Text("MRP (Price)") },
+                                label = { Text(strings.mrpPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f).testTag("quick_add_product_mrp")
                             )
@@ -556,7 +572,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             OutlinedTextField(
                                 value = initialStock,
                                 onValueChange = { initialStock = it },
-                                label = { Text("Stock Qty") },
+                                label = { Text(strings.currentStock) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f).testTag("quick_add_product_stock"),
                                 enabled = trackStock
@@ -566,7 +582,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                         // Category Dropdown
                         var dropdownExpanded by remember { mutableStateOf(false) }
                         var selectedCatName by remember(selectedCatId) {
-                            mutableStateOf(categories.find { it.id == selectedCatId }?.name ?: "Miscellaneous")
+                            mutableStateOf(categories.find { it.id == selectedCatId }?.name ?: "General")
                         }
 
                         Box(modifier = Modifier.fillMaxWidth()) {
@@ -574,7 +590,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                 onClick = { dropdownExpanded = true },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("Category: $selectedCatName")
+                                Text("${strings.category}: $selectedCatName")
                                 Icon(Icons.Default.ArrowDropDown, null)
                             }
                             DropdownMenu(
@@ -600,7 +616,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Track Stock (स्टॉक गिनती करें)", fontSize = 14.sp)
+                            Text(strings.trackStock, fontSize = 14.sp)
                             Switch(checked = trackStock, onCheckedChange = { trackStock = it })
                         }
 
@@ -613,31 +629,34 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                 onClick = { showQuickAddDialog = false },
                                 modifier = Modifier.weight(1f)
                             ) {
-                                Text("Cancel")
+                                Text(strings.cancel)
                             }
 
+                            val saveAndAddText = if (settings.appLanguage == AppLanguage.HINDI) "सेव करें व बिल में जोड़ें" else "Save & Add to Bill"
                             Button(
                                 onClick = {
                                     val mrpValue = newMrp.toDoubleOrNull()
-                                    val stockValue = initialStock.toIntOrNull() ?: 0
+                                    val stockValue = initialStock.toDoubleOrNull() ?: 0.0
                                     if (newName.trim().isEmpty() || mrpValue == null) {
-                                        Toast.makeText(context, "Name and valid Price required!", Toast.LENGTH_SHORT).show()
+                                        val reqMsg = if (settings.appLanguage == AppLanguage.HINDI) "नाम और वैध कीमत आवश्यक है!" else "Name and valid price required!"
+                                        Toast.makeText(context, reqMsg, Toast.LENGTH_SHORT).show()
                                     } else {
                                         viewModel.quickAddProduct(
                                             name = newName,
                                             mrp = mrpValue,
                                             categoryId = selectedCatId,
                                             trackStock = trackStock,
-                                            currentStock = if (trackStock) stockValue else 0
+                                            currentStock = if (trackStock) stockValue else 0.0
                                         )
                                         showQuickAddDialog = false
-                                        Toast.makeText(context, "${newName.trim()} Added!", Toast.LENGTH_SHORT).show()
+                                        val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${newName.trim()} जुड़ गया!" else "${newName.trim()} Added!"
+                                        Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1.5f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text("Save & Add to Bill")
+                                Text(saveAndAddText)
                             }
                         }
                     }
@@ -656,6 +675,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
 fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val customers by viewModel.customers.collectAsState()
 
     var showUdhaarCustomerDialog by remember { mutableStateOf(false) }
@@ -663,7 +683,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("भुगतान चुने (Payment) 💵", fontWeight = FontWeight.Bold) },
+                title = { Text(strings.paymentTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Billing) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -692,7 +712,8 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = "कुल चुकाने योग्य राशि (Amount to pay)", fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
+                    val payableTitle = if (settings.appLanguage == AppLanguage.HINDI) "कुल चुकाने योग्य राशि" else "Total Payable Amount"
+                    Text(text = payableTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = CurrencyUtils.formatRupees(invoiceTotal),
@@ -722,7 +743,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                 ) {
                     if (settings.staticPaytmQrImageUri.isNotEmpty()) {
                         Text(
-                            "PAYTM BUSINESS QR CODE 📲",
+                            strings.paytmQrCode,
                             fontWeight = FontWeight.ExtraBold,
                             fontSize = 15.sp,
                             color = SaffronPrimary,
@@ -745,8 +766,13 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
+                        val qrPrompt = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "ग्राहक से कहें: 'QR स्कैन करके राशि दर्ज करें।'"
+                        } else {
+                            "Ask customer: 'Scan QR and enter exact amount.'"
+                        }
                         Text(
-                            text = "Customer से कहें: 'QR scan karke exact amount manually enter karein.'",
+                            text = qrPrompt,
                             fontSize = 12.sp,
                             color = TextNearBlack,
                             fontWeight = FontWeight.Bold,
@@ -764,14 +790,16 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                             Icon(Icons.Default.QrCode2, "No QR Configured", tint = SaffronPrimary, modifier = Modifier.size(80.dp))
                         }
                         Spacer(modifier = Modifier.height(16.dp))
+                        val noQrTitle = if (settings.appLanguage == AppLanguage.HINDI) "UPI QR सेट नहीं है" else "UPI QR not set"
+                        val noQrSub = if (settings.appLanguage == AppLanguage.HINDI) "सेटिंग्स में जाकर दुकान का Paytm Business QR लगाएं।" else "Go to Settings to configure shop Paytm QR."
                         Text(
-                            text = "UPI QR is not configured!",
+                            text = noQrTitle,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             color = TextNearBlack
                         )
                         Text(
-                            text = "Settings में जाकर दुकान का Paytm Business QR लगायें।",
+                            text = noQrSub,
                             fontSize = 12.sp,
                             color = TextMediumGray,
                             fontWeight = FontWeight.Bold,
@@ -804,7 +832,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Payments, null, tint = Color.White)
-                            Text("नकद मिला (Cash)", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                            Text(strings.cash, fontWeight = FontWeight.Black, fontSize = 14.sp)
                         }
                     }
 
@@ -822,7 +850,8 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.QrCodeScanner, null, tint = Color.White)
-                            Text("UPI Settle (Paid)", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                            val upiText = if (settings.appLanguage == AppLanguage.HINDI) "UPI भुगतान" else "UPI Paid"
+                            Text(upiText, fontWeight = FontWeight.Black, fontSize = 14.sp)
                         }
                     }
                 }
@@ -843,7 +872,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                     ) {
                         Icon(Icons.Default.Book, null, tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("उधार खाता (Mark Udhaar Ledger)", fontWeight = FontWeight.Black, fontSize = 16.sp)
+                        Text(strings.udhaarMode, fontWeight = FontWeight.Black, fontSize = 16.sp)
                     }
                 }
             }
@@ -871,8 +900,9 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        val selectCustHeader = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक चुनें" else "Select Udhaar Customer"
                         Text(
-                            "उधार ग्राहक चुनें 👥",
+                            selectCustHeader,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
                             color = ErrorRed
@@ -882,7 +912,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                         OutlinedTextField(
                             value = searchCustName,
                             onValueChange = { searchCustName = it },
-                            placeholder = { Text("Search or Type customer name...", color = TextMutedGray) },
+                            placeholder = { Text(strings.searchCustomer, color = TextMutedGray) },
                             modifier = Modifier.fillMaxWidth().testTag("udhaar_customer_search"),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = SaffronPrimary,
@@ -898,10 +928,12 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                     modifier = Modifier.fillMaxWidth().padding(8.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text("कोई ग्राहक नहीं मिला।", color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    val noCustFound = if (settings.appLanguage == AppLanguage.HINDI) "कोई ग्राहक नहीं मिला।" else "No customer found."
+                                    Text(noCustFound, color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     TextButton(onClick = { showAddNewCustomerBlock = true }) {
-                                        Text("+ Add New: '$searchCustName'", color = SaffronPrimary, fontWeight = FontWeight.Black)
+                                        val addNewLabel = if (settings.appLanguage == AppLanguage.HINDI) "+ नया जोड़ें: '$searchCustName'" else "+ Add New: '$searchCustName'"
+                                        Text(addNewLabel, color = SaffronPrimary, fontWeight = FontWeight.Black)
                                     }
                                 }
                             } else {
@@ -942,12 +974,12 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
 
                         if (showAddNewCustomerBlock || filteredCustomers.isEmpty()) {
                             HorizontalDivider(color = BorderStrong, thickness = 1.2.dp)
-                            Text("New Customer (नया ग्राहक जोड़ें):", fontWeight = FontWeight.Black, fontSize = 12.sp, color = TextNearBlack)
+                            Text(strings.addCustomer, fontWeight = FontWeight.Black, fontSize = 12.sp, color = TextNearBlack)
                             
                             OutlinedTextField(
                                 value = custPhone,
                                 onValueChange = { custPhone = it },
-                                label = { Text("Phone Number (Optional)") },
+                                label = { Text(strings.customerPhone) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                 modifier = Modifier.fillMaxWidth().testTag("new_customer_phone_field"),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -960,10 +992,12 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                 )
                             )
 
+                            val confirmUdhaarLabel = if (settings.appLanguage == AppLanguage.HINDI) "खाता खोलें और उधार लिखें" else "Open Ledger & Confirm Udhaar"
                             Button(
                                 onClick = {
                                     if (searchCustName.trim().isEmpty()) {
-                                        Toast.makeText(context, "ग्राहक का नाम ज़रूरी है!", Toast.LENGTH_SHORT).show()
+                                        val reqName = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक का नाम ज़रूरी है!" else "Customer name required!"
+                                        Toast.makeText(context, reqName, Toast.LENGTH_SHORT).show()
                                     } else {
                                         viewModel.completeBill(
                                             paymentMode = "UDHAAR",
@@ -977,7 +1011,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Text("खाता खोलें और उधार लिखें Confirm", fontWeight = FontWeight.Black)
+                                Text(confirmUdhaarLabel, fontWeight = FontWeight.Black)
                             }
                         }
 
@@ -985,7 +1019,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                             onClick = { showUdhaarCustomerDialog = false },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Cancel", color = TextMediumGray, fontWeight = FontWeight.Bold)
+                            Text(strings.cancel, color = TextMediumGray, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1001,13 +1035,15 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
 @Composable
 fun BillSuccessScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current
+    val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val lastSale by viewModel.lastSale.collectAsState()
     val lastItems by viewModel.lastSaleItems.collectAsState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(WarmCreamBg), // Uniform warm cream background
+            .background(WarmCreamBg),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -1028,29 +1064,36 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
             )
 
             Text(
-                text = "बिल सुरक्षित हो गया! 🎉",
+                text = strings.billSavedSuccess,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Black,
                 color = SuccessGreen
             )
 
             lastSale?.let { sale ->
+                val billNoPrefix = if (settings.appLanguage == AppLanguage.HINDI) "बिल नंबर:" else "Bill No:"
                 Text(
-                    text = "Bill No: ${sale.billNumber}",
+                    text = "$billNoPrefix ${sale.billNumber}",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = TextMediumGray
                 )
 
                 Text(
-                    text = "कुल राशि: ${CurrencyUtils.formatRupees(sale.totalAmount)}",
+                    text = "${strings.totalAmount}: ${CurrencyUtils.formatRupees(sale.totalAmount)}",
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
                     color = TextNearBlack
                 )
 
+                val paymentModeLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम:" else "Payment Mode:"
+                val modeDisplay = when (sale.paymentMode) {
+                    "UPI" -> "UPI"
+                    "UDHAAR" -> strings.udhaarMode
+                    else -> strings.cash
+                }
                 Text(
-                    text = "Payment Mode: ${sale.paymentMode}",
+                    text = "$paymentModeLabel $modeDisplay",
                     fontWeight = FontWeight.Black,
                     color = when (sale.paymentMode) {
                         "UPI" -> Color(0xFF0E5A94)
@@ -1073,7 +1116,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Share, null, tint = Color.White)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("WhatsApp पर बिल भेजें 📱", fontSize = 16.sp, fontWeight = FontWeight.Black)
+                    Text(strings.shareReceiptWhatsApp, fontSize = 16.sp, fontWeight = FontWeight.Black)
                 }
             }
 
@@ -1088,7 +1131,8 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("बिल कॉपी करें (Copy Invoice Ticket)", fontWeight = FontWeight.Bold)
+                    val copyLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिल कॉपी करें" else "Copy Invoice"
+                    Text(copyLabel, fontWeight = FontWeight.Bold)
                 }
             }
 
@@ -1102,7 +1146,8 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextNearBlack),
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    Text("इतिहास (History)", fontWeight = FontWeight.Bold)
+                    val histLabel = if (settings.appLanguage == AppLanguage.HINDI) "इतिहास" else "History"
+                    Text(histLabel, fontWeight = FontWeight.Bold)
                 }
 
                 Button(
@@ -1110,7 +1155,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                     colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
                     modifier = Modifier.weight(1.2f).height(48.dp).testTag("new_bill_confirm")
                 ) {
-                    Text("नया बिल (New Bill)", fontWeight = FontWeight.Bold)
+                    Text(strings.newBill, fontWeight = FontWeight.Bold)
                 }
             }
         }

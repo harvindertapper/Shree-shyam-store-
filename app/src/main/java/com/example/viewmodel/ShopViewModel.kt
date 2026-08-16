@@ -67,20 +67,31 @@ class ShopViewModel(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = StoreSettings(
                 shopName = "Shree Shyam General Store",
+                ownerName = "",
                 ownerPhone = "",
                 staticPaytmQrImageUri = "",
                 welcomeChantEnabled = true,
                 firstLaunchCompleted = false,
+                loggedInUid = "",
                 loggedInUsername = "",
                 loggedInEmail = "",
                 isUserLoggedIn = false,
+                appLockEnabled = true,
+                biometricEnabled = false,
+                securityPin = "1234",
                 firebaseUrl = "",
                 firebasePrefix = "shreeshyam_sync",
                 lastSyncTime = "Never Synced",
                 autoSyncEnabled = false,
-                securityPin = "1234"
+                appLanguage = com.example.utils.AppLanguage.HINDI
             )
         )
+
+    fun setLanguage(language: com.example.utils.AppLanguage) {
+        viewModelScope.launch {
+            settingsDataStore.updateAppLanguage(language)
+        }
+    }
 
     fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String, securityPin: String = "1234") {
         viewModelScope.launch {
@@ -106,6 +117,79 @@ class ShopViewModel(
     }
 
     // --- User Authentication & Session Management Functions ---
+    fun onGoogleSignInSuccess(
+        uid: String,
+        email: String,
+        displayName: String,
+        onSuccess: (isFirstTime: Boolean) -> Unit
+    ) {
+        viewModelScope.launch {
+            val username = displayName.ifBlank { email.substringBefore("@") }
+            val existingUser = repository.getUserByEmail(email)
+            if (existingUser == null) {
+                val newUser = User(
+                    uid = uid,
+                    username = username,
+                    email = email,
+                    passwordHash = ""
+                )
+                repository.insertUser(newUser)
+            }
+            settingsDataStore.saveSession(uid, username, email)
+            val settings = storeSettings.value
+            onSuccess(!settings.firstLaunchCompleted)
+        }
+    }
+
+    fun saveShopProfile(
+        shopName: String,
+        ownerName: String,
+        ownerPhone: String,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            settingsDataStore.updateShopName(shopName.trim())
+            settingsDataStore.updateOwnerName(ownerName.trim())
+            settingsDataStore.updateOwnerPhone(ownerPhone.trim())
+            settingsDataStore.setFirstLaunchCompleted(true)
+            triggerAutoSync()
+            onSuccess()
+        }
+    }
+
+    fun setAppLockPin(pin: String, enableBiometric: Boolean = false) {
+        viewModelScope.launch {
+            settingsDataStore.updateSecurityPin(pin)
+            settingsDataStore.updateAppLockEnabled(true)
+            settingsDataStore.updateBiometricEnabled(enableBiometric)
+        }
+    }
+
+    fun toggleBiometric(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsDataStore.updateBiometricEnabled(enabled)
+        }
+    }
+
+    fun sendForgotPinEmail(
+        email: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            if (email.isBlank() || !android.util.Patterns.EMAIL_ADDRESS.matcher(email.trim()).matches()) {
+                onError("Please enter a valid registered email address!")
+                return@launch
+            }
+            val result = com.example.utils.AuthManager.sendPasswordResetEmail(email.trim())
+            if (result.isSuccess) {
+                onSuccess()
+            } else {
+                onError(result.exceptionOrNull()?.localizedMessage ?: "Failed to send reset email. Verify Firebase configuration.")
+            }
+        }
+    }
+
     fun registerUser(
         username: String,
         email: String,
@@ -150,7 +234,7 @@ class ShopViewModel(
                 repository.insertUser(user)
 
                 // Save active session
-                settingsDataStore.saveSession(trimmedUsername, trimmedEmail)
+                settingsDataStore.saveSession(user.uid, trimmedUsername, trimmedEmail)
 
                 onSuccess()
             } catch (e: Exception) {
@@ -192,7 +276,7 @@ class ShopViewModel(
                 val hashedPass = sha256(password)
                 if (user.passwordHash == hashedPass) {
                     // Save active session
-                    settingsDataStore.saveSession(user.username, user.email)
+                    settingsDataStore.saveSession(user.uid, user.username, user.email)
                     onSuccess()
                 } else {
                     onError("Incorrect password! Change and retry.")
@@ -205,6 +289,9 @@ class ShopViewModel(
 
     fun logoutUser() {
         viewModelScope.launch {
+            context?.let { ctx ->
+                com.example.utils.AuthManager.signOut(ctx)
+            }
             settingsDataStore.clearSession()
             navigateTo(Screen.Login)
         }
@@ -254,9 +341,10 @@ class ShopViewModel(
         mrp: Double,
         sellingPrice: Double?,
         purchasePrice: Double?,
-        currentStock: Int,
+        currentStock: Double,
+        unit: String = "pcs",
         trackStock: Boolean,
-        lowStockAlertQty: Int,
+        lowStockAlertQty: Double,
         isActive: Boolean
     ) {
         viewModelScope.launch {
@@ -270,6 +358,7 @@ class ShopViewModel(
                     sellingPrice = sellingPrice,
                     purchasePrice = purchasePrice,
                     currentStock = currentStock,
+                    unit = unit.trim().ifEmpty { "pcs" },
                     trackStock = trackStock,
                     lowStockAlertQty = lowStockAlertQty,
                     isActive = isActive,
@@ -278,14 +367,15 @@ class ShopViewModel(
                 )
                 val newProductId = repository.insertProduct(product)
                 // Log stock adjustment for opening entry
-                if (trackStock && currentStock > 0) {
+                if (trackStock && currentStock > 0.0) {
                     val adjustment = StockAdjustment(
                         productId = newProductId,
-                        oldStock = 0,
+                        oldStock = 0.0,
                         newStock = currentStock,
                         difference = currentStock,
                         reason = "Opening stock entry",
-                        createdAt = now
+                        createdAt = now,
+                        updatedAt = now
                     )
                     repository.insertStockAdjustment(adjustment)
                 }
@@ -304,6 +394,7 @@ class ShopViewModel(
                         sellingPrice = sellingPrice,
                         purchasePrice = purchasePrice,
                         currentStock = finalStock,
+                        unit = unit.trim().ifEmpty { existing.unit },
                         trackStock = trackStock,
                         lowStockAlertQty = lowStockAlertQty,
                         isActive = isActive,
@@ -320,7 +411,8 @@ class ShopViewModel(
                             newStock = currentStock,
                             difference = diff,
                             reason = "Manual correction during edit",
-                            createdAt = now
+                            createdAt = now,
+                            updatedAt = now
                         )
                         repository.insertStockAdjustment(adjustment)
                     }
@@ -332,7 +424,7 @@ class ShopViewModel(
 
     suspend fun getProduct(id: Long): Product? = repository.getProductById(id)
 
-    fun adjustStock(productId: Long, actualStockCounted: Int, reason: String) {
+    fun adjustStock(productId: Long, actualStockCounted: Double, reason: String) {
         viewModelScope.launch {
             repository.adjustProductStock(productId, actualStockCounted, reason)
             triggerAutoSync()
@@ -343,8 +435,8 @@ class ShopViewModel(
 
 
     // --- Billing State (Cart) ---
-    private val _cartState = MutableStateFlow<Map<Product, Int>>(emptyMap())
-    val cartState: StateFlow<Map<Product, Int>> = _cartState.asStateFlow()
+    private val _cartState = MutableStateFlow<Map<Product, Double>>(emptyMap())
+    val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
 
     val cartTotal: StateFlow<Double> = _cartState.map { cart ->
         cart.entries.sumOf { (product, quantity) ->
@@ -356,11 +448,11 @@ class ShopViewModel(
         initialValue = 0.0
     )
 
-    fun addProductToCart(product: Product, quantity: Int = 1) {
+    fun addProductToCart(product: Product, quantity: Double = 1.0) {
         val current = _cartState.value.toMutableMap()
-        val currentQty = current[product] ?: 0
+        val currentQty = current[product] ?: 0.0
         val finalQty = currentQty + quantity
-        if (finalQty > 0) {
+        if (finalQty > 0.0) {
             current[product] = finalQty
         } else {
             current.remove(product)
@@ -368,9 +460,9 @@ class ShopViewModel(
         _cartState.value = current
     }
 
-    fun setProductQuantityInCart(product: Product, qty: Int) {
+    fun setProductQuantityInCart(product: Product, qty: Double) {
         val current = _cartState.value.toMutableMap()
-        if (qty > 0) {
+        if (qty > 0.0) {
             current[product] = qty
         } else {
             current.remove(product)
@@ -391,7 +483,7 @@ class ShopViewModel(
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
      */
-    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Int) {
+    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs") {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val prod = Product(
@@ -400,6 +492,7 @@ class ShopViewModel(
                 mrp = mrp,
                 sellingPrice = mrp,
                 currentStock = currentStock,
+                unit = unit.trim().ifEmpty { "pcs" },
                 trackStock = trackStock,
                 isActive = true,
                 createdAt = now,
@@ -408,21 +501,22 @@ class ShopViewModel(
             val newId = repository.insertProduct(prod)
             val insertedProduct = prod.copy(id = newId)
 
-            if (trackStock && currentStock > 0) {
+            if (trackStock && currentStock > 0.0) {
                 repository.insertStockAdjustment(
                     StockAdjustment(
                         productId = newId,
-                        oldStock = 0,
+                        oldStock = 0.0,
                         newStock = currentStock,
                         difference = currentStock,
                         reason = "Opening stock entry",
-                        createdAt = now
+                        createdAt = now,
+                        updatedAt = now
                     )
                 )
             }
 
             // Add the inserted product directly to our cart
-            addProductToCart(insertedProduct, 1)
+            addProductToCart(insertedProduct, 1.0)
             triggerAutoSync()
         }
     }
@@ -479,13 +573,15 @@ class ShopViewModel(
             }
 
             // 2. Prep entities
+            val now = System.currentTimeMillis()
             val sale = Sale(
                 billNumber = billNo,
                 totalAmount = total,
                 paymentMode = paymentMode,
                 customerId = finalCustomerId,
                 note = note,
-                createdAt = System.currentTimeMillis()
+                createdAt = now,
+                updatedAt = now
             )
 
             val saleItems = cartItems.map { (prod, qty) ->
@@ -494,8 +590,10 @@ class ShopViewModel(
                     productId = prod.id,
                     productNameSnapshot = prod.name,
                     quantity = qty,
+                    unit = prod.unit,
                     unitPrice = prod.getEffectivePrice(),
-                    lineTotal = prod.getEffectivePrice() * qty
+                    lineTotal = prod.getEffectivePrice() * qty,
+                    updatedAt = now
                 )
             }
 
@@ -713,7 +811,7 @@ class ShopViewModel(
         Toast.makeText(context, "Re-order List Copied (ऑर्डर लिस्ट कॉपी हो गई) 📋", Toast.LENGTH_SHORT).show()
     }
 
-    fun bulkRestockProduct(product: Product, quantityToAdd: Int) {
+    fun bulkRestockProduct(product: Product, quantityToAdd: Double) {
         viewModelScope.launch {
             val updated = product.copy(
                 currentStock = product.currentStock + quantityToAdd,
