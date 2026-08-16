@@ -37,6 +37,7 @@ import com.example.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(viewModel: ShopViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val sales by viewModel.salesHistory.collectAsState()
     val customers by viewModel.customers.collectAsState()
 
@@ -71,6 +72,14 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { viewModel.exportSalesCsv(context, filteredSales) },
+                        modifier = Modifier.testTag("export_sales_csv_button")
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Export Sales CSV", tint = SaffronPrimary)
                     }
                 }
             )
@@ -406,14 +415,61 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                             Text(sale.paymentMode, fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val customerPhone = customers.find { it.id == sale.customerId }?.phone
+                                    viewModel.shareInvoiceViaWhatsApp(
+                                        context = context,
+                                        customSale = sale,
+                                        customItems = saleItems.value,
+                                        phoneNumber = customerPhone
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
+                                shape = RoundedCornerShape(10.dp),
+                                modifier = Modifier.weight(1f).height(44.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("WhatsApp", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.copyInvoiceToClipboard(
+                                        context = context,
+                                        customSale = sale,
+                                        customItems = saleItems.value
+                                    )
+                                },
+                                border = BorderStroke(1.2.dp, BorderStrong),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextNearBlack),
+                                modifier = Modifier.weight(1f).height(44.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Copy 📋", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
 
                         Button(
                             onClick = { selectedViewSale = null },
                             colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
-                            modifier = Modifier.fillMaxWidth()
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            Text("Close (बंद करें)")
+                            Text("Close (बंद करें)", fontWeight = FontWeight.Bold)
                         }
                     }
                 }

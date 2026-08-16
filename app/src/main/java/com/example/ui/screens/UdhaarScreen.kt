@@ -82,6 +82,12 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.exportUdhaarCsv(context, customers, customerBalances) },
+                        modifier = Modifier.testTag("export_udhaar_csv_button")
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Export Udhaar CSV", tint = SaffronPrimary)
+                    }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("उधारी वाले", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Checkbox(
@@ -226,19 +232,38 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                                     }
                                 }
 
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(
-                                        text = "Due Balance",
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = TextMediumGray
-                                    )
-                                    Text(
-                                        text = CurrencyUtils.formatRupees(balance),
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight.Black,
-                                        color = if (balance > 0.01) ErrorRed else SuccessGreen
-                                    )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "Due Balance",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = TextMediumGray
+                                        )
+                                        Text(
+                                            text = CurrencyUtils.formatRupees(balance),
+                                            fontSize = 18.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = if (balance > 0.01) ErrorRed else SuccessGreen
+                                        )
+                                    }
+
+                                    if (balance > 0.01) {
+                                        IconButton(
+                                            onClick = { viewModel.sendUdhaarReminder(context, cust, balance) },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Send,
+                                                contentDescription = "Send WhatsApp Reminder",
+                                                tint = SuccessGreen,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -410,6 +435,25 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                 fontSize = 14.sp,
                                 color = Color.DarkGray
                             )
+                        }
+
+                        if (currentBalance > 0.01) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { viewModel.sendUdhaarReminder(context, cust, currentBalance) },
+                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(46.dp)
+                                    .testTag("customer_whatsapp_reminder_btn")
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.Send, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("WhatsApp तकादा / Reminder भेजें 💬", fontWeight = FontWeight.Black, fontSize = 14.sp)
+                                }
+                            }
                         }
                     }
                 }

@@ -1062,15 +1062,31 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Clipboard button
+            // WhatsApp Share button
             Button(
+                onClick = { viewModel.shareInvoiceViaWhatsApp(context) },
+                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
+                shape = RoundedCornerShape(12.dp),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("share_whatsapp_bill_button")
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Share, null, tint = Color.White)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("WhatsApp पर बिल भेजें 📱", fontSize = 16.sp, fontWeight = FontWeight.Black)
+                }
+            }
+
+            // Clipboard button
+            OutlinedButton(
                 onClick = { viewModel.copyInvoiceToClipboard(context) },
-                colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
-                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = TextNearBlack),
                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("copy_invoice_text_button")
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ContentCopy, null, tint = Color.White)
+                    Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("बिल कॉपी करें (Copy Invoice Ticket)", fontWeight = FontWeight.Bold)
                 }
@@ -1091,7 +1107,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
 
                 Button(
                     onClick = { viewModel.navigateTo(Screen.Billing) },
-                    colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
                     modifier = Modifier.weight(1.2f).height(48.dp).testTag("new_bill_confirm")
                 ) {
                     Text("नया बिल (New Bill)", fontWeight = FontWeight.Bold)

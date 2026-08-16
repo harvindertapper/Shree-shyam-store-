@@ -42,6 +42,7 @@ import com.example.ui.theme.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductsScreen(viewModel: ShopViewModel) {
+    val context = LocalContext.current
     val products by viewModel.products.collectAsState()
     val categories by viewModel.categories.collectAsState()
 
@@ -67,6 +68,12 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { viewModel.exportStockCsv(context) },
+                        modifier = Modifier.testTag("export_stock_csv_button")
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = "Export Stock CSV", tint = SaffronPrimary)
+                    }
                     IconButton(onClick = { showCategoryManagerDialog = true }) {
                         Icon(Icons.Default.Category, contentDescription = "Manage Categories")
                     }

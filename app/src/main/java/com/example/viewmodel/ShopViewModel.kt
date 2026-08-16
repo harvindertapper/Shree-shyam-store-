@@ -594,24 +594,24 @@ class ShopViewModel(
 
     fun getSaleItems(saleId: Long): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleId)
 
-    // Helper functions for clipboard copy text
-    fun generateInvoiceText(): String {
-        val sale = _lastSale.value ?: return "No Invoice Found"
-        val items = _lastSaleItems.value
+    // Helper functions for clipboard copy text and sharing
+    fun generateInvoiceText(customSale: Sale? = null, customItems: List<SaleItem>? = null): String {
+        val sale = customSale ?: _lastSale.value ?: return "No Invoice Found"
+        val items = customItems ?: _lastSaleItems.value
         val settings = storeSettings.value
 
         val sb = StringBuilder()
-        sb.append("🚩 ${settings.shopName}\n")
-        sb.append("Bill No: ${sale.billNumber}\n")
+        sb.append("🚩 *${settings.shopName}*\n")
+        sb.append("📄 Bill No: ${sale.billNumber}\n")
         val df = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH)
-        sb.append("Date: ${df.format(java.util.Date(sale.createdAt))}\n")
+        sb.append("📅 Date: ${df.format(java.util.Date(sale.createdAt))}\n")
         sb.append("----------------------------\n")
         for (itm in items) {
-            sb.append("${itm.productNameSnapshot}\n")
-            sb.append("  ${itm.quantity} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
+            sb.append("• ${itm.productNameSnapshot}\n")
+            sb.append("   ${itm.quantity} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
         }
         sb.append("----------------------------\n")
-        sb.append("Total Amount: ${CurrencyUtils.formatRupees(sale.totalAmount)}\n")
+        sb.append("*Total Amount: ${CurrencyUtils.formatRupees(sale.totalAmount)}*\n")
         sb.append("Payment Mode: ${sale.paymentMode}\n")
         sb.append("----------------------------\n")
         sb.append("Jai Shree Shyam 🙏\n")
@@ -620,12 +620,69 @@ class ShopViewModel(
         return sb.toString()
     }
 
-    fun copyInvoiceToClipboard(context: Context) {
-        val txt = generateInvoiceText()
+    fun copyInvoiceToClipboard(context: Context, customSale: Sale? = null, customItems: List<SaleItem>? = null) {
+        val txt = generateInvoiceText(customSale, customItems)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("Store Bill", txt)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(context, "Bill Copied to Clipboard!", Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareInvoiceViaWhatsApp(context: Context, customSale: Sale? = null, customItems: List<SaleItem>? = null, phoneNumber: String? = null) {
+        val txt = generateInvoiceText(customSale, customItems)
+        com.example.utils.ShareUtils.shareText(
+            context = context,
+            text = txt,
+            title = "Share Bill on WhatsApp",
+            phoneNumber = phoneNumber
+        )
+    }
+
+    fun sendUdhaarReminder(context: Context, customer: Customer, balance: Double) {
+        val settings = storeSettings.value
+        val msg = com.example.utils.ShareUtils.generateUdhaarReminderText(
+            shopName = settings.shopName,
+            customerName = customer.name,
+            balance = balance,
+            ownerPhone = settings.ownerPhone
+        )
+        com.example.utils.ShareUtils.shareText(
+            context = context,
+            text = msg,
+            title = "Send Udhaar Reminder",
+            phoneNumber = customer.phone
+        )
+    }
+
+    fun exportSalesCsv(context: Context, salesToExport: List<Sale>) {
+        val settings = storeSettings.value
+        com.example.utils.ShareUtils.exportSalesCsv(
+            context = context,
+            sales = salesToExport,
+            shopName = settings.shopName
+        )
+    }
+
+    fun exportStockCsv(context: Context) {
+        val settings = storeSettings.value
+        val prods = products.value
+        val catMap = categories.value.associate { it.id to it.name }
+        com.example.utils.ShareUtils.exportStockCsv(
+            context = context,
+            products = prods,
+            categoryNameMap = catMap,
+            shopName = settings.shopName
+        )
+    }
+
+    fun exportUdhaarCsv(context: Context, debtorCustomers: List<Customer>, balances: Map<Long, Double>) {
+        val settings = storeSettings.value
+        com.example.utils.ShareUtils.exportUdhaarCsv(
+            context = context,
+            customers = debtorCustomers,
+            balances = balances,
+            shopName = settings.shopName
+        )
     }
 
     // --- Cloud Synchronization State ---

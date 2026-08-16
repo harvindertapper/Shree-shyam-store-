@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -118,23 +120,33 @@ class MainActivity : ComponentActivity() {
                             .fillMaxSize()
                             .padding(innerPadding)
                     ) {
-                        when (val screen = currentScreen) {
-                            is Screen.Welcome -> WelcomeScreen(viewModel)
-                            is Screen.Login -> LoginScreen(viewModel)
-                            is Screen.Register -> RegisterScreen(viewModel)
-                            is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
-                            is Screen.Home -> HomeScreen(viewModel)
-                            is Screen.Billing -> BillingScreen(viewModel)
-                            is Screen.Payment -> PaymentScreen(viewModel, screen.invoiceTotal)
-                            is Screen.BillSuccess -> BillSuccessScreen(viewModel)
-                            is Screen.Products -> ProductsScreen(viewModel)
-                            is Screen.AddEditProduct -> AddEditProductScreen(viewModel, screen.productId)
-                            is Screen.OpeningStock -> OpeningStockScreen(viewModel)
-                            is Screen.StockAdjustment -> StockAdjustmentScreen(viewModel, screen.productId)
-                            is Screen.Udhaar -> UdhaarScreen(viewModel)
-                            is Screen.CustomerDetail -> CustomerDetailScreen(viewModel, screen.customerId)
-                            is Screen.Reports -> ReportsScreen(viewModel)
-                            is Screen.Settings -> SettingsScreen(viewModel)
+                        AnimatedContent(
+                            targetState = currentScreen,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(220)) +
+                                        slideInVertically(animationSpec = tween(220), initialOffsetY = { 30 }) togetherWith
+                                        fadeOut(animationSpec = tween(150))
+                            },
+                            label = "ScreenNavigationTransition"
+                        ) { screen ->
+                            when (screen) {
+                                is Screen.Welcome -> WelcomeScreen(viewModel)
+                                is Screen.Login -> LoginScreen(viewModel)
+                                is Screen.Register -> RegisterScreen(viewModel)
+                                is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
+                                is Screen.Home -> HomeScreen(viewModel)
+                                is Screen.Billing -> BillingScreen(viewModel)
+                                is Screen.Payment -> PaymentScreen(viewModel, screen.invoiceTotal)
+                                is Screen.BillSuccess -> BillSuccessScreen(viewModel)
+                                is Screen.Products -> ProductsScreen(viewModel)
+                                is Screen.AddEditProduct -> AddEditProductScreen(viewModel, screen.productId)
+                                is Screen.OpeningStock -> OpeningStockScreen(viewModel)
+                                is Screen.StockAdjustment -> StockAdjustmentScreen(viewModel, screen.productId)
+                                is Screen.Udhaar -> UdhaarScreen(viewModel)
+                                is Screen.CustomerDetail -> CustomerDetailScreen(viewModel, screen.customerId)
+                                is Screen.Reports -> ReportsScreen(viewModel)
+                                is Screen.Settings -> SettingsScreen(viewModel)
+                            }
                         }
                     }
                 }

@@ -598,14 +598,15 @@ fun ModernQuickActionCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+    Surface(
         shape = RoundedCornerShape(20.dp),
+        color = SurfaceWhite,
         border = androidx.compose.foundation.BorderStroke(1.dp, SurfaceCardBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shadowElevation = 2.dp,
         modifier = modifier
             .minimumInteractiveComponentSize()
-            .clickable { onClick() }
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -613,8 +614,8 @@ fun ModernQuickActionCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(44.dp)
-                    .background(containerColor, RoundedCornerShape(12.dp)),
+                    .size(46.dp)
+                    .background(containerColor, RoundedCornerShape(14.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
