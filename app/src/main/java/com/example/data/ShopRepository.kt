@@ -2,8 +2,6 @@ package com.example.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.runBlocking
 
 class ShopRepository(
     private val categoryDao: CategoryDao,
@@ -13,7 +11,8 @@ class ShopRepository(
     private val udhaarDao: UdhaarDao,
     private val stockAdjustmentDao: StockAdjustmentDao,
     private val userDao: UserDao,
-    private val database: AppDatabase? = null
+    private val database: AppDatabase? = null,
+    private val shopProfileDao: ShopProfileDao? = null
 ) {
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
@@ -114,33 +113,41 @@ class ShopRepository(
         return stockAdjustmentDao.insertAdjustment(adjustment)
     }
 
-    /**
-     * Corrects a product stock level manually and logs history
-     */
+    /** Corrects a product stock level and logs the audit record atomically. */
     suspend fun adjustProductStock(productId: Long, actualStockCounted: Double, reason: String) {
-        val product = productDao.getProductById(productId) ?: return
-        val oldStock = product.currentStock
-        val diff = actualStockCounted - oldStock
-        val now = System.currentTimeMillis()
-        
-        val updatedProduct = product.copy(
-            currentStock = actualStockCounted,
-            updatedAt = now,
-            isSynced = false
-        )
-        productDao.update(updatedProduct)
+        require(actualStockCounted >= 0.0) { "Stock cannot be negative" }
+        val operation: suspend () -> Unit = operation@{
+            val product = productDao.getProductById(productId) ?: return@operation
+            val oldStock = product.currentStock
+            val now = System.currentTimeMillis()
+            productDao.update(
+                product.copy(
+                    currentStock = actualStockCounted,
+                    updatedAt = now,
+                    isSynced = false
+                )
+            )
+            stockAdjustmentDao.insertAdjustment(
+                StockAdjustment(
+                    productId = productId,
+                    oldStock = oldStock,
+                    newStock = actualStockCounted,
+                    difference = actualStockCounted - oldStock,
+                    reason = reason.trim().ifEmpty { "Manual stock adjustment" },
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        }
+        if (database != null) database.withTransaction { operation() } else operation()
+    }
 
-        val adjustment = StockAdjustment(
-            productId = productId,
-            oldStock = oldStock,
-            newStock = actualStockCounted,
-            difference = diff,
-            reason = reason,
-            isSynced = false,
-            createdAt = now,
-            updatedAt = now
-        )
-        stockAdjustmentDao.insertAdjustment(adjustment)
+    suspend fun getShopProfile(uid: String): ShopProfile? =
+        shopProfileDao?.getByUid(uid) ?: database?.shopProfileDao()?.getByUid(uid)
+
+    suspend fun saveShopProfile(profile: ShopProfile) {
+        shopProfileDao?.upsert(profile) ?: database?.shopProfileDao()?.upsert(profile)
     }
 
     // --- User Authentication / Session Management Functions ---
@@ -178,14 +185,18 @@ class ShopRepository(
     suspend fun markUsersSynced(ids: List<Long>) = userDao.markUsersSynced(ids)
 
     suspend fun clearAllLocalTables() {
-        categoryDao.clearAllCategories()
-        productDao.clearAllProducts()
-        saleDao.clearAllSales()
-        saleDao.clearAllSaleItems()
-        customerDao.clearAllCustomers()
-        udhaarDao.clearAllTransactions()
-        stockAdjustmentDao.clearAllAdjustments()
-        userDao.clearAllUsers()
+        val operation: suspend () -> Unit = {
+            shopProfileDao?.clearAll() ?: database?.shopProfileDao()?.clearAll()
+            categoryDao.clearAllCategories()
+            productDao.clearAllProducts()
+            saleDao.clearAllSales()
+            saleDao.clearAllSaleItems()
+            customerDao.clearAllCustomers()
+            udhaarDao.clearAllTransactions()
+            stockAdjustmentDao.clearAllAdjustments()
+            userDao.clearAllUsers()
+        }
+        if (database != null) database.withTransaction { operation() } else operation()
     }
 
     suspend fun insertRestoredData(
@@ -198,14 +209,17 @@ class ShopRepository(
         adjustmentsList: List<StockAdjustment>,
         usersList: List<User>
     ) {
-        if (categoriesList.isNotEmpty()) categoryDao.insertAll(categoriesList)
-        if (productsList.isNotEmpty()) productDao.insertAll(productsList)
-        if (salesList.isNotEmpty()) saleDao.insertAllSales(salesList)
-        if (saleItemsList.isNotEmpty()) saleDao.insertAllSaleItems(saleItemsList)
-        if (customersList.isNotEmpty()) customerDao.insertAll(customersList)
-        if (udhaarTxsList.isNotEmpty()) udhaarDao.insertAll(udhaarTxsList)
-        if (adjustmentsList.isNotEmpty()) stockAdjustmentDao.insertAll(adjustmentsList)
-        if (usersList.isNotEmpty()) userDao.insertAll(usersList)
+        val operation: suspend () -> Unit = {
+            if (categoriesList.isNotEmpty()) categoryDao.insertAll(categoriesList)
+            if (productsList.isNotEmpty()) productDao.insertAll(productsList)
+            if (salesList.isNotEmpty()) saleDao.insertAllSales(salesList)
+            if (saleItemsList.isNotEmpty()) saleDao.insertAllSaleItems(saleItemsList)
+            if (customersList.isNotEmpty()) customerDao.insertAll(customersList)
+            if (udhaarTxsList.isNotEmpty()) udhaarDao.insertAll(udhaarTxsList)
+            if (adjustmentsList.isNotEmpty()) stockAdjustmentDao.insertAll(adjustmentsList)
+            if (usersList.isNotEmpty()) userDao.insertAll(usersList)
+        }
+        if (database != null) database.withTransaction { operation() } else operation()
     }
 
     suspend fun getAllSaleItems(): List<SaleItem> = saleDao.getAllSaleItemsList()

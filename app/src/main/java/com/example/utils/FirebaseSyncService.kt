@@ -1,7 +1,17 @@
 package com.example.utils
 
-import com.example.data.*
+import com.example.data.AppDatabase
+import com.example.data.Category
+import com.example.data.Customer
+import com.example.data.Product
+import com.example.data.Sale
+import com.example.data.SaleItem
+import com.example.data.SettingsDataStore
+import com.example.data.StockAdjustment
+import com.example.data.UdhaarTransaction
+import com.example.data.User
 import com.google.android.gms.tasks.Tasks
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.squareup.moshi.Moshi
@@ -9,367 +19,413 @@ import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
- * Robust cloud synchronization service for Shree Shyam Store.
- * Supports Firestore WriteBatch atomic synchronization and offline-safe REST fallback.
+ * Bidirectional cloud synchronization for the local Room database.
+ *
+ * Firestore is used by the background worker. The REST helpers are retained for
+ * the manual JSON backup/restore screen and intentionally return safe values on
+ * network or decoding failures so offline use never crashes the app.
  */
 class FirebaseSyncService(
     private val database: AppDatabase,
-    private val settingsDataStore: SettingsDataStore? = null
+    @Suppress("UNUSED_PARAMETER") private val settingsDataStore: SettingsDataStore? = null
 ) {
-    private val firestore: FirebaseFirestore by lazy {
-        FirebaseFirestore.getInstance()
-    }
+    private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
-    /**
-     * Pushes all local unsynced entities (Products, Bills, Customers, Categories, Udhaar)
-     * to Cloud Firestore under shops/{shopUid}/... using WriteBatch.
-     * Marks entities as isSynced = true upon successful commit.
-     */
     suspend fun pushUpstream(shopUid: String): Boolean = withContext(Dispatchers.IO) {
-        if (shopUid.isBlank()) return@withContext false
+        val uid = shopUid.trim()
+        if (uid.isEmpty()) return@withContext false
 
         try {
-            val productDao = database.productDao()
-            val saleDao = database.saleDao()
-            val customerDao = database.customerDao()
-            val categoryDao = database.categoryDao()
-            val udhaarDao = database.udhaarDao()
+            val products = database.productDao().getUnsyncedProducts()
+            val sales = database.saleDao().getUnsyncedSales()
+            val saleItems = database.saleDao().getUnsyncedSaleItems()
+            val customers = database.customerDao().getUnsyncedCustomers()
+            val categories = database.categoryDao().getUnsyncedCategories()
+            val udhaar = database.udhaarDao().getUnsyncedTransactions()
+            val adjustments = database.stockAdjustmentDao().getUnsyncedAdjustments()
+            val users = database.userDao().getUnsyncedUsers()
 
-            val unsyncedProducts = productDao.getUnsyncedProducts()
-            val unsyncedSales = saleDao.getUnsyncedSales()
-            val unsyncedCustomers = customerDao.getUnsyncedCustomers()
-            val unsyncedCategories = categoryDao.getUnsyncedCategories()
-            val unsyncedUdhaar = udhaarDao.getUnsyncedTransactions()
-
-            val totalCount = unsyncedProducts.size + unsyncedSales.size + unsyncedCustomers.size +
-                    unsyncedCategories.size + unsyncedUdhaar.size
-
-            if (totalCount == 0) {
-                return@withContext true
+            val shop = firestore.collection("shops").document(uid)
+            val writes = buildList {
+                products.forEach { add(shop.collection("products").document(it.id.toString()) to it.toCloudMap()) }
+                sales.forEach { add(shop.collection("bills").document(it.id.toString()) to it.toCloudMap()) }
+                saleItems.forEach { add(shop.collection("sale_items").document(it.id.toString()) to it.toCloudMap()) }
+                customers.forEach { add(shop.collection("customers").document(it.id.toString()) to it.toCloudMap()) }
+                categories.forEach { add(shop.collection("categories").document(it.id.toString()) to it.toCloudMap()) }
+                udhaar.forEach { add(shop.collection("udhaar_transactions").document(it.id.toString()) to it.toCloudMap()) }
+                adjustments.forEach { add(shop.collection("stock_adjustments").document(it.id.toString()) to it.toCloudMap()) }
+                users.forEach { add(shop.collection("users").document(it.id.toString()) to it.toCloudMap()) }
             }
 
-            val batch = firestore.batch()
-            val shopDoc = firestore.collection("shops").document(shopUid)
-
-            // 1. Upload Products -> shops/{shopUid}/products/{id}
-            unsyncedProducts.forEach { product ->
-                val docRef = shopDoc.collection("products").document(product.id.toString())
-                val dataMap = hashMapOf<String, Any?>(
-                    "id" to product.id,
-                    "name" to product.name,
-                    "categoryId" to product.categoryId,
-                    "mrp" to product.mrp,
-                    "sellingPrice" to product.sellingPrice,
-                    "purchasePrice" to product.purchasePrice,
-                    "currentStock" to product.currentStock,
-                    "unit" to product.unit,
-                    "trackStock" to product.trackStock,
-                    "lowStockAlertQty" to product.lowStockAlertQty,
-                    "barcode" to product.barcode,
-                    "isActive" to product.isActive,
-                    "createdAt" to product.createdAt,
-                    "updatedAt" to product.updatedAt,
-                    "isDeleted" to product.isDeleted
-                )
-                batch.set(docRef, dataMap, SetOptions.merge())
+            // Firestore limits a write batch to 500 operations. Keep headroom
+            // for server-side metadata and make large offline queues safe.
+            writes.chunked(MAX_BATCH_WRITES).forEach { chunk ->
+                val batch = firestore.batch()
+                chunk.forEach { (reference, data) ->
+                    batch.set(reference, data, SetOptions.merge())
+                }
+                Tasks.await(batch.commit(), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
             }
 
-            // 2. Upload Bills / Sales -> shops/{shopUid}/bills/{id}
-            unsyncedSales.forEach { sale ->
-                val docRef = shopDoc.collection("bills").document(sale.id.toString())
-                val dataMap = hashMapOf<String, Any?>(
-                    "id" to sale.id,
-                    "billNumber" to sale.billNumber,
-                    "totalAmount" to sale.totalAmount,
-                    "paymentMode" to sale.paymentMode,
-                    "customerId" to sale.customerId,
-                    "note" to sale.note,
-                    "createdAt" to sale.createdAt,
-                    "updatedAt" to sale.updatedAt,
-                    "isDeleted" to sale.isDeleted
-                )
-                batch.set(docRef, dataMap, SetOptions.merge())
-            }
-
-            // 3. Upload Customers -> shops/{shopUid}/customers/{id}
-            unsyncedCustomers.forEach { customer ->
-                val docRef = shopDoc.collection("customers").document(customer.id.toString())
-                val dataMap = hashMapOf<String, Any?>(
-                    "id" to customer.id,
-                    "name" to customer.name,
-                    "phone" to customer.phone,
-                    "createdAt" to customer.createdAt,
-                    "updatedAt" to customer.updatedAt,
-                    "isDeleted" to customer.isDeleted
-                )
-                batch.set(docRef, dataMap, SetOptions.merge())
-            }
-
-            // 4. Upload Categories -> shops/{shopUid}/categories/{id}
-            unsyncedCategories.forEach { category ->
-                val docRef = shopDoc.collection("categories").document(category.id.toString())
-                val dataMap = hashMapOf<String, Any?>(
-                    "id" to category.id,
-                    "name" to category.name,
-                    "createdAt" to category.createdAt,
-                    "updatedAt" to category.updatedAt,
-                    "isDeleted" to category.isDeleted
-                )
-                batch.set(docRef, dataMap, SetOptions.merge())
-            }
-
-            // 5. Upload Udhaar Transactions -> shops/{shopUid}/udhaar_transactions/{id}
-            unsyncedUdhaar.forEach { tx ->
-                val docRef = shopDoc.collection("udhaar_transactions").document(tx.id.toString())
-                val dataMap = hashMapOf<String, Any?>(
-                    "id" to tx.id,
-                    "customerId" to tx.customerId,
-                    "saleId" to tx.saleId,
-                    "type" to tx.type,
-                    "amount" to tx.amount,
-                    "note" to tx.note,
-                    "createdAt" to tx.createdAt,
-                    "updatedAt" to tx.updatedAt,
-                    "isDeleted" to tx.isDeleted
-                )
-                batch.set(docRef, dataMap, SetOptions.merge())
-            }
-
-            // Execute Firestore batch commit
-            Tasks.await(batch.commit(), 15, TimeUnit.SECONDS)
-
-            // Mark local records synced upon success
-            if (unsyncedProducts.isNotEmpty()) productDao.markProductsSynced(unsyncedProducts.map { it.id })
-            if (unsyncedSales.isNotEmpty()) saleDao.markSalesSynced(unsyncedSales.map { it.id })
-            if (unsyncedCustomers.isNotEmpty()) customerDao.markCustomersSynced(unsyncedCustomers.map { it.id })
-            if (unsyncedCategories.isNotEmpty()) categoryDao.markCategoriesSynced(unsyncedCategories.map { it.id })
-            if (unsyncedUdhaar.isNotEmpty()) udhaarDao.markTransactionsSynced(unsyncedUdhaar.map { it.id })
-
+            if (products.isNotEmpty()) database.productDao().markProductsSynced(products.map { it.id })
+            if (sales.isNotEmpty()) database.saleDao().markSalesSynced(sales.map { it.id })
+            if (saleItems.isNotEmpty()) database.saleDao().markSaleItemsSynced(saleItems.map { it.id })
+            if (customers.isNotEmpty()) database.customerDao().markCustomersSynced(customers.map { it.id })
+            if (categories.isNotEmpty()) database.categoryDao().markCategoriesSynced(categories.map { it.id })
+            if (udhaar.isNotEmpty()) database.udhaarDao().markTransactionsSynced(udhaar.map { it.id })
+            if (adjustments.isNotEmpty()) database.stockAdjustmentDao().markAdjustmentsSynced(adjustments.map { it.id })
+            if (users.isNotEmpty()) database.userDao().markUsersSynced(users.map { it.id })
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 
-    /**
-     * Pulls downstream modifications from Firestore where updatedAt > lastSyncTime,
-     * upserts documents into Room database, and returns the new lastSyncTime timestamp.
-     */
+    /** Pulls all changed cloud collections and returns the new high-water mark. */
     suspend fun pullDownstream(shopUid: String, lastSyncTime: Long): Long = withContext(Dispatchers.IO) {
-        if (shopUid.isBlank()) return@withContext lastSyncTime
-        val newSyncTime = System.currentTimeMillis()
+        val uid = shopUid.trim()
+        if (uid.isEmpty()) return@withContext lastSyncTime
+        val now = System.currentTimeMillis()
 
         try {
-            val shopDoc = firestore.collection("shops").document(shopUid)
-
-            // Pull Categories
-            val catTask = shopDoc.collection("categories")
-                .whereGreaterThan("updatedAt", lastSyncTime)
-                .get()
-            val catSnap = Tasks.await(catTask, 10, TimeUnit.SECONDS)
-            val pulledCategories = catSnap.documents.mapNotNull { doc ->
-                val name = doc.getString("name") ?: return@mapNotNull null
-                Category(
-                    id = doc.getLong("id") ?: doc.id.toLongOrNull() ?: 0L,
-                    name = name,
-                    isSynced = true,
-                    createdAt = doc.getLong("createdAt") ?: newSyncTime,
-                    updatedAt = doc.getLong("updatedAt") ?: newSyncTime,
-                    isDeleted = doc.getBoolean("isDeleted") ?: false
-                )
-            }
-            if (pulledCategories.isNotEmpty()) {
-                database.categoryDao().insertAll(pulledCategories)
-            }
-
-            // Pull Products
-            val prodTask = shopDoc.collection("products")
-                .whereGreaterThan("updatedAt", lastSyncTime)
-                .get()
-            val prodSnap = Tasks.await(prodTask, 10, TimeUnit.SECONDS)
-            val pulledProducts = prodSnap.documents.mapNotNull { doc ->
-                val name = doc.getString("name") ?: return@mapNotNull null
-                Product(
-                    id = doc.getLong("id") ?: doc.id.toLongOrNull() ?: 0L,
-                    name = name,
-                    categoryId = doc.getLong("categoryId") ?: 1L,
-                    mrp = doc.getDouble("mrp") ?: 0.0,
-                    sellingPrice = doc.getDouble("sellingPrice"),
-                    purchasePrice = doc.getDouble("purchasePrice"),
-                    currentStock = doc.getDouble("currentStock") ?: 0.0,
-                    unit = doc.getString("unit") ?: "pcs",
-                    trackStock = doc.getBoolean("trackStock") ?: true,
-                    lowStockAlertQty = doc.getDouble("lowStockAlertQty") ?: 5.0,
-                    barcode = doc.getString("barcode") ?: "",
-                    isActive = doc.getBoolean("isActive") ?: true,
-                    isSynced = true,
-                    createdAt = doc.getLong("createdAt") ?: newSyncTime,
-                    updatedAt = doc.getLong("updatedAt") ?: newSyncTime,
-                    isDeleted = doc.getBoolean("isDeleted") ?: false
-                )
-            }
-            if (pulledProducts.isNotEmpty()) {
-                database.productDao().insertAll(pulledProducts)
-            }
-
-            // Pull Customers
-            val custTask = shopDoc.collection("customers")
-                .whereGreaterThan("updatedAt", lastSyncTime)
-                .get()
-            val custSnap = Tasks.await(custTask, 10, TimeUnit.SECONDS)
-            val pulledCustomers = custSnap.documents.mapNotNull { doc ->
-                val name = doc.getString("name") ?: return@mapNotNull null
-                Customer(
-                    id = doc.getLong("id") ?: doc.id.toLongOrNull() ?: 0L,
-                    name = name,
-                    phone = doc.getString("phone"),
-                    isSynced = true,
-                    createdAt = doc.getLong("createdAt") ?: newSyncTime,
-                    updatedAt = doc.getLong("updatedAt") ?: newSyncTime,
-                    isDeleted = doc.getBoolean("isDeleted") ?: false
-                )
-            }
-            if (pulledCustomers.isNotEmpty()) {
-                database.customerDao().insertAll(pulledCustomers)
-            }
-
-            // Pull Bills / Sales
-            val billTask = shopDoc.collection("bills")
-                .whereGreaterThan("updatedAt", lastSyncTime)
-                .get()
-            val billSnap = Tasks.await(billTask, 10, TimeUnit.SECONDS)
-            val pulledSales = billSnap.documents.mapNotNull { doc ->
-                val billNum = doc.getString("billNumber") ?: return@mapNotNull null
-                Sale(
-                    id = doc.getLong("id") ?: doc.id.toLongOrNull() ?: 0L,
-                    billNumber = billNum,
-                    totalAmount = doc.getDouble("totalAmount") ?: 0.0,
-                    paymentMode = doc.getString("paymentMode") ?: "CASH",
-                    customerId = doc.getLong("customerId"),
-                    note = doc.getString("note"),
-                    isSynced = true,
-                    createdAt = doc.getLong("createdAt") ?: newSyncTime,
-                    updatedAt = doc.getLong("updatedAt") ?: newSyncTime,
-                    isDeleted = doc.getBoolean("isDeleted") ?: false
-                )
-            }
-            if (pulledSales.isNotEmpty()) {
-                database.saleDao().insertAllSales(pulledSales)
-            }
-
-            // Pull Udhaar Transactions
-            val udhaarTask = shopDoc.collection("udhaar_transactions")
-                .whereGreaterThan("updatedAt", lastSyncTime)
-                .get()
-            val udhaarSnap = Tasks.await(udhaarTask, 10, TimeUnit.SECONDS)
-            val pulledUdhaar = udhaarSnap.documents.mapNotNull { doc ->
-                val customerId = doc.getLong("customerId") ?: return@mapNotNull null
-                UdhaarTransaction(
-                    id = doc.getLong("id") ?: doc.id.toLongOrNull() ?: 0L,
-                    customerId = customerId,
-                    saleId = doc.getLong("saleId"),
-                    type = doc.getString("type") ?: "CREDIT",
-                    amount = doc.getDouble("amount") ?: 0.0,
-                    note = doc.getString("note"),
-                    isSynced = true,
-                    createdAt = doc.getLong("createdAt") ?: newSyncTime,
-                    updatedAt = doc.getLong("updatedAt") ?: newSyncTime,
-                    isDeleted = doc.getBoolean("isDeleted") ?: false
-                )
-            }
-            if (pulledUdhaar.isNotEmpty()) {
-                database.udhaarDao().insertAll(pulledUdhaar)
-            }
-
-            newSyncTime
-        } catch (e: Exception) {
+            val shop = firestore.collection("shops").document(uid)
+            pullCategories(shop, lastSyncTime, now)
+            pullProducts(shop, lastSyncTime, now)
+            pullCustomers(shop, lastSyncTime, now)
+            pullSales(shop, lastSyncTime, now)
+            pullSaleItems(shop, lastSyncTime, now)
+            pullUdhaar(shop, lastSyncTime, now)
+            pullAdjustments(shop, lastSyncTime, now)
+            pullUsers(shop, lastSyncTime, now)
+            now
+        } catch (_: Exception) {
+            // Keep the previous cursor so a transient failure is retried rather
+            // than silently skipping records.
             lastSyncTime
         }
     }
 
+    private suspend fun pullCategories(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("categories").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.categoryDao().insertAll(docs.mapNotNull { doc ->
+            val name = doc.getString("name") ?: return@mapNotNull null
+            Category(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                name = name,
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullProducts(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("products").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.productDao().insertAll(docs.mapNotNull { doc ->
+            val name = doc.getString("name") ?: return@mapNotNull null
+            Product(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                name = name,
+                categoryId = doc.long("categoryId") ?: 0L,
+                mrp = doc.number("mrp"),
+                sellingPrice = doc.optionalNumber("sellingPrice"),
+                purchasePrice = doc.optionalNumber("purchasePrice"),
+                currentStock = doc.number("currentStock"),
+                unit = doc.getString("unit") ?: "pcs",
+                trackStock = doc.getBoolean("trackStock") ?: true,
+                lowStockAlertQty = doc.number("lowStockAlertQty", 5.0),
+                barcode = doc.getString("barcode").orEmpty(),
+                isActive = doc.getBoolean("isActive") ?: true,
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullCustomers(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("customers").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.customerDao().insertAll(docs.mapNotNull { doc ->
+            val name = doc.getString("name") ?: return@mapNotNull null
+            Customer(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                name = name,
+                phone = doc.getString("phone"),
+                creditLimit = doc.number("creditLimit", 5000.0),
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullSales(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("bills").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.saleDao().insertAllSales(docs.mapNotNull { doc ->
+            val number = doc.getString("billNumber") ?: return@mapNotNull null
+            Sale(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                billNumber = number,
+                totalAmount = doc.number("totalAmount"),
+                paymentMode = doc.getString("paymentMode") ?: "CASH",
+                customerId = doc.long("customerId"),
+                note = doc.getString("note"),
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullSaleItems(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("sale_items").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.saleDao().insertAllSaleItems(docs.mapNotNull { doc ->
+            val productName = doc.getString("productNameSnapshot") ?: return@mapNotNull null
+            SaleItem(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                saleId = doc.long("saleId") ?: return@mapNotNull null,
+                productId = doc.long("productId") ?: return@mapNotNull null,
+                productNameSnapshot = productName,
+                quantity = doc.number("quantity", 1.0),
+                unit = doc.getString("unit") ?: "pcs",
+                unitPrice = doc.number("unitPrice"),
+                lineTotal = doc.number("lineTotal"),
+                isSynced = true,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullUdhaar(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("udhaar_transactions").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.udhaarDao().insertAll(docs.mapNotNull { doc ->
+            UdhaarTransaction(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                customerId = doc.long("customerId") ?: return@mapNotNull null,
+                saleId = doc.long("saleId"),
+                type = doc.getString("type") ?: "CREDIT",
+                amount = doc.number("amount"),
+                note = doc.getString("note"),
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullAdjustments(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("stock_adjustments").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.stockAdjustmentDao().insertAll(docs.mapNotNull { doc ->
+            StockAdjustment(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                productId = doc.long("productId") ?: return@mapNotNull null,
+                oldStock = doc.number("oldStock"),
+                newStock = doc.number("newStock"),
+                difference = doc.number("difference"),
+                reason = doc.getString("reason") ?: "Cloud adjustment",
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private suspend fun pullUsers(shop: DocumentReference, since: Long, fallbackTime: Long) {
+        val docs = Tasks.await(
+            shop.collection("users").whereGreaterThan("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
+        ).documents
+        database.userDao().insertAll(docs.mapNotNull { doc ->
+            User(
+                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                uid = doc.getString("uid").orEmpty(),
+                username = doc.getString("username") ?: return@mapNotNull null,
+                email = doc.getString("email") ?: return@mapNotNull null,
+                passwordHash = doc.getString("passwordHash").orEmpty(),
+                isSynced = true,
+                createdAt = doc.long("createdAt") ?: fallbackTime,
+                updatedAt = doc.long("updatedAt") ?: fallbackTime,
+                isDeleted = doc.getBoolean("isDeleted") ?: false
+            )
+        })
+    }
+
+    private fun Product.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "name" to name, "categoryId" to categoryId, "mrp" to mrp,
+        "sellingPrice" to sellingPrice, "purchasePrice" to purchasePrice,
+        "currentStock" to currentStock, "unit" to unit, "trackStock" to trackStock,
+        "lowStockAlertQty" to lowStockAlertQty, "barcode" to barcode, "isActive" to isActive,
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun Sale.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "billNumber" to billNumber, "totalAmount" to totalAmount,
+        "paymentMode" to paymentMode, "customerId" to customerId, "note" to note,
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun SaleItem.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "saleId" to saleId, "productId" to productId,
+        "productNameSnapshot" to productNameSnapshot, "quantity" to quantity,
+        "unit" to unit, "unitPrice" to unitPrice, "lineTotal" to lineTotal,
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun Customer.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "name" to name, "phone" to phone, "creditLimit" to creditLimit,
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun Category.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "name" to name, "createdAt" to createdAt,
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun UdhaarTransaction.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "customerId" to customerId, "saleId" to saleId, "type" to type,
+        "amount" to amount, "note" to note, "createdAt" to createdAt,
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun StockAdjustment.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "productId" to productId, "oldStock" to oldStock,
+        "newStock" to newStock, "difference" to difference, "reason" to reason,
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
+    private fun User.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "uid" to uid, "username" to username, "email" to email,
+        "passwordHash" to passwordHash, "createdAt" to createdAt,
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+    )
+
     companion object {
+        private const val MAX_BATCH_WRITES = 450
+        private const val FIRESTORE_TIMEOUT_SECONDS = 15L
+        private const val DEFAULT_PREFIX = "shreeshyam_sync"
         private val client = OkHttpClient.Builder()
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
             .build()
+        private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
 
-        private val moshi = Moshi.Builder()
-            .add(KotlinJsonAdapterFactory())
-            .build()
-
-        private fun getJsonUrl(url: String, prefix: String, table: String): String {
-            var cleanUrl = url.trim()
-            if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-                cleanUrl = "https://$cleanUrl"
+        private fun normalizedBaseUrl(url: String): String? {
+            val value = url.trim()
+            if (value.isEmpty()) return null
+            val withScheme = if (value.startsWith("http://") || value.startsWith("https://")) {
+                value
+            } else {
+                "https://$value"
             }
-            cleanUrl = cleanUrl.removeSuffix("/")
-            val cleanPrefix = prefix.trim().ifEmpty { "shreeshyam_sync" }
-            return "$cleanUrl/$cleanPrefix/$table.json"
+            return withScheme.trimEnd('/').removeSuffix(".json")
+        }
+
+        private fun getJsonUrl(url: String, prefix: String, table: String): String? {
+            val base = normalizedBaseUrl(url) ?: return null
+            val cleanPrefix = prefix.trim().trim('/').ifEmpty { DEFAULT_PREFIX }
+            val cleanTable = table.trim().trim('/')
+            if (cleanTable.isEmpty()) return null
+            return "$base/$cleanPrefix/$cleanTable.json"
         }
 
         suspend fun testFirebaseConnection(url: String): Boolean = withContext(Dispatchers.IO) {
-            if (url.isBlank()) return@withContext false
-            var cleanUrl = url.trim()
-            if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-                cleanUrl = "https://$cleanUrl"
-            }
-            cleanUrl = cleanUrl.removeSuffix("/")
-            val checkUrl = "$cleanUrl/.json?shallow=true"
-            val request = Request.Builder().url(checkUrl).get().build()
-            try {
-                client.newCall(request).execute().use { response ->
-                    response.isSuccessful
-                }
-            } catch (e: Exception) {
-                false
-            }
+            val base = normalizedBaseUrl(url) ?: return@withContext false
+            val request = runCatching { Request.Builder().url("$base/.json?shallow=true").get().build() }
+                .getOrNull() ?: return@withContext false
+            runCatching { client.newCall(request).execute().use { it.isSuccessful } }.getOrDefault(false)
         }
 
-        suspend fun <T> uploadTable(url: String, prefix: String, tableName: String, list: List<T>, clazz: Class<T>): Boolean = withContext(Dispatchers.IO) {
-            val targetUrl = getJsonUrl(url, prefix, tableName)
-            val type = Types.newParameterizedType(List::class.java, clazz)
-            val adapter = moshi.adapter<List<T>>(type)
-            val json = adapter.serializeNulls().toJson(list)
-
-            val body = json.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull())
-            val request = Request.Builder().url(targetUrl).put(body).build()
-            try {
-                client.newCall(request).execute().use { response ->
-                    response.isSuccessful
-                }
-            } catch (e: Exception) {
-                false
-            }
+        suspend fun <T> uploadTable(
+            url: String,
+            prefix: String,
+            tableName: String,
+            list: List<T>,
+            clazz: Class<T>
+        ): Boolean = withContext(Dispatchers.IO) {
+            val targetUrl = getJsonUrl(url, prefix, tableName) ?: return@withContext false
+            runCatching {
+                val type = Types.newParameterizedType(List::class.java, clazz)
+                val json = moshi.adapter<List<T>>(type).serializeNulls().toJson(list)
+                val request = Request.Builder()
+                    .url(targetUrl)
+                    .put(json.toRequestBody(JSON_MEDIA_TYPE))
+                    .build()
+                client.newCall(request).execute().use { it.isSuccessful }
+            }.getOrDefault(false)
         }
 
-        suspend fun <T> downloadTable(url: String, prefix: String, tableName: String, clazz: Class<T>): List<T> = withContext(Dispatchers.IO) {
-            val targetUrl = getJsonUrl(url, prefix, tableName)
-            val request = Request.Builder().url(targetUrl).get().build()
-            try {
+        suspend fun <T> downloadTable(
+            url: String,
+            prefix: String,
+            tableName: String,
+            clazz: Class<T>
+        ): List<T> = withContext(Dispatchers.IO) {
+            val targetUrl = getJsonUrl(url, prefix, tableName) ?: return@withContext emptyList()
+            runCatching {
+                val request = Request.Builder().url(targetUrl).get().build()
                 client.newCall(request).execute().use { response ->
-                    if (response.isSuccessful) {
-                        val bodyStr = response.body?.string() ?: ""
-                        if (bodyStr.isBlank() || bodyStr == "null") {
-                            emptyList()
-                        } else {
-                            val type = Types.newParameterizedType(List::class.java, clazz)
-                            val adapter = moshi.adapter<List<T>>(type)
-                            adapter.fromJson(bodyStr) ?: emptyList()
-                        }
-                    } else {
-                        emptyList()
-                    }
+                    if (!response.isSuccessful) return@use emptyList()
+                    val body = response.body?.string().orEmpty()
+                    if (body.isBlank() || body == "null") return@use emptyList()
+                    val type = Types.newParameterizedType(List::class.java, clazz)
+                    moshi.adapter<List<T>>(type).fromJson(body).orEmpty()
                 }
-            } catch (e: Exception) {
-                emptyList()
-            }
+            }.getOrDefault(emptyList())
         }
+
+        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
+
+private fun com.google.firebase.firestore.DocumentSnapshot.long(field: String): Long? =
+    getLong(field) ?: getDouble(field)?.toLong()
+
+private fun com.google.firebase.firestore.DocumentSnapshot.number(field: String, default: Double = 0.0): Double =
+    getDouble(field) ?: getLong(field)?.toDouble() ?: default
+
+private fun com.google.firebase.firestore.DocumentSnapshot.optionalNumber(field: String): Double? =
+    getDouble(field) ?: getLong(field)?.toDouble()

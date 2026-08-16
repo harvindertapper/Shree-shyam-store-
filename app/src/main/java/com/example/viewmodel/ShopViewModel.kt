@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.*
 import com.example.utils.CurrencyUtils
+import com.example.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
@@ -78,9 +79,9 @@ class ShopViewModel(
                 isUserLoggedIn = false,
                 appLockEnabled = true,
                 biometricEnabled = false,
-                securityPin = "1234",
+                securityPin = SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
                 firebaseUrl = "",
-                firebasePrefix = "store_sync",
+                firebasePrefix = "shreeshyam_sync",
                 lastSyncTime = "Never Synced",
                 autoSyncEnabled = false,
                 appLanguage = com.example.utils.AppLanguage.HINDI
@@ -151,6 +152,23 @@ class ShopViewModel(
             settingsDataStore.updateShopName(shopName.trim())
             settingsDataStore.updateOwnerName(ownerName.trim())
             settingsDataStore.updateOwnerPhone(ownerPhone.trim())
+            val sessionSettings = settingsDataStore.settingsFlow.first()
+            val uid = sessionSettings.loggedInUid.ifBlank {
+                sessionSettings.loggedInEmail.ifBlank { sessionSettings.loggedInUsername }
+            }.trim()
+            if (uid.isNotEmpty()) {
+                repository.saveShopProfile(
+                    ShopProfile(
+                        uid = uid,
+                        shopName = shopName.trim(),
+                        ownerName = ownerName.trim(),
+                        ownerPhone = ownerPhone.trim(),
+                        email = sessionSettings.loggedInEmail.trim(),
+                        isSynced = false,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+            }
             settingsDataStore.setFirstLaunchCompleted(true)
             triggerAutoSync()
             onSuccess()
@@ -823,9 +841,11 @@ class ShopViewModel(
 
     fun bulkRestockProduct(product: Product, quantityToAdd: Double) {
         viewModelScope.launch {
+            if (quantityToAdd <= 0.0) return@launch
             val updated = product.copy(
                 currentStock = product.currentStock + quantityToAdd,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                isSynced = false
             )
             repository.updateProduct(updated)
             repository.insertStockAdjustment(
@@ -867,19 +887,25 @@ class ShopViewModel(
 
     fun updateFirebaseSettings(url: String, prefix: String, autoSync: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.updateFirebaseConfig(url.trim(), prefix.trim())
+            val current = settingsDataStore.settingsFlow.first()
+            val effectiveUrl = url.trim().ifEmpty { current.firebaseUrl }
+            val effectivePrefix = prefix.trim().ifEmpty { current.firebasePrefix }
+            settingsDataStore.updateFirebaseConfig(effectiveUrl, effectivePrefix)
             settingsDataStore.updateAutoSyncEnabled(autoSync)
         }
     }
 
     fun syncAllToCloud(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val settings = storeSettings.value
-            val url = com.example.BuildConfig.FIREBASE_URL
+            val settings = settingsDataStore.settingsFlow.first()
+            val url = settings.firebaseUrl.ifBlank { com.example.BuildConfig.FIREBASE_URL }
 
-            val userIdentifier = settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }.lowercase().trim()
+            val userIdentifier = settings.loggedInUid.ifBlank {
+                settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }
+            }.lowercase().trim()
             val hashedUser = hashStringSHA256(userIdentifier)
-            val prefix = "shreeshyam_sync/users/$hashedUser"
+            val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
+            val prefix = "$basePrefix/users/$hashedUser"
 
             _syncInProgress.value = true
             _syncMessage.value = "Starting Backup..."
@@ -894,38 +920,42 @@ class ShopViewModel(
                     return@launch
                 }
 
-                // Gather Snapshot Data from Database Flows via .first()
+                // Gather snapshot data and require every table to upload successfully.
+                val uploadResults = mutableListOf<Boolean>()
                 _syncMessage.value = "Backing up Categories..."
                 val catList = repository.allCategories.first()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "categories", catList, Category::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "categories", catList, Category::class.java)
 
                 _syncMessage.value = "Backing up Products..."
                 val prodList = repository.allProducts.first()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "products", prodList, Product::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "products", prodList, Product::class.java)
 
                 _syncMessage.value = "Backing up Bills..."
                 val salesList = repository.allSales.first()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "sales", salesList, Sale::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "sales", salesList, Sale::class.java)
 
                 _syncMessage.value = "Backing up Sale Items..."
                 val saleItemsList = repository.getAllSaleItems()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "sale_items", saleItemsList, SaleItem::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "sale_items", saleItemsList, SaleItem::class.java)
 
                 _syncMessage.value = "Backing up Customers..."
                 val customersList = repository.allCustomers.first()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "customers", customersList, Customer::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "customers", customersList, Customer::class.java)
 
                 _syncMessage.value = "Backing up Ledger..."
                 val udhaarList = repository.allUdhaarTransactions.first()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "udhaar_transactions", udhaarList, UdhaarTransaction::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "udhaar_transactions", udhaarList, UdhaarTransaction::class.java)
 
                 _syncMessage.value = "Backing up Stock Adjustments..."
                 val adjList = repository.getAllStockAdjustmentsList()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "stock_adjustments", adjList, StockAdjustment::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "stock_adjustments", adjList, StockAdjustment::class.java)
 
                 _syncMessage.value = "Backing up Users..."
                 val usersList = repository.getAllUsers()
-                com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "users", usersList, User::class.java)
+                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "users", usersList, User::class.java)
+                if (uploadResults.any { !it }) {
+                    throw IllegalStateException("One or more backup tables failed to upload")
+                }
 
                 // Update sync time
                 val currentDF = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", java.util.Locale.ENGLISH)
@@ -945,12 +975,15 @@ class ShopViewModel(
 
     fun restoreAllFromCloud(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
-            val settings = storeSettings.value
-            val url = com.example.BuildConfig.FIREBASE_URL
+            val settings = settingsDataStore.settingsFlow.first()
+            val url = settings.firebaseUrl.ifBlank { com.example.BuildConfig.FIREBASE_URL }
 
-            val userIdentifier = settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }.lowercase().trim()
+            val userIdentifier = settings.loggedInUid.ifBlank {
+                settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }
+            }.lowercase().trim()
             val hashedUser = hashStringSHA256(userIdentifier)
-            val prefix = "shreeshyam_sync/users/$hashedUser"
+            val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
+            val prefix = "$basePrefix/users/$hashedUser"
 
             _syncInProgress.value = true
             _syncMessage.value = "Testing connection..."
@@ -989,7 +1022,8 @@ class ShopViewModel(
                 _syncMessage.value = "Downloading Accounts..."
                 val usersList = com.example.utils.FirebaseSyncService.downloadTable(url, prefix, "users", User::class.java)
 
-                if (catList.isEmpty() && prodList.isEmpty() && salesList.isEmpty() && customersList.isEmpty()) {
+                if (catList.isEmpty() && prodList.isEmpty() && salesList.isEmpty() && saleItemsList.isEmpty() &&
+                    customersList.isEmpty() && udhaarList.isEmpty() && adjList.isEmpty() && usersList.isEmpty()) {
                     _syncInProgress.value = false
                     _syncMessage.value = null
                     onResult(false, "No backup data found under prefix '$prefix' at this database URL.")
