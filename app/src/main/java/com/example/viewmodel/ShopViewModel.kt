@@ -77,16 +77,24 @@ class ShopViewModel(
                 firebaseUrl = "",
                 firebasePrefix = "shreeshyam_sync",
                 lastSyncTime = "Never Synced",
-                autoSyncEnabled = false
+                autoSyncEnabled = false,
+                securityPin = "1234"
             )
         )
 
-    fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String) {
+    fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String, securityPin: String = "1234") {
         viewModelScope.launch {
             settingsDataStore.updateShopName(shopName)
             settingsDataStore.updateOwnerPhone(ownerPhone)
             settingsDataStore.updateWelcomeChantEnabled(welcomeChantEnabled)
             settingsDataStore.updateStaticPaytmQrImageUri(qrImageUri)
+            settingsDataStore.updateSecurityPin(securityPin)
+        }
+    }
+
+    fun updateSecurityPin(pin: String) {
+        viewModelScope.launch {
+            settingsDataStore.updateSecurityPin(pin)
         }
     }
 

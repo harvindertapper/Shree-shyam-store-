@@ -42,6 +42,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
 
     var shopName by remember { mutableStateOf("") }
     var ownerPhone by remember { mutableStateOf("") }
+    var securityPin by remember { mutableStateOf("1234") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
     var qrUriString by remember { mutableStateOf("") }
     var autoSyncEnabled by remember { mutableStateOf(false) }
@@ -53,6 +54,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     LaunchedEffect(settings) {
         shopName = settings.shopName
         ownerPhone = settings.ownerPhone
+        securityPin = settings.securityPin
         welcomeChantEnabled = settings.welcomeChantEnabled
         qrUriString = settings.staticPaytmQrImageUri
         autoSyncEnabled = settings.autoSyncEnabled
@@ -202,6 +204,70 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .testTag("settings_owner_phone_field")
+                    )
+                }
+            }
+
+            // Card: Owner 4-Digit Security PIN
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth().testTag("settings_pin_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(SaffronLight, RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Pin, null, tint = SaffronDark, modifier = Modifier.size(20.dp))
+                        }
+                        Column {
+                            Text(
+                                text = "4-अंकों का ओनर पिन (Security PIN) 🔒",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black,
+                                color = SaffronDark
+                            )
+                            Text(
+                                text = "ऐप में तुरंत लॉगिन करने के लिए अपना PIN सेट करें",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMutedGray
+                            )
+                        }
+                    }
+
+                    AppOutlinedTextField(
+                        value = securityPin,
+                        onValueChange = {
+                            if (it.length <= 4 && it.all { char -> char.isDigit() }) {
+                                securityPin = it
+                            }
+                        },
+                        label = "Owner PIN (डिफ़ॉल्ट: 1234) *",
+                        placeholder = "4-digit PIN",
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_security_pin_field")
                     )
                 }
             }
@@ -526,7 +592,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             shopName = shopName.trim(),
                             ownerPhone = ownerPhone.trim(),
                             welcomeChantEnabled = welcomeChantEnabled,
-                            qrImageUri = qrUriString
+                            qrImageUri = qrUriString,
+                            securityPin = if (securityPin.length == 4) securityPin else "1234"
                         )
                         viewModel.updateFirebaseSettings(
                             url = "",

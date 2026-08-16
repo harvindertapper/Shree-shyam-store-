@@ -27,7 +27,8 @@ data class StoreSettings(
     val firebaseUrl: String,
     val firebasePrefix: String,
     val lastSyncTime: String,
-    val autoSyncEnabled: Boolean
+    val autoSyncEnabled: Boolean,
+    val securityPin: String
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -44,6 +45,7 @@ class SettingsDataStore(private val context: Context) {
         private val FIREBASE_PREFIX = stringPreferencesKey("firebase_prefix")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
         private val AUTO_SYNC_ENABLED = booleanPreferencesKey("auto_sync_enabled")
+        private val SECURITY_PIN = stringPreferencesKey("security_pin")
     }
 
     val settingsFlow: Flow<StoreSettings> = context.dataStore.data
@@ -67,9 +69,16 @@ class SettingsDataStore(private val context: Context) {
                 firebaseUrl = preferences[FIREBASE_URL] ?: "",
                 firebasePrefix = preferences[FIREBASE_PREFIX] ?: "shreeshyam_sync",
                 lastSyncTime = preferences[LAST_SYNC_TIME] ?: "Never Synced",
-                autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: false
+                autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: false,
+                securityPin = preferences[SECURITY_PIN] ?: "1234"
             )
         }
+
+    suspend fun updateSecurityPin(pin: String) {
+        context.dataStore.edit { preferences ->
+            preferences[SECURITY_PIN] = pin
+        }
+    }
 
     suspend fun updateShopName(name: String) {
         context.dataStore.edit { preferences ->
