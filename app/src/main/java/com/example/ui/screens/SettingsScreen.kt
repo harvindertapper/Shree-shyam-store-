@@ -590,7 +590,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         }
                     }
 
-                    Divider(color = BorderStrong)
+                    HorizontalDivider(color = BorderStrong)
 
                     val syncNote = if (settings.appLanguage == AppLanguage.HINDI) {
                         "क्लाउड बैकअप आपके स्टोर अकाउंट के साथ स्वचालित रूप से आपके सुरक्षित स्टोर डेटाबेस पर सिंक होता है।"
@@ -764,6 +764,24 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     .testTag("save_settings_button")
             )
             
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Footer branding
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Version 1.0.0 • Powered by 7zen Labs",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextMutedGray,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }

@@ -189,7 +189,7 @@ interface AppStrings {
 
 object HindiStrings : AppStrings {
     override val godBlessing = "|| श्री गणेशाय नमः ||  जय श्री श्याम 🙏"
-    override val devotionalHeader = "श्री श्याम किराना स्टोर"
+    override val devotionalHeader = "स्मार्ट डिजिटल स्टोर"
     override val shopSubtitle = "दुकानदार का डिजिटल बहीखाता और बिलिंग काउंटर"
     override val feature1Title = "तेज़ बिलिंग"
     override val feature1Desc = "नकद, UPI और उधार बिल 3 सेकंड में"
@@ -242,7 +242,7 @@ object HindiStrings : AppStrings {
     override val upiPaytm = "Paytm / UPI"
     override val allTime = "सभी समय"
 
-    override val defaultShopName = "श्री श्याम किराना स्टोर"
+    override val defaultShopName = "स्मार्ट डिजिटल स्टोर"
     override val todaySales = "आज की कुल बिक्री"
     override val cashSales = "नकद बिक्री"
     override val upiSales = "UPI बिक्री"
@@ -351,7 +351,7 @@ object HindiStrings : AppStrings {
 
 object EnglishStrings : AppStrings {
     override val godBlessing = "|| Shree Ganeshay Namah ||  Jai Shree Shyam 🙏"
-    override val devotionalHeader = "Shree Shyam Store"
+    override val devotionalHeader = "Smart Digital Store"
     override val shopSubtitle = "Smart Digital Ledger & POS Billing Counter"
     override val feature1Title = "Fast POS Billing"
     override val feature1Desc = "Cash, UPI & Credit bills in under 3 seconds"
@@ -404,7 +404,7 @@ object EnglishStrings : AppStrings {
     override val upiPaytm = "Paytm / UPI"
     override val allTime = "All Time"
 
-    override val defaultShopName = "Shree Shyam Kirana Store"
+    override val defaultShopName = "Smart Digital Store"
     override val todaySales = "Today's Total Sales"
     override val cashSales = "Cash Sales"
     override val upiSales = "UPI Sales"

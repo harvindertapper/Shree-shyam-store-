@@ -68,7 +68,8 @@ object ShareUtils {
         shopName: String,
         customerName: String,
         balance: Double,
-        ownerPhone: String? = null
+        ownerPhone: String? = null,
+        ownerName: String? = null
     ): String {
         val formattedAmount = CurrencyUtils.formatRupees(balance)
         val sb = StringBuilder()
@@ -79,7 +80,52 @@ object ShareUtils {
         if (!ownerPhone.isNullOrBlank()) {
             sb.append("संपर्क / UPI नंबर: $ownerPhone\n")
         }
+        if (!ownerName.isNullOrBlank()) {
+            sb.append("दुकानदार: $ownerName\n")
+        }
         sb.append("\nधन्यवाद!\n")
+        sb.append("— $shopName")
+        return sb.toString()
+    }
+
+    /**
+     * Generate structured WhatsApp / SMS bill invoice receipt text
+     */
+    fun generateBillReceiptText(
+        shopName: String,
+        billNumber: String,
+        dateFormatted: String,
+        items: List<SaleItem>,
+        totalAmount: Double,
+        paymentMode: String,
+        ownerPhone: String? = null,
+        ownerName: String? = null
+    ): String {
+        val sb = StringBuilder()
+        sb.append("🧾 *$shopName*\n")
+        if (!ownerName.isNullOrBlank()) {
+            sb.append("👤 दुकानदार / Store: $ownerName\n")
+        }
+        if (!ownerPhone.isNullOrBlank()) {
+            sb.append("📞 संपर्क / Phone: $ownerPhone\n")
+        }
+        sb.append("📄 बिल नंबर / Bill No: $billNumber\n")
+        sb.append("📅 दिनांक / Date: $dateFormatted\n")
+        sb.append("----------------------------\n")
+        for (itm in items) {
+            sb.append("• ${itm.productNameSnapshot}\n")
+            sb.append("   ${itm.quantity} ${itm.unit} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
+        }
+        sb.append("----------------------------\n")
+        sb.append("*कुल राशि / Total: ${CurrencyUtils.formatRupees(totalAmount)}*\n")
+        val modeText = when (paymentMode.uppercase()) {
+            "UPI" -> "UPI / QR"
+            "UDHAAR" -> "उधार / Udhaar"
+            else -> "नकद / Cash"
+        }
+        sb.append("भुगतान माध्यम / Mode: $modeText\n")
+        sb.append("----------------------------\n")
+        sb.append("धन्यवाद! फिर पधारें 🙏\n")
         sb.append("— $shopName")
         return sb.toString()
     }

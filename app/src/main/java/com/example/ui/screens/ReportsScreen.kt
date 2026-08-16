@@ -370,7 +370,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            settings.shopName.ifEmpty { "SHREE SHYAM STORE" },
+                            settings.shopName.ifEmpty { strings.defaultShopName },
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             color = SaffronDark,

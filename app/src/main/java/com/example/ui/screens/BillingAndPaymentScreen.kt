@@ -75,7 +75,24 @@ fun BillingScreen(viewModel: ShopViewModel) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(strings.newBill, fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        val displayName = settings.shopName.ifEmpty { strings.defaultShopName }
+                        Text(
+                            text = displayName,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 17.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = strings.newBill,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMediumGray
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -683,7 +700,24 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(strings.paymentTitle, fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        val displayName = settings.shopName.ifEmpty { strings.defaultShopName }
+                        Text(
+                            text = displayName,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 17.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = strings.paymentTitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextMediumGray
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Billing) }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")

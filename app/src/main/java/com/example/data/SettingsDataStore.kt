@@ -76,7 +76,7 @@ class SettingsDataStore(private val context: Context) {
             }
 
             StoreSettings(
-                shopName = preferences[SHOP_NAME] ?: "Shree Shyam General Store",
+                shopName = preferences[SHOP_NAME] ?: "",
                 ownerName = preferences[OWNER_NAME] ?: "",
                 ownerPhone = preferences[OWNER_PHONE] ?: "",
                 staticPaytmQrImageUri = preferences[STATIC_PAYTM_QR_IMAGE_URI] ?: "",

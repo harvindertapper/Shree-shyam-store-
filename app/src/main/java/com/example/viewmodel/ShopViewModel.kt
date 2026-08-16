@@ -66,7 +66,7 @@ class ShopViewModel(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = StoreSettings(
-                shopName = "Shree Shyam General Store",
+                shopName = "",
                 ownerName = "",
                 ownerPhone = "",
                 staticPaytmQrImageUri = "",
@@ -80,7 +80,7 @@ class ShopViewModel(
                 biometricEnabled = false,
                 securityPin = "1234",
                 firebaseUrl = "",
-                firebasePrefix = "shreeshyam_sync",
+                firebasePrefix = "store_sync",
                 lastSyncTime = "Never Synced",
                 autoSyncEnabled = false,
                 appLanguage = com.example.utils.AppLanguage.HINDI
@@ -697,25 +697,20 @@ class ShopViewModel(
         val sale = customSale ?: _lastSale.value ?: return "No Invoice Found"
         val items = customItems ?: _lastSaleItems.value
         val settings = storeSettings.value
-
-        val sb = StringBuilder()
-        sb.append("🚩 *${settings.shopName}*\n")
-        sb.append("📄 Bill No: ${sale.billNumber}\n")
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         val df = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm a", java.util.Locale.ENGLISH)
-        sb.append("📅 Date: ${df.format(java.util.Date(sale.createdAt))}\n")
-        sb.append("----------------------------\n")
-        for (itm in items) {
-            sb.append("• ${itm.productNameSnapshot}\n")
-            sb.append("   ${itm.quantity} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
-        }
-        sb.append("----------------------------\n")
-        sb.append("*Total Amount: ${CurrencyUtils.formatRupees(sale.totalAmount)}*\n")
-        sb.append("Payment Mode: ${sale.paymentMode}\n")
-        sb.append("----------------------------\n")
-        sb.append("Jai Shree Shyam 🙏\n")
-        sb.append("Thank you! Visit Again.")
 
-        return sb.toString()
+        return com.example.utils.ShareUtils.generateBillReceiptText(
+            shopName = shopDisplayName,
+            billNumber = sale.billNumber,
+            dateFormatted = df.format(java.util.Date(sale.createdAt)),
+            items = items,
+            totalAmount = sale.totalAmount,
+            paymentMode = sale.paymentMode,
+            ownerPhone = settings.ownerPhone.ifEmpty { null },
+            ownerName = settings.ownerName.ifEmpty { null }
+        )
     }
 
     fun copyInvoiceToClipboard(context: Context, customSale: Sale? = null, customItems: List<SaleItem>? = null) {
@@ -738,11 +733,14 @@ class ShopViewModel(
 
     fun sendUdhaarReminder(context: Context, customer: Customer, balance: Double) {
         val settings = storeSettings.value
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         val msg = com.example.utils.ShareUtils.generateUdhaarReminderText(
-            shopName = settings.shopName,
+            shopName = shopDisplayName,
             customerName = customer.name,
             balance = balance,
-            ownerPhone = settings.ownerPhone
+            ownerPhone = settings.ownerPhone.ifEmpty { null },
+            ownerName = settings.ownerName.ifEmpty { null }
         )
         com.example.utils.ShareUtils.shareText(
             context = context,
@@ -754,40 +752,48 @@ class ShopViewModel(
 
     fun exportSalesCsv(context: Context, salesToExport: List<Sale>) {
         val settings = storeSettings.value
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         com.example.utils.ShareUtils.exportSalesCsv(
             context = context,
             sales = salesToExport,
-            shopName = settings.shopName
+            shopName = shopDisplayName
         )
     }
 
     fun exportStockCsv(context: Context) {
         val settings = storeSettings.value
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         val prods = products.value
         val catMap = categories.value.associate { it.id to it.name }
         com.example.utils.ShareUtils.exportStockCsv(
             context = context,
             products = prods,
             categoryNameMap = catMap,
-            shopName = settings.shopName
+            shopName = shopDisplayName
         )
     }
 
     fun exportUdhaarCsv(context: Context, debtorCustomers: List<Customer>, balances: Map<Long, Double>) {
         val settings = storeSettings.value
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         com.example.utils.ShareUtils.exportUdhaarCsv(
             context = context,
             customers = debtorCustomers,
             balances = balances,
-            shopName = settings.shopName
+            shopName = shopDisplayName
         )
     }
 
     fun generateReorderText(lowStockList: List<Product>): String {
         val settings = storeSettings.value
+        val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
+        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
         val catMap = categories.value.associate { it.id to it.name }
         return com.example.utils.ShareUtils.generateReorderListText(
-            shopName = settings.shopName,
+            shopName = shopDisplayName,
             lowStockItems = lowStockList,
             categoryNameMap = catMap
         )
