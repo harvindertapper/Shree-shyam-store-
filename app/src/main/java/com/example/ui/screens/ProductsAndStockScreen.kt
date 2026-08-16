@@ -48,14 +48,30 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
+    var filterOnlyLowStock by remember { mutableStateOf(false) }
     var showCategoryManagerDialog by remember { mutableStateOf(false) }
+    var showReorderDialog by remember { mutableStateOf(false) }
 
-    val filteredProducts = remember(products, searchQuery, selectedCategoryId) {
+    val lowStockProducts = remember(products) {
+        products.filter { it.isActive && it.trackStock && it.currentStock <= it.lowStockAlertQty }
+    }
+
+    val filteredProducts = remember(products, searchQuery, selectedCategoryId, filterOnlyLowStock) {
         products.filter { prod ->
             val matchesCategory = selectedCategoryId == null || prod.categoryId == selectedCategoryId
             val matchesSearch = prod.name.contains(searchQuery, ignoreCase = true)
-            matchesCategory && matchesSearch
+            val matchesLowStock = !filterOnlyLowStock || (prod.isActive && prod.trackStock && prod.currentStock <= prod.lowStockAlertQty)
+            matchesCategory && matchesSearch && matchesLowStock
         }
+    }
+
+    if (showReorderDialog) {
+        LowStockReorderDialog(
+            viewModel = viewModel,
+            lowStockProducts = lowStockProducts,
+            categories = categories,
+            onDismiss = { showReorderDialog = false }
+        )
     }
 
     Scaffold(
@@ -68,6 +84,31 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                     }
                 },
                 actions = {
+                    // Re-order List Action Icon with Badge
+                    IconButton(
+                        onClick = { showReorderDialog = true },
+                        modifier = Modifier.testTag("open_reorder_list_button")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (lowStockProducts.isNotEmpty()) {
+                                    Badge(
+                                        containerColor = ErrorRed,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text("${lowStockProducts.size}", fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.PlaylistAddCheck,
+                                contentDescription = "Re-order List",
+                                tint = if (lowStockProducts.isNotEmpty()) ErrorRed else SaffronPrimary
+                            )
+                        }
+                    }
+
                     IconButton(
                         onClick = { viewModel.exportStockCsv(context) },
                         modifier = Modifier.testTag("export_stock_csv_button")
@@ -117,25 +158,110 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                 )
             )
 
-            // Category Selector Chips
+            // Low Stock Re-order Quick Alert Banner
+            if (lowStockProducts.isNotEmpty()) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = ErrorRedLight),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.2.dp, ErrorRed.copy(alpha = 0.5f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clickable { showReorderDialog = true }
+                        .testTag("low_stock_reorder_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(20.dp))
+                            Column {
+                                Text(
+                                    text = "कम स्टॉक चेतावनी (Low Stock): ${lowStockProducts.size} सामान",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = ErrorRed
+                                )
+                                Text(
+                                    text = "थोक ऑर्डर लिस्ट तैयार करें 📋",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextNearBlack
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { showReorderDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp)
+                        ) {
+                            Text("ऑर्डर लिस्ट", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // Category & Low Stock Selector Chips
             LazyRow(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .padding(vertical = 6.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 item {
                     FilterChip(
-                        selected = selectedCategoryId == null,
-                        onClick = { selectedCategoryId = null },
+                        selected = selectedCategoryId == null && !filterOnlyLowStock,
+                        onClick = {
+                            selectedCategoryId = null
+                            filterOnlyLowStock = false
+                        },
                         label = { Text("सभी (All)", fontWeight = FontWeight.Bold) }
+                    )
+                }
+                item {
+                    FilterChip(
+                        selected = filterOnlyLowStock,
+                        onClick = { filterOnlyLowStock = !filterOnlyLowStock },
+                        label = {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Icon(
+                                    Icons.Default.PriorityHigh,
+                                    contentDescription = null,
+                                    tint = if (filterOnlyLowStock) Color.White else ErrorRed,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "कम स्टॉक (${lowStockProducts.size})",
+                                    fontWeight = FontWeight.Black,
+                                    color = if (filterOnlyLowStock) Color.White else ErrorRed
+                                )
+                            }
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ErrorRed,
+                            selectedLabelColor = Color.White
+                        )
                     )
                 }
                 items(categories) { cat ->
                     FilterChip(
-                        selected = selectedCategoryId == cat.id,
-                        onClick = { selectedCategoryId = cat.id },
+                        selected = selectedCategoryId == cat.id && !filterOnlyLowStock,
+                        onClick = {
+                            selectedCategoryId = cat.id
+                            filterOnlyLowStock = false
+                        },
                         label = { Text(cat.name, fontWeight = FontWeight.Bold) }
                     )
                 }
@@ -1112,6 +1238,249 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 6. LOW STOCK RE-ORDER LIST DIALOG
+// ==========================================
+@Composable
+fun LowStockReorderDialog(
+    viewModel: ShopViewModel,
+    lowStockProducts: List<Product>,
+    categories: List<Category>,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val categoryMap = remember(categories) { categories.associate { it.id to it.name } }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
+            border = BorderStroke(1.5.dp, ErrorRed.copy(alpha = 0.4f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.9f)
+                .testTag("low_stock_reorder_dialog")
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.ListAlt, contentDescription = null, tint = SaffronPrimary, modifier = Modifier.size(24.dp))
+                            Text(
+                                text = "थोक आर्डर लिस्ट (Re-order)",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Black,
+                                color = TextNearBlack
+                            )
+                        }
+                        Text(
+                            text = "कुल ${lowStockProducts.size} सामान कम हैं",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ErrorRed
+                        )
+                    }
+
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMediumGray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Action Buttons Bar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // WhatsApp Share
+                    Button(
+                        onClick = {
+                            viewModel.shareReorderListViaWhatsApp(context, lowStockProducts)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .weight(1.4f)
+                            .height(44.dp)
+                            .testTag("share_reorder_whatsapp_button")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("WhatsApp ऑर्डर 📱", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+
+                    // Copy Button
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.copyReorderListToClipboard(context, lowStockProducts)
+                        },
+                        border = BorderStroke(1.2.dp, BorderStrong),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextNearBlack),
+                        modifier = Modifier
+                            .weight(0.9f)
+                            .height(44.dp)
+                            .testTag("copy_reorder_list_button")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("कॉपी 📋", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = BorderStrong)
+                Spacer(modifier = Modifier.height(8.dp))
+
+                if (lowStockProducts.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(54.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "बधाई हो! कोई सामान कम नहीं है 🎉",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                color = SuccessGreen
+                            )
+                            Text(
+                                text = "दुकान में पर्याप्त स्टॉक मौजूद है।",
+                                fontSize = 13.sp,
+                                color = TextMediumGray
+                            )
+                        }
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(lowStockProducts) { item ->
+                            val catName = categoryMap[item.categoryId] ?: "General"
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = WarmCreamBg),
+                                border = BorderStroke(1.dp, BorderStrong)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(12.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.name,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 15.sp,
+                                                color = TextNearBlack
+                                            )
+                                            Text(
+                                                text = "$catName | MRP: ₹${item.mrp}",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = TextMediumGray
+                                            )
+                                        }
+
+                                        // Status Pill
+                                        Surface(
+                                            shape = RoundedCornerShape(50),
+                                            color = if (item.currentStock <= 0) ErrorRedLight else WarningOrangeLight,
+                                            border = BorderStroke(1.dp, if (item.currentStock <= 0) ErrorRed else WarningOrange)
+                                        ) {
+                                            Text(
+                                                text = if (item.currentStock <= 0) "ख़त्म (0)" else "बचा: ${item.currentStock} पीस",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = if (item.currentStock <= 0) ErrorRed else WarningOrange,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Quick Restock Steppers (+5, +10, +25, +50)
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "नया माल आया:",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            color = TextNearBlack
+                                        )
+
+                                        listOf(5, 10, 25, 50).forEach { qty ->
+                                            OutlinedButton(
+                                                onClick = {
+                                                    viewModel.bulkRestockProduct(item, qty)
+                                                    Toast.makeText(context, "+$qty स्टॉक जोड़ा गया (${item.name})", Toast.LENGTH_SHORT).show()
+                                                },
+                                                shape = RoundedCornerShape(8.dp),
+                                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                                                border = BorderStroke(1.dp, SaffronPrimary.copy(alpha = 0.6f)),
+                                                colors = ButtonDefaults.outlinedButtonColors(containerColor = SurfaceWhite),
+                                                modifier = Modifier.height(30.dp)
+                                            ) {
+                                                Text("+$qty", fontSize = 11.sp, fontWeight = FontWeight.Black, color = SaffronDark)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = SlateContainer, contentColor = TextNearBlack),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(46.dp)
+                ) {
+                    Text("बंद करें (Close)", fontWeight = FontWeight.Bold)
                 }
             }
         }

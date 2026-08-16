@@ -685,6 +685,55 @@ class ShopViewModel(
         )
     }
 
+    fun generateReorderText(lowStockList: List<Product>): String {
+        val settings = storeSettings.value
+        val catMap = categories.value.associate { it.id to it.name }
+        return com.example.utils.ShareUtils.generateReorderListText(
+            shopName = settings.shopName,
+            lowStockItems = lowStockList,
+            categoryNameMap = catMap
+        )
+    }
+
+    fun shareReorderListViaWhatsApp(context: Context, lowStockList: List<Product>, wholesalerPhone: String? = null) {
+        val text = generateReorderText(lowStockList)
+        com.example.utils.ShareUtils.shareText(
+            context = context,
+            text = text,
+            title = "Share Re-order List (ऑर्डर लिस्ट)",
+            phoneNumber = wholesalerPhone
+        )
+    }
+
+    fun copyReorderListToClipboard(context: Context, lowStockList: List<Product>) {
+        val text = generateReorderText(lowStockList)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("Re-order List", text)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "Re-order List Copied (ऑर्डर लिस्ट कॉपी हो गई) 📋", Toast.LENGTH_SHORT).show()
+    }
+
+    fun bulkRestockProduct(product: Product, quantityToAdd: Int) {
+        viewModelScope.launch {
+            val updated = product.copy(
+                currentStock = product.currentStock + quantityToAdd,
+                updatedAt = System.currentTimeMillis()
+            )
+            repository.updateProduct(updated)
+            repository.insertStockAdjustment(
+                StockAdjustment(
+                    productId = product.id,
+                    oldStock = product.currentStock,
+                    newStock = updated.currentStock,
+                    difference = quantityToAdd,
+                    reason = "Bulk Wholesale Restock",
+                    createdAt = System.currentTimeMillis()
+                )
+            )
+            triggerAutoSync()
+        }
+    }
+
     // --- Cloud Synchronization State ---
     private val _syncInProgress = MutableStateFlow(false)
     val syncInProgress: StateFlow<Boolean> = _syncInProgress.asStateFlow()

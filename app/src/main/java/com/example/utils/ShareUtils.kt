@@ -85,6 +85,36 @@ object ShareUtils {
     }
 
     /**
+     * Generate Wholesale Re-order List text for WhatsApp/SMS
+     */
+    fun generateReorderListText(
+        shopName: String,
+        lowStockItems: List<Product>,
+        categoryNameMap: Map<Long, String>
+    ): String {
+        val df = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale.ENGLISH)
+        val sb = StringBuilder()
+        sb.append("📋 *सामान का नया आर्डर (Wholesale Re-order List)*\n")
+        sb.append("🏪 दुकान: *$shopName*\n")
+        sb.append("📅 दिनांक: ${df.format(Date())}\n")
+        sb.append("----------------------------\n")
+        sb.append("कृपया निम्नलिखित सामान भेजने का कष्ट करें:\n\n")
+
+        lowStockItems.forEachIndexed { index, item ->
+            val cat = categoryNameMap[item.categoryId]?.let { " ($it)" } ?: ""
+            sb.append("${index + 1}. *${item.name}*$cat\n")
+            val current = if (item.currentStock <= 0) "ख़त्म (0 stock)" else "बचा: ${item.currentStock} पीस"
+            sb.append("   ▸ वर्तमान स्टॉक: $current | MRP: ₹${item.mrp}\n")
+        }
+
+        sb.append("\n----------------------------\n")
+        sb.append("कुल आइटम: ${lowStockItems.size} सामान\n")
+        sb.append("धन्यवाद! 🙏\n")
+        sb.append("— $shopName")
+        return sb.toString()
+    }
+
+    /**
      * Export Sales History to CSV and launch share sheet
      */
     fun exportSalesCsv(
