@@ -1,0 +1,4 @@
+# Default owner for repository changes.
+# Replace or extend this entry with the owner's GitHub handle/team before
+# requiring code-owner approval on protected branches.
+* @harvindertapper
