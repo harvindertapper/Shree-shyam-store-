@@ -7,8 +7,10 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.example.commerce.CommerceValidation
+import com.example.commerce.PaymentMode
+import com.example.commerce.UdhaarTransactionType
 import kotlinx.coroutines.flow.Flow
-import java.util.Locale
 
 @Dao
 interface CategoryDao {
@@ -84,6 +86,12 @@ abstract class SaleDao {
     @Query("SELECT * FROM sales WHERE id = :id")
     abstract suspend fun getSaleById(id: Long): Sale?
 
+    @Query("SELECT COUNT(*) FROM sales")
+    abstract suspend fun countAllSales(): Int
+
+    @Query("SELECT COUNT(*) FROM sales WHERE billNumber = :billNumber")
+    abstract suspend fun countSalesByBillNumber(billNumber: String): Int
+
     @Query("SELECT * FROM sales WHERE createdAt >= :start AND createdAt <= :end AND isDeleted = 0 ORDER BY createdAt DESC")
     abstract fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>>
 
@@ -130,8 +138,8 @@ abstract class SaleDao {
     @Query("SELECT * FROM products WHERE id = :productId LIMIT 1")
     abstract suspend fun getProductById(productId: Long): Product?
 
-    @Query("UPDATE products SET currentStock = currentStock - :quantity, updatedAt = :updatedAt, isSynced = 0 WHERE id = :productId")
-    abstract suspend fun deductProductStock(productId: Long, quantity: Double, updatedAt: Long)
+    @Query("UPDATE products SET currentStock = currentStock - :quantity, updatedAt = :updatedAt, isSynced = 0 WHERE id = :productId AND (trackStock = 0 OR (currentStock >= :quantity AND currentStock >= 0))")
+    abstract suspend fun deductProductStockIfAvailable(productId: Long, quantity: Double, updatedAt: Long): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long
@@ -139,11 +147,20 @@ abstract class SaleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    abstract suspend fun insertCustomer(customer: Customer): Long
+
     @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
     abstract suspend fun touchCustomer(customerId: Long, updatedAt: Long)
 
     @Query("SELECT COUNT(*) > 0 FROM customers WHERE id = :customerId AND isDeleted = 0")
     abstract suspend fun hasActiveCustomer(customerId: Long): Boolean
+
+    @Query("SELECT creditLimit FROM customers WHERE id = :customerId AND isDeleted = 0 LIMIT 1")
+    abstract suspend fun getCustomerCreditLimit(customerId: Long): Double?
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    abstract suspend fun getCustomerBalance(customerId: Long): Double
 
     /**
      * Executes atomic bill checkout transaction in local SQLite:
@@ -154,43 +171,86 @@ abstract class SaleDao {
      * 5. If payment method is UDHAAR, logs UdhaarTransaction credit record & touches customer
      */
     @Transaction
+    open suspend fun completeBillCheckoutWithNewCustomer(
+        sale: Sale,
+        items: List<SaleItem>,
+        newCustomer: Customer
+    ): Long {
+        val customerId = insertCustomer(newCustomer)
+        return completeBillCheckout(
+            sale = sale.copy(customerId = customerId),
+            items = items,
+            selectedCustomerId = customerId
+        )
+    }
+
+    @Transaction
     open suspend fun completeBillCheckout(
         sale: Sale,
         items: List<SaleItem>,
         selectedCustomerId: Long? = null
     ): Long {
         require(items.isNotEmpty()) { "A bill must contain at least one item" }
-        val normalizedPaymentMode = sale.paymentMode.trim().uppercase(Locale.ENGLISH)
-        require(normalizedPaymentMode in setOf("CASH", "UPI", "UDHAAR")) {
-            "Unsupported payment mode: ${sale.paymentMode}"
+        require(sale.billNumber.trim().isNotEmpty()) { "Bill number is required" }
+        require(countSalesByBillNumber(sale.billNumber) == 0) {
+            "Bill number already processed"
         }
+
+        val paymentMode = PaymentMode.parse(sale.paymentMode)
         require(sale.totalAmount.isFinite() && sale.totalAmount >= 0.0) {
             "Sale total must be a finite non-negative amount"
         }
+
         items.forEach { item ->
             require(item.productId > 0L) { "Sale item must reference a product" }
-            require(item.quantity.isFinite() && item.quantity > 0.0) { "Sale quantity must be positive" }
-            require(item.unitPrice.isFinite() && item.unitPrice >= 0.0) { "Sale unit price is invalid" }
-            require(item.lineTotal.isFinite() && item.lineTotal >= 0.0) { "Sale line total is invalid" }
-            require(getProductById(item.productId) != null) { "Sale item references a missing product" }
+            require(item.quantity.isFinite() && item.quantity > 0.0) {
+                "Sale quantity must be positive"
+            }
+            require(item.unitPrice.isFinite() && item.unitPrice >= 0.0) {
+                "Sale unit price is invalid"
+            }
+            require(item.lineTotal.isFinite() && item.lineTotal >= 0.0) {
+                "Sale line total is invalid"
+            }
+            require(getProductById(item.productId) != null) {
+                "Sale item references a missing product"
+            }
+            val calculatedLineTotal = CommerceValidation.calculateLineTotal(item.unitPrice, item.quantity)
+            require(CommerceValidation.amountsMatch(calculatedLineTotal, item.lineTotal)) {
+                "Sale line total does not match its unit price and quantity"
+            }
         }
-        val calculatedTotal = items.sumOf { it.unitPrice * it.quantity }
-        require(calculatedTotal.isFinite() && kotlin.math.abs(calculatedTotal - sale.totalAmount) <= 0.01) {
+
+        val calculatedTotal = CommerceValidation.calculateBillTotal(items)
+        require(CommerceValidation.amountsMatch(calculatedTotal, sale.totalAmount)) {
             "Sale total does not match its line items"
         }
+
         val now = System.currentTimeMillis()
-        val finalCustomerId = if (normalizedPaymentMode == "UDHAAR") {
+        val finalCustomerId = if (paymentMode == PaymentMode.UDHAAR) {
             val customerId = selectedCustomerId ?: sale.customerId
             require(customerId != null && hasActiveCustomer(customerId)) {
                 "Udhaar bills require an active customer"
+            }
+            val creditLimit = getCustomerCreditLimit(customerId)
+            require(creditLimit != null && creditLimit.isFinite() && creditLimit >= 0.0) {
+                "Customer credit limit is invalid"
+            }
+            val currentBalance = getCustomerBalance(customerId)
+            require(currentBalance.isFinite()) { "Customer balance is invalid" }
+            val projectedBalance = CommerceValidation.roundCurrency(currentBalance + calculatedTotal)
+            require(projectedBalance <= CommerceValidation.roundCurrency(creditLimit)) {
+                "Udhaar credit limit exceeded"
             }
             customerId
         } else {
             null
         }
+
         val finalizedSale = sale.copy(
             customerId = finalCustomerId,
-            paymentMode = normalizedPaymentMode,
+            totalAmount = calculatedTotal,
+            paymentMode = paymentMode.name,
             createdAt = if (sale.createdAt > 0) sale.createdAt else now,
             updatedAt = now,
             isSynced = false
@@ -198,46 +258,57 @@ abstract class SaleDao {
         val saleId = insertSale(finalizedSale)
 
         for (item in items) {
+            val calculatedLineTotal = CommerceValidation.calculateLineTotal(item.unitPrice, item.quantity)
             val itemToSave = item.copy(
                 saleId = saleId,
+                unitPrice = CommerceValidation.normalizeUnitPrice(item.unitPrice),
+                lineTotal = calculatedLineTotal,
                 updatedAt = now,
                 isSynced = false
             )
             insertSaleItem(itemToSave)
 
             val product = getProductById(item.productId)
-            if (product != null && product.trackStock) {
-                val oldStock = product.currentStock
-                val newStock = oldStock - item.quantity
+            require(product != null) { "Sale item references a missing product" }
+            if (product.trackStock) {
+                require(product.currentStock.isFinite() && product.currentStock >= 0.0) {
+                    "Tracked product stock is invalid"
+                }
+                val updatedRows = deductProductStockIfAvailable(product.id, item.quantity, now)
+                require(updatedRows == 1) {
+                    "Insufficient stock for product ${product.name}"
+                }
+                val newStock = product.currentStock - item.quantity
+                require(newStock >= 0.0) { "Tracked product stock cannot become negative" }
 
-                deductProductStock(product.id, item.quantity, now)
+                insertStockAdjustment(
+                    StockAdjustment(
+                        productId = product.id,
+                        oldStock = product.currentStock,
+                        newStock = newStock,
+                        difference = -item.quantity,
+                        reason = "Bill Sale (No: ${sale.billNumber})",
+                        isSynced = false,
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                )
+            }
+        }
 
-                val adj = StockAdjustment(
-                    productId = product.id,
-                    oldStock = oldStock,
-                    newStock = newStock,
-                    difference = -item.quantity,
-                    reason = "Bill Sale (No: ${sale.billNumber})",
+        if (paymentMode == PaymentMode.UDHAAR && finalCustomerId != null) {
+            insertUdhaarTransaction(
+                UdhaarTransaction(
+                    customerId = finalCustomerId,
+                    saleId = saleId,
+                    type = UdhaarTransactionType.CREDIT.name,
+                    amount = calculatedTotal,
+                    note = "Bill No: ${sale.billNumber}",
                     isSynced = false,
                     createdAt = now,
                     updatedAt = now
                 )
-                insertStockAdjustment(adj)
-            }
-        }
-
-        if (normalizedPaymentMode == "UDHAAR" && finalCustomerId != null) {
-            val udhaarTx = UdhaarTransaction(
-                customerId = finalCustomerId,
-                saleId = saleId,
-                type = "CREDIT",
-                amount = sale.totalAmount,
-                note = "Bill No: ${sale.billNumber}",
-                isSynced = false,
-                createdAt = now,
-                updatedAt = now
             )
-            insertUdhaarTransaction(udhaarTx)
             touchCustomer(finalCustomerId, now)
         }
 
@@ -289,16 +360,16 @@ interface UdhaarDao {
     @Query("SELECT * FROM udhaar_transactions WHERE customerId = :customerId")
     suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE -amount END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
     fun getCustomerBalanceFlow(customerId: Long): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE -amount END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
     suspend fun getCustomerBalance(customerId: Long): Double
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE -amount END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
     fun getTotalUdhaarFlow(): Flow<Double>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount ELSE -amount END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
     suspend fun getTotalUdhaar(): Double
 
     @Query("SELECT * FROM udhaar_transactions WHERE isSynced = 0")

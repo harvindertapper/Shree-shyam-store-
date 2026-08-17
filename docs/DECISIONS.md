@@ -35,6 +35,13 @@
 
 **Reason:** The repository previously depended on an externally installed Gradle version, which made local and CI behavior less reproducible. The wrapper does not contain secrets and downloads the pinned distribution when needed.
 
+## ADR-006: Apply explicit P0 checkout and udhaar policies
+
+**Status:** Accepted for the P0 financial-safety branch
+**Decision:** Tracked inventory uses `REJECT_UNDERFLOW`; udhaar uses a hard projected-balance credit limit; received payments are validated at the repository boundary and may create a customer credit balance when they exceed the outstanding amount; UPI remains a manual settlement flow until a verified gateway/reference workflow is introduced.
+
+**Reason:** These defaults make the current offline-first workflow deterministic without silently creating negative stock or bypassing the owner’s credit policy. Payment integration, credit-balance presentation, immutable reversals, actor metadata, and minor-unit money migration remain follow-up work rather than being implied by the prototype UI.
+
 ## Open decisions
 
-The owner still needs to decide the production application ID/package identity, whether local password auth will be removed in favor of Firebase identity, the inventory underflow policy, the payment/UPI provider boundary, stable global ID and conflict strategy, backup provider authorization, release distribution channel, data-retention expectations, and production rollout date. These should be recorded here before implementing the corresponding production migrations.
+The owner still needs to decide the production application ID/package identity, whether local password auth will be removed in favor of Firebase identity, the payment/UPI provider boundary, stable global ID and conflict strategy, backup provider authorization, release distribution channel, data-retention expectations, and production rollout date. The P0 branch accepts the inventory and UPI defaults above; remaining production blockers include minor-unit money migration, immutable ledger reversals, actor/audit metadata, multi-device identity/conflict semantics, and non-destructive Room migrations. These should be recorded here before implementing the corresponding production migrations.

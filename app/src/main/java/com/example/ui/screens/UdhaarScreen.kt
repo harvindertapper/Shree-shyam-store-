@@ -52,7 +52,11 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
     val customerBalances = remember(transactions) {
         transactions.groupBy { it.customerId }.mapValues { (_, txList) ->
             txList.sumOf { tx ->
-                if (tx.type == "CREDIT") tx.amount else -tx.amount
+                when (tx.type) {
+                    "CREDIT" -> tx.amount
+                    "PAYMENT" -> -tx.amount
+                    else -> 0.0
+                }
             }
         }
     }
@@ -389,7 +393,11 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     LaunchedEffect(customerId, customerTransactions.value) {
         customer = viewModel.customers.value.find { it.id == customerId }
         currentBalance = customerTransactions.value.sumOf { tx ->
-            if (tx.type == "CREDIT") tx.amount else -tx.amount
+            when (tx.type) {
+                "CREDIT" -> tx.amount
+                "PAYMENT" -> -tx.amount
+                else -> 0.0
+            }
         }
     }
 
@@ -509,6 +517,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                     } else {
                         items(customerTransactions.value) { record ->
                             val isCredit = record.type == "CREDIT"
+                            val isPayment = record.type == "PAYMENT"
 
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -529,23 +538,35 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                             modifier = Modifier
                                                 .size(40.dp)
                                                 .background(
-                                                    if (isCredit) Color(0xFFFFF1F2) else Color(0xFFF0FDF4),
+                                                    when {
+                                                        isCredit -> Color(0xFFFFF1F2)
+                                                        isPayment -> Color(0xFFF0FDF4)
+                                                        else -> Color(0xFFFFF8E1)
+                                                    },
                                                     shape = RoundedCornerShape(8.dp)
                                                 ),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Icon(
-                                                imageVector = if (isCredit) Icons.Default.ArrowOutward else Icons.Default.CallReceived,
+                                                imageVector = when {
+                                                    isCredit -> Icons.Default.ArrowOutward
+                                                    isPayment -> Icons.Default.CallReceived
+                                                    else -> Icons.Default.Info
+                                                },
                                                 contentDescription = null,
-                                                tint = if (isCredit) ErrorRed else SuccessGreen
+                                                tint = when {
+                                                    isCredit -> ErrorRed
+                                                    isPayment -> SuccessGreen
+                                                    else -> WarningOrange
+                                                }
                                             )
                                         }
 
                                         Column {
-                                            val txTypeLabel = if (isCredit) {
-                                                if (settings.appLanguage == AppLanguage.HINDI) "उधार दिया" else "Credit Given"
-                                            } else {
-                                                if (settings.appLanguage == AppLanguage.HINDI) "रकम प्राप्त हुई" else "Payment Received"
+                                            val txTypeLabel = when {
+                                                isCredit -> if (settings.appLanguage == AppLanguage.HINDI) "उधार दिया" else "Credit Given"
+                                                isPayment -> if (settings.appLanguage == AppLanguage.HINDI) "रकम प्राप्त हुई" else "Payment Received"
+                                                else -> if (settings.appLanguage == AppLanguage.HINDI) "अमान्य प्रविष्टि" else "Invalid ledger entry"
                                             }
                                             Text(
                                                 text = txTypeLabel,
@@ -571,10 +592,18 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                     }
 
                                     Text(
-                                        text = "${if (isCredit) "+" else "-"}${CurrencyUtils.formatRupees(record.amount)}",
+                                        text = when {
+                                            isCredit -> "+${CurrencyUtils.formatRupees(record.amount)}"
+                                            isPayment -> "-${CurrencyUtils.formatRupees(record.amount)}"
+                                            else -> CurrencyUtils.formatRupees(record.amount)
+                                        },
                                         fontWeight = FontWeight.Black,
                                         fontSize = 16.sp,
-                                        color = if (isCredit) ErrorRed else SuccessGreen
+                                        color = when {
+                                            isCredit -> ErrorRed
+                                            isPayment -> SuccessGreen
+                                            else -> WarningOrange
+                                        }
                                     )
                                 }
                             }

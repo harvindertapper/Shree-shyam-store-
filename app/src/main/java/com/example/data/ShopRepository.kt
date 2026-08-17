@@ -1,6 +1,8 @@
 package com.example.data
 
 import androidx.room.withTransaction
+import com.example.commerce.CommerceValidation
+import com.example.commerce.UdhaarTransactionType
 import kotlinx.coroutines.flow.Flow
 
 class ShopRepository(
@@ -67,6 +69,14 @@ class ShopRepository(
         return completeBillCheckout(sale, items, selectedCustomerId)
     }
 
+    suspend fun insertSaleWithNewCustomer(
+        sale: Sale,
+        items: List<SaleItem>,
+        newCustomer: Customer
+    ): Long {
+        return saleDao.completeBillCheckoutWithNewCustomer(sale, items, newCustomer)
+    }
+
     // Customers
     val allCustomers: Flow<List<Customer>> = customerDao.getAllCustomers()
     
@@ -97,10 +107,34 @@ class ShopRepository(
     suspend fun getTotalUdhaar(): Double =
         udhaarDao.getTotalUdhaar()
 
-    suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long = 
+    suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long =
         udhaarDao.insertTransaction(transaction)
 
-    suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) = 
+    suspend fun recordUdhaarPayment(customerId: Long, amount: Double, note: String?): Long {
+        val operation: suspend () -> Long = {
+            require(amount.isFinite() && amount > 0.0) {
+                "Payment amount must be finite and positive"
+            }
+            val customer = customerDao.getCustomerById(customerId)
+            require(customer != null && !customer.isDeleted) {
+                "Payment requires an active customer"
+            }
+            udhaarDao.insertTransaction(
+                UdhaarTransaction(
+                    customerId = customerId,
+                    type = UdhaarTransactionType.PAYMENT.name,
+                    amount = CommerceValidation.roundCurrency(amount),
+                    note = note?.trim()?.ifEmpty { "Payment received" } ?: "Payment received",
+                    isSynced = false,
+                    createdAt = System.currentTimeMillis(),
+                    updatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+        return database?.withTransaction { operation() } ?: operation()
+    }
+
+    suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) =
         udhaarDao.deleteTransaction(transaction)
 
     // Stock Adjustments

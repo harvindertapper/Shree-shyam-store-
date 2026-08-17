@@ -528,14 +528,13 @@ fun BillingScreen(viewModel: ShopViewModel) {
 
         // 1. Incomplete Stock alert confirmation
         showStockWarningProduct?.let { product ->
-            val dialogTitle = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक कम है ⚠️" else "Low Stock Warning ⚠️"
+            val dialogTitle = if (settings.appLanguage == AppLanguage.HINDI) "पर्याप्त स्टॉक नहीं है" else "Insufficient stock"
             val dialogBody = if (settings.appLanguage == AppLanguage.HINDI) {
-                "प्रोडक्ट '${product.name}' का स्टॉक केवल ${product.currentStock} बचा है। क्या आप इस बिक्री को फिर भी थैले में जोड़ना चाहते हैं?"
+                "प्रोडक्ट '${product.name}' का उपलब्ध स्टॉक ${product.currentStock} है। इससे अधिक मात्रा का बिल नहीं बनाया जा सकता।"
             } else {
-                "Product '${product.name}' only has ${product.currentStock} in stock. Do you still want to add it to the cart?"
+                "Product '${product.name}' has only ${product.currentStock} available. A bill cannot include more than the available stock."
             }
-            val confirmAdd = if (settings.appLanguage == AppLanguage.HINDI) "हाँ, जोड़ें" else "Yes, Add"
-            val cancelAdd = if (settings.appLanguage == AppLanguage.HINDI) "नहीं" else "No"
+            val confirmAdd = if (settings.appLanguage == AppLanguage.HINDI) "ठीक है" else "OK"
 
             AlertDialog(
                 onDismissRequest = { showStockWarningProduct = null },
@@ -544,17 +543,9 @@ fun BillingScreen(viewModel: ShopViewModel) {
                 confirmButton = {
                     Button(
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100)),
-                        onClick = {
-                            viewModel.addProductToCart(product, 1.0)
-                            showStockWarningProduct = null
-                        }
+                        onClick = { showStockWarningProduct = null }
                     ) {
                         Text(confirmAdd)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showStockWarningProduct = null }) {
-                        Text(cancelAdd)
                     }
                 }
             )
@@ -745,10 +736,25 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val customers by viewModel.customers.collectAsState()
     val allUdhaarTransactions by viewModel.allUdhaarTransactions.collectAsState()
+    val checkoutInFlight by viewModel.checkoutInFlight.collectAsState()
+    val checkoutError by viewModel.checkoutError.collectAsState()
+
+    LaunchedEffect(checkoutError) {
+        checkoutError?.let { message ->
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            viewModel.clearCheckoutError()
+        }
+    }
 
     val customerBalanceMap = remember(allUdhaarTransactions) {
         allUdhaarTransactions.groupBy { it.customerId }.mapValues { (_, list) ->
-            list.sumOf { if (it.type == "CREDIT") it.amount else -it.amount }
+            list.sumOf {
+                when (it.type) {
+                    "CREDIT" -> it.amount
+                    "PAYMENT" -> -it.amount
+                    else -> 0.0
+                }
+            }
         }
     }
 
@@ -917,6 +923,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                         onClick = {
                             viewModel.completeBill(paymentMode = "CASH")
                         },
+                        enabled = !checkoutInFlight,
                         colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -935,6 +942,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                         onClick = {
                             viewModel.completeBill(paymentMode = "UPI")
                         },
+                        enabled = !checkoutInFlight,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E5A94), contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -953,6 +961,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                 // Udhaar
                 Button(
                     onClick = { showUdhaarCustomerDialog = true },
+                    enabled = !checkoutInFlight,
                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
@@ -1036,7 +1045,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                         Surface(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .clickable {
+                                                .clickable(enabled = !checkoutInFlight) {
                                                     viewModel.completeBill(
                                                         paymentMode = "UDHAAR",
                                                         customerId = cust.id
@@ -1102,6 +1111,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                                         showUdhaarCustomerDialog = false
                                     }
                                 },
+                                enabled = !checkoutInFlight,
                                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
                                 modifier = Modifier.fillMaxWidth()
                             ) {

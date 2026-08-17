@@ -122,10 +122,9 @@ object PdfReportUtils {
             var totalRepaid = 0.0
             val sortedTxs = transactions.sortedBy { it.createdAt }
             sortedTxs.forEach { tx ->
-                if (tx.type.equals("CREDIT", ignoreCase = true) || tx.type.equals("UDHAAR", ignoreCase = true)) {
-                    totalUdhaar += tx.amount
-                } else {
-                    totalRepaid += tx.amount
+                when (tx.type.uppercase(Locale.ENGLISH)) {
+                    "CREDIT" -> totalUdhaar += tx.amount
+                    "PAYMENT" -> totalRepaid += tx.amount
                 }
             }
             val netBalance = (totalUdhaar - totalRepaid).coerceAtLeast(0.0)
