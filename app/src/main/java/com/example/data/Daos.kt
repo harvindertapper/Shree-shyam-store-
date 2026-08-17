@@ -351,3 +351,22 @@ interface UserDao {
 // Alias for BillDao to support direct POS billing terminology
 typealias BillDao = SaleDao
 
+
+
+@Dao
+interface ShopProfileDao {
+    @Query("SELECT * FROM shop_profiles WHERE uid = :uid LIMIT 1")
+    suspend fun getByUid(uid: String): ShopProfile?
+
+    @Query("SELECT * FROM shop_profiles WHERE isDeleted = 0 ORDER BY updatedAt DESC LIMIT 1")
+    suspend fun getActiveProfile(): ShopProfile?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(profile: ShopProfile)
+
+    @Query("UPDATE shop_profiles SET isSynced = 1 WHERE uid = :uid")
+    suspend fun markSynced(uid: String)
+
+    @Query("DELETE FROM shop_profiles")
+    suspend fun clearAll()
+}
