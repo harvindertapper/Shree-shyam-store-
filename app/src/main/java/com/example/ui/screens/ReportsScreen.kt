@@ -34,6 +34,7 @@ import com.example.utils.DateTimeUtils
 import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,13 +49,22 @@ fun ReportsScreen(viewModel: ShopViewModel) {
     var selectedIntervalTab by remember { mutableStateOf(0) } // 0: Today, 1: This Month, 2: All Time
     var selectedViewSale by remember { mutableStateOf<Sale?>(null) }
 
+    // Keep time-based report windows fresh while this screen remains visible.
+    var clockTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            clockTick = System.currentTimeMillis()
+        }
+    }
+
     // Intervals calculations
-    val todayStart = remember { DateTimeUtils.getStartOfDay() }
-    val todayEnd = remember { DateTimeUtils.getEndOfDay() }
-    val monthStart = remember { DateTimeUtils.getStartOfMonth() }
+    val todayStart = remember(clockTick) { DateTimeUtils.getStartOfDay() }
+    val todayEnd = remember(clockTick) { DateTimeUtils.getEndOfDay() }
+    val monthStart = remember(clockTick) { DateTimeUtils.getStartOfMonth() }
 
     // Intermediary filter collections
-    val filteredSales = remember(sales, selectedIntervalTab) {
+    val filteredSales = remember(sales, selectedIntervalTab, todayStart, todayEnd, monthStart) {
         when (selectedIntervalTab) {
             0 -> sales.filter { it.createdAt in todayStart..todayEnd }
             1 -> sales.filter { it.createdAt >= monthStart }

@@ -17,6 +17,9 @@ import java.util.Locale
 
 object ShareUtils {
 
+    private fun csvField(value: String): String =
+        "\"${value.replace("\"", "\"\"")}\""
+
     /**
      * Share formatted text (bill, receipt, message) via Android Share Sheet or directly to WhatsApp
      */
@@ -216,11 +219,11 @@ object ShareUtils {
             writer.append("Bill Number,Date,Payment Mode,Total Amount (INR),Customer ID,Created At\n")
             val df = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.ENGLISH)
             for (s in sales) {
-                writer.append("\"${s.billNumber}\",")
-                writer.append("\"${df.format(Date(s.createdAt))}\",")
-                writer.append("\"${s.paymentMode}\",")
+                writer.append(csvField(s.billNumber)).append(",")
+                writer.append(csvField(df.format(Date(s.createdAt)))).append(",")
+                writer.append(csvField(s.paymentMode)).append(",")
                 writer.append("${s.totalAmount},")
-                writer.append("\"${s.customerId ?: ""}\",")
+                writer.append(csvField(s.customerId?.toString().orEmpty())).append(",")
                 writer.append("${s.createdAt}\n")
             }
             writer.flush()
@@ -255,13 +258,13 @@ object ShareUtils {
             for (p in products) {
                 val catName = categoryNameMap[p.categoryId] ?: "General"
                 val status = if (!p.trackStock) "Not Tracked" else if (p.currentStock <= 0) "Out of Stock" else if (p.currentStock <= 5) "Low Stock" else "In Stock"
-                writer.append("\"${p.name.replace("\"", "\"\"")}\",")
-                writer.append("\"$catName\",")
+                writer.append(csvField(p.name)).append(",")
+                writer.append(csvField(catName)).append(",")
                 writer.append("${p.mrp},")
                 writer.append("${p.sellingPrice ?: p.mrp},")
                 writer.append("${p.currentStock},")
                 writer.append("${p.trackStock},")
-                writer.append("\"$status\"\n")
+                writer.append(csvField(status)).append("\n")
             }
             writer.flush()
             writer.close()
@@ -295,10 +298,10 @@ object ShareUtils {
             for (c in customers) {
                 val bal = balances[c.id] ?: 0.0
                 val status = if (bal > 0.01) "Pending Due" else "Settled"
-                writer.append("\"${c.name.replace("\"", "\"\"")}\",")
-                writer.append("\"${c.phone ?: ""}\",")
+                writer.append(csvField(c.name)).append(",")
+                writer.append(csvField(c.phone.orEmpty())).append(",")
                 writer.append("$bal,")
-                writer.append("\"$status\"\n")
+                writer.append(csvField(status)).append("\n")
             }
             writer.flush()
             writer.close()

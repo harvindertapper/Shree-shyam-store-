@@ -41,9 +41,11 @@ object PdfReportUtils {
             // Standard A4 dimensions: 595 x 842 points (72 dpi)
             val pageWidth = 595
             val pageHeight = 842
-            val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
-            val page = pdfDocument.startPage(pageInfo)
-            val canvas: Canvas = page.canvas
+            var pageNumber = 1
+            var page = pdfDocument.startPage(
+                PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+            )
+            var canvas: Canvas = page.canvas
 
             // Paints
             val textPaint = Paint().apply {
@@ -177,13 +179,45 @@ object PdfReportUtils {
             val rowDateFormat = SimpleDateFormat("dd/MM/yy hh:mm a", Locale.ENGLISH)
             var runningBalance = 0.0
 
+            fun startContinuationPage() {
+                pdfDocument.finishPage(page)
+                pageNumber += 1
+                page = pdfDocument.startPage(
+                    PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
+                )
+                canvas = page.canvas
+                y = margin + 32f
+                canvas.drawText(
+                    "${shopName.ifBlank { "SHREE SHYAM STORE" }.uppercase(Locale.ENGLISH)} — ${customer.name} (continued)",
+                    margin,
+                    y,
+                    boldPaint
+                )
+                y += 20f
+                canvas.drawLine(margin, y, pageWidth - margin, y, linePaint)
+                y += 12f
+                canvas.drawRect(
+                    RectF(margin, y, pageWidth - margin, y + 24f),
+                    tableHeaderBg
+                )
+                canvas.drawRect(RectF(margin, y, pageWidth - margin, y + 24f), linePaint)
+                canvas.drawText("Date & Time", colDate, y + 16f, boldPaint)
+                canvas.drawText("Description / Note", colDesc, y + 16f, boldPaint)
+                canvas.drawText("Type", colType, y + 16f, boldPaint)
+                canvas.drawText("Amount", colAmount, y + 16f, boldPaint)
+                canvas.drawText("Balance", colBalance, y + 16f, boldPaint)
+                y += 24f
+            }
+
             if (sortedTxs.isEmpty()) {
                 y += 20f
                 canvas.drawText("No transactions recorded for this customer.", margin + 14f, y, subtitlePaint)
                 y += 20f
             } else {
                 for (tx in sortedTxs) {
-                    if (y > pageHeight - 60f) break // Single page fit constraint
+                    if (y > pageHeight - 60f) {
+                        startContinuationPage()
+                    }
 
                     val isCredit = tx.type.equals("CREDIT", ignoreCase = true) || tx.type.equals("UDHAAR", ignoreCase = true)
                     if (isCredit) {

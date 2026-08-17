@@ -55,6 +55,7 @@ object AuthManager {
     ): Result<FirebaseUser> {
         return try {
             val auth = getFirebaseAuth(context)
+                ?: return Result.failure(Exception("Google Sign-In requires Firebase configuration."))
             val credentialManager = CredentialManager.create(context)
 
             val rawNonce = UUID.randomUUID().toString()
@@ -63,10 +64,16 @@ object AuthManager {
             val digest = md.digest(bytes)
             val hashedNonce = digest.fold("") { str, it -> str + "%02x".format(it) }
 
-            val googleIdOption: GetCredentialRequest = if (!serverClientId.isNullOrBlank()) {
+            val resolvedClientId = serverClientId?.trim().takeUnless { it.isNullOrBlank() }
+                ?: context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+                    .takeIf { it != 0 }
+                    ?.let { context.getString(it).trim() }
+                    ?.takeUnless { it.isBlank() }
+
+            val googleIdOption: GetCredentialRequest = if (resolvedClientId != null) {
                 val googleIdOptionBuilder = GetGoogleIdOption.Builder()
                     .setFilterByAuthorizedAccounts(false)
-                    .setServerClientId(serverClientId)
+                    .setServerClientId(resolvedClientId)
                     .setAutoSelectEnabled(true)
                     .setNonce(hashedNonce)
                     .build()
@@ -75,11 +82,7 @@ object AuthManager {
                     .addCredentialOption(googleIdOptionBuilder)
                     .build()
             } else {
-                val signInWithGoogleOption = GetSignInWithGoogleOption.Builder("default_web_client_id")
-                    .build()
-                GetCredentialRequest.Builder()
-                    .addCredentialOption(signInWithGoogleOption)
-                    .build()
+                return Result.failure(Exception("Google Sign-In is not configured. Add a Firebase web client ID."))
             }
 
             val result: GetCredentialResponse = credentialManager.getCredential(
@@ -92,15 +95,10 @@ object AuthManager {
                 val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
                 val idToken = googleIdTokenCredential.idToken
 
-                if (auth != null) {
-                    val authCredential = GoogleAuthProvider.getCredential(idToken, null)
-                    val authResult = auth.signInWithCredential(authCredential).await()
-                    val user = authResult.user ?: throw Exception("Firebase User is null after Google Auth")
-                    Result.success(user)
-                } else {
-                    // Fallback if Firebase backend is not active: Return a dummy/offline success representation
-                    Result.failure(Exception("Google Sign-In requires Firebase configuration. Use offline setup."))
-                }
+                val authCredential = GoogleAuthProvider.getCredential(idToken, null)
+                val authResult = auth.signInWithCredential(authCredential).await()
+                val user = authResult.user ?: throw Exception("Firebase User is null after Google Auth")
+                Result.success(user)
             } else {
                 Result.failure(Exception("Unsupported credential type: ${credential.type}"))
             }

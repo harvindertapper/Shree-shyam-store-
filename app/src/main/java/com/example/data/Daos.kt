@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
+import java.util.Locale
 
 @Dao
 interface CategoryDao {
@@ -141,6 +142,9 @@ abstract class SaleDao {
     @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
     abstract suspend fun touchCustomer(customerId: Long, updatedAt: Long)
 
+    @Query("SELECT COUNT(*) > 0 FROM customers WHERE id = :customerId AND isDeleted = 0")
+    abstract suspend fun hasActiveCustomer(customerId: Long): Boolean
+
     /**
      * Executes atomic bill checkout transaction in local SQLite:
      * 1. Inserts Bill/Sale record
@@ -155,10 +159,38 @@ abstract class SaleDao {
         items: List<SaleItem>,
         selectedCustomerId: Long? = null
     ): Long {
+        require(items.isNotEmpty()) { "A bill must contain at least one item" }
+        val normalizedPaymentMode = sale.paymentMode.trim().uppercase(Locale.ENGLISH)
+        require(normalizedPaymentMode in setOf("CASH", "UPI", "UDHAAR")) {
+            "Unsupported payment mode: ${sale.paymentMode}"
+        }
+        require(sale.totalAmount.isFinite() && sale.totalAmount >= 0.0) {
+            "Sale total must be a finite non-negative amount"
+        }
+        items.forEach { item ->
+            require(item.productId > 0L) { "Sale item must reference a product" }
+            require(item.quantity.isFinite() && item.quantity > 0.0) { "Sale quantity must be positive" }
+            require(item.unitPrice.isFinite() && item.unitPrice >= 0.0) { "Sale unit price is invalid" }
+            require(item.lineTotal.isFinite() && item.lineTotal >= 0.0) { "Sale line total is invalid" }
+            require(getProductById(item.productId) != null) { "Sale item references a missing product" }
+        }
+        val calculatedTotal = items.sumOf { it.unitPrice * it.quantity }
+        require(calculatedTotal.isFinite() && kotlin.math.abs(calculatedTotal - sale.totalAmount) <= 0.01) {
+            "Sale total does not match its line items"
+        }
         val now = System.currentTimeMillis()
-        val finalCustomerId = if (sale.paymentMode == "UDHAAR") selectedCustomerId else null
+        val finalCustomerId = if (normalizedPaymentMode == "UDHAAR") {
+            val customerId = selectedCustomerId ?: sale.customerId
+            require(customerId != null && hasActiveCustomer(customerId)) {
+                "Udhaar bills require an active customer"
+            }
+            customerId
+        } else {
+            null
+        }
         val finalizedSale = sale.copy(
             customerId = finalCustomerId,
+            paymentMode = normalizedPaymentMode,
             createdAt = if (sale.createdAt > 0) sale.createdAt else now,
             updatedAt = now,
             isSynced = false
@@ -194,7 +226,7 @@ abstract class SaleDao {
             }
         }
 
-        if (sale.paymentMode == "UDHAAR" && finalCustomerId != null) {
+        if (normalizedPaymentMode == "UDHAAR" && finalCustomerId != null) {
             val udhaarTx = UdhaarTransaction(
                 customerId = finalCustomerId,
                 saleId = saleId,
