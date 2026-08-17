@@ -32,6 +32,7 @@ import com.example.utils.DateTimeUtils
 import com.example.utils.LocaleHelper
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
+import kotlinx.coroutines.delay
 
 @Composable
 fun HomeScreen(viewModel: ShopViewModel) {
@@ -41,12 +42,21 @@ fun HomeScreen(viewModel: ShopViewModel) {
     val sales by viewModel.salesHistory.collectAsState()
     val products by viewModel.products.collectAsState()
 
-    // Determine bounds for Today
-    val startOfDay = remember { DateTimeUtils.getStartOfDay() }
-    val endOfDay = remember { DateTimeUtils.getEndOfDay() }
+    // Keep time-based dashboard values fresh while this screen remains visible.
+    var clockTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000L)
+            clockTick = System.currentTimeMillis()
+        }
+    }
+
+    // Determine bounds for Today from the current time tick.
+    val startOfDay = remember(clockTick) { DateTimeUtils.getStartOfDay() }
+    val endOfDay = remember(clockTick) { DateTimeUtils.getEndOfDay() }
 
     // Aggregate statistics reactively
-    val todaySales = remember(sales) {
+    val todaySales = remember(sales, startOfDay, endOfDay) {
         sales.filter { it.createdAt in startOfDay..endOfDay }
     }
     val totalToday = remember(todaySales) { todaySales.sumOf { it.totalAmount } }
@@ -60,7 +70,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
     }
     val lowStockCount = remember(lowStockProducts) { lowStockProducts.size }
 
-    val hour = remember { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
+    val hour = remember(clockTick) { java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY) }
     val timeGreeting = remember(hour, settings.appLanguage) {
         when (hour) {
             in 4..11 -> strings.greetingMorning

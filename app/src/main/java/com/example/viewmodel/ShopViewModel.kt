@@ -199,7 +199,7 @@ class ShopViewModel(
                 onError("Please enter a valid registered email address!")
                 return@launch
             }
-            val result = com.example.utils.AuthManager.sendPasswordResetEmail(email.trim())
+            val result = com.example.utils.AuthManager.sendPasswordResetEmail(email.trim(), context)
             if (result.isSuccess) {
                 onSuccess()
             } else {
