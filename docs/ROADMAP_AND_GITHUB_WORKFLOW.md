@@ -1,5 +1,11 @@
 # Shree Shyam Store - Master Engineering Roadmap & GitHub Workflow
 
+## Current takeover status (17 August 2026)
+
+The repository baseline is recorded in `docs/BASELINE_AUDIT.md`. The first stabilization branch, `fix/security-sync-boundary`, removes local user-account data from Firestore and REST backup payloads, preserves device-owned users and shop profile data during business-data restore, makes cloud restore replacement atomic through Room, adds the Gradle wrapper, expands the stable CI test selection, and adds local development/release documentation. The branch is under pull request review; `main` remains unchanged.
+
+The next priorities are to choose one identity model, remove or migrate weak local credential compatibility paths, replace destructive Room fallback with tested migrations, define stable multi-device IDs and conflict policy, decide the inventory underflow policy, and add domain/integration coverage for billing, inventory, ledger, sync, restore, and authorization. Production release work must wait for the release and recovery gates in `docs/RELEASE_RUNBOOK.md`.
+
 ## 1. GitHub Collaboration & Workflow Governance
 
 ### A. Branching Strategy
@@ -9,8 +15,8 @@
 
 ### B. Pull Request (PR) Checklist & Definition of Done
 Every PR must fulfill:
-1. **Compilation & Lint**: Zero build errors (`gradle assembleDebug`).
-2. **Local Tests**: All unit tests pass (`gradle testDebugUnitTest`).
+1. **Compilation & Lint**: Zero build errors (`./gradlew assembleDebug` and `./gradlew lintDebug`).
+2. **Local Tests**: All stable unit/Robolectric tests pass (`./gradlew testDebugUnitTest`).
 3. **Data Safety**: No destructive database schema changes without migration.
 4. **Offline Resilience**: App must work seamlessly offline without network crashes.
 5. **Shopkeeper UX**: Large touch targets (>= 48dp), bilingual Hindi/English clarity, ₹ currency formatting.
