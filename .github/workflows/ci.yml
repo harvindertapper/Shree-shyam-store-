@@ -75,6 +75,8 @@ jobs:
           ./gradlew --no-daemon --stacktrace testDebugUnitTest
           --tests com.example.SecurityUtilsTest
           --tests com.example.RestoreSecurityTest
+          --tests com.example.CheckoutInvariantsTest
+          --tests com.example.CommerceValidationTest
           --tests com.example.ExampleUnitTest
           --tests com.example.ExampleRobolectricTest
 

@@ -5,12 +5,17 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.commerce.CommerceValidation
 import com.example.data.*
 import com.example.utils.CurrencyUtils
 import com.example.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 
 sealed class Screen {
     object Welcome : Screen()
@@ -460,9 +465,10 @@ class ShopViewModel(
     val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
 
     val cartTotal: StateFlow<Double> = _cartState.map { cart ->
-        cart.entries.sumOf { (product, quantity) ->
+        val rawTotal = cart.entries.sumOf { (product, quantity) ->
             product.getEffectivePrice() * quantity
         }
+        if (rawTotal.isFinite()) CommerceValidation.roundCurrency(rawTotal) else 0.0
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -470,10 +476,13 @@ class ShopViewModel(
     )
 
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
+        if (!quantity.isFinite()) return
         val current = _cartState.value.toMutableMap()
         val currentQty = current[product] ?: 0.0
         val finalQty = currentQty + quantity
+        if (!finalQty.isFinite()) return
         if (finalQty > 0.0) {
+            if (product.trackStock && finalQty > product.currentStock) return
             current[product] = finalQty
         } else {
             current.remove(product)
@@ -482,8 +491,10 @@ class ShopViewModel(
     }
 
     fun setProductQuantityInCart(product: Product, qty: Double) {
+        if (!qty.isFinite()) return
         val current = _cartState.value.toMutableMap()
         if (qty > 0.0) {
+            if (product.trackStock && qty > product.currentStock) return
             current[product] = qty
         } else {
             current.remove(product)
@@ -551,6 +562,16 @@ class ShopViewModel(
     private val _lastSaleItems = MutableStateFlow<List<SaleItem>>(emptyList())
     val lastSaleItems: StateFlow<List<SaleItem>> = _lastSaleItems.asStateFlow()
 
+    private val _checkoutInFlight = MutableStateFlow(false)
+    val checkoutInFlight: StateFlow<Boolean> = _checkoutInFlight.asStateFlow()
+
+    private val _checkoutError = MutableStateFlow<String?>(null)
+    val checkoutError: StateFlow<String?> = _checkoutError.asStateFlow()
+
+    fun clearCheckoutError() {
+        _checkoutError.value = null
+    }
+
     fun completeBill(
         paymentMode: String, // "CASH", "UPI", "UDHAAR"
         customerId: Long? = null,
@@ -558,81 +579,96 @@ class ShopViewModel(
         customerPhone: String = "",
         note: String? = null
     ) {
+        if (_checkoutInFlight.value) return
+        val cartItems = _cartState.value
+        if (cartItems.isEmpty()) return
+
+        _checkoutInFlight.value = true
+        _checkoutError.value = null
         viewModelScope.launch {
-            val total = cartTotal.value
-            val cartItems = _cartState.value
-            if (cartItems.isEmpty()) return@launch
+            try {
+                val total = cartTotal.value
+                val formatter = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ENGLISH)
+                val billNo = "BILL-${formatter.format(Date())}-${UUID.randomUUID().toString().take(8).uppercase(Locale.ENGLISH)}"
 
-            // Local bill number generation: BILL-YYYYMMDD-HHmmss
-            val formatter = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.ENGLISH)
-            val billNo = "BILL-${formatter.format(java.util.Date())}"
-
-            // 1. Determine Customer ID if Udhaar
-            val finalCustomerId = if (paymentMode == "UDHAAR") {
-                if (customerId != null) {
-                    customerId
-                } else {
-                    // Create customer on the fly
-                    val trimmedName = customerName.trim()
-                    if (trimmedName.isEmpty()) return@launch // Required
-
-                    val existing = repository.getCustomerByName(trimmedName)
-                    if (existing != null) {
-                        existing.id
+                val isUdhaar = paymentMode.trim().equals("UDHAAR", ignoreCase = true)
+                var newCustomer: Customer? = null
+                val finalCustomerId = if (isUdhaar) {
+                    if (customerId != null) {
+                        customerId
                     } else {
-                        repository.insertCustomer(
-                            Customer(
+                        val trimmedName = customerName.trim()
+                        require(trimmedName.isNotEmpty()) { "Customer name is required for udhaar" }
+                        val existing = repository.getCustomerByName(trimmedName)
+                        if (existing != null) {
+                            existing.id
+                        } else {
+                            newCustomer = Customer(
                                 name = trimmedName,
                                 phone = customerPhone.trim().ifEmpty { null },
                                 createdAt = System.currentTimeMillis(),
                                 updatedAt = System.currentTimeMillis()
                             )
-                        )
+                            null
+                        }
                     }
+                } else {
+                    null
                 }
-            } else {
-                null
-            }
 
-            // 2. Prep entities
-            val now = System.currentTimeMillis()
-            val sale = Sale(
-                billNumber = billNo,
-                totalAmount = total,
-                paymentMode = paymentMode,
-                customerId = finalCustomerId,
-                note = note,
-                createdAt = now,
-                updatedAt = now
-            )
-
-            val saleItems = cartItems.map { (prod, qty) ->
-                SaleItem(
-                    saleId = 0, // setup in repository
-                    productId = prod.id,
-                    productNameSnapshot = prod.name,
-                    quantity = qty,
-                    unit = prod.unit,
-                    unitPrice = prod.getEffectivePrice(),
-                    lineTotal = prod.getEffectivePrice() * qty,
+                val now = System.currentTimeMillis()
+                val saleItems = cartItems.map { (prod, qty) ->
+                    val unitPrice = CommerceValidation.normalizeUnitPrice(prod.getEffectivePrice())
+                    SaleItem(
+                        saleId = 0,
+                        productId = prod.id,
+                        productNameSnapshot = prod.name,
+                        quantity = qty,
+                        unit = prod.unit,
+                        unitPrice = unitPrice,
+                        lineTotal = CommerceValidation.calculateLineTotal(unitPrice, qty),
+                        updatedAt = now
+                    )
+                }
+                val sale = Sale(
+                    billNumber = billNo,
+                    totalAmount = CommerceValidation.calculateBillTotal(saleItems),
+                    paymentMode = paymentMode,
+                    customerId = finalCustomerId,
+                    note = note,
+                    createdAt = now,
                     updatedAt = now
                 )
+
+                val savedSaleId = if (newCustomer != null) {
+                    repository.insertSaleWithNewCustomer(sale, saleItems, newCustomer)
+                } else {
+                    repository.insertSaleWithItems(sale, saleItems, finalCustomerId)
+                }
+                val savedSale = repository.getSaleById(savedSaleId)
+                if (savedSale != null) {
+                    _lastSale.value = savedSale
+                    _lastSaleItems.value = repository.getSaleItemsForSaleList(savedSaleId)
+                }
+
+                clearCart()
+                triggerAutoSync()
+                navigateTo(Screen.BillSuccess)
+            } catch (error: IllegalArgumentException) {
+                _checkoutError.value = when {
+                    error.message?.contains("credit limit", ignoreCase = true) == true ->
+                        "Udhaar credit limit exceeded. Bill was not saved."
+                    error.message?.contains("stock", ignoreCase = true) == true ->
+                        "Insufficient stock. Bill was not saved."
+                    error.message?.contains("customer", ignoreCase = true) == true ->
+                        "Valid customer details are required. Bill was not saved."
+                    else -> "Bill details are invalid. Bill was not saved."
+                }
+            } catch (_: Exception) {
+                _checkoutError.value = "Bill could not be saved. Please try again."
+            } finally {
+                _checkoutInFlight.value = false
             }
-
-            // 3. Save sale, adjust quantities and logs inside the helper
-            val savedSaleId = repository.insertSaleWithItems(sale, saleItems, finalCustomerId)
-
-            // Keep record for invoice receipt visualizer
-            val savedSale = repository.getSaleById(savedSaleId)
-            if (savedSale != null) {
-                _lastSale.value = savedSale
-                _lastSaleItems.value = repository.getSaleItemsForSaleList(savedSaleId)
-            }
-
-            // 4. Wipe cart
-            clearCart()
-            triggerAutoSync()
-            navigateTo(Screen.BillSuccess)
         }
     }
 
@@ -673,16 +709,18 @@ class ShopViewModel(
 
     fun addUdhaarPayment(customerId: Long, amount: Double, note: String?) {
         viewModelScope.launch {
-            if (amount <= 0.0) return@launch
-            val tx = UdhaarTransaction(
-                customerId = customerId,
-                type = "PAYMENT",
-                amount = amount,
-                note = note?.trim()?.ifEmpty { "Cash Deposit Received" } ?: "Cash Deposit Received",
-                createdAt = System.currentTimeMillis()
-            )
-            repository.insertUdhaarTransaction(tx)
-            triggerAutoSync()
+            try {
+                repository.recordUdhaarPayment(customerId, amount, note)
+                triggerAutoSync()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(
+                    context,
+                    error.message ?: "Payment was not saved",
+                    Toast.LENGTH_LONG
+                ).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Payment could not be saved", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
