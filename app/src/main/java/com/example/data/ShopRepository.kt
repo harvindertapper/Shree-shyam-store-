@@ -184,9 +184,20 @@ class ShopRepository(
     suspend fun getUnsyncedUsers(): List<User> = userDao.getUnsyncedUsers()
     suspend fun markUsersSynced(ids: List<Long>) = userDao.markUsersSynced(ids)
 
-    suspend fun clearAllLocalTables() {
+    /**
+     * Atomically replaces cloud-owned business tables during a restore.
+     * Device-local identity/session records and the shop profile are preserved.
+     */
+    suspend fun replaceCloudRestorableTables(
+        categoriesList: List<Category>,
+        productsList: List<Product>,
+        salesList: List<Sale>,
+        saleItemsList: List<SaleItem>,
+        customersList: List<Customer>,
+        udhaarTxsList: List<UdhaarTransaction>,
+        adjustmentsList: List<StockAdjustment>
+    ) {
         val operation: suspend () -> Unit = {
-            shopProfileDao?.clearAll() ?: database?.shopProfileDao()?.clearAll()
             categoryDao.clearAllCategories()
             productDao.clearAllProducts()
             saleDao.clearAllSales()
@@ -194,22 +205,7 @@ class ShopRepository(
             customerDao.clearAllCustomers()
             udhaarDao.clearAllTransactions()
             stockAdjustmentDao.clearAllAdjustments()
-            userDao.clearAllUsers()
-        }
-        if (database != null) database.withTransaction { operation() } else operation()
-    }
 
-    suspend fun insertRestoredData(
-        categoriesList: List<Category>,
-        productsList: List<Product>,
-        salesList: List<Sale>,
-        saleItemsList: List<SaleItem>,
-        customersList: List<Customer>,
-        udhaarTxsList: List<UdhaarTransaction>,
-        adjustmentsList: List<StockAdjustment>,
-        usersList: List<User>
-    ) {
-        val operation: suspend () -> Unit = {
             if (categoriesList.isNotEmpty()) categoryDao.insertAll(categoriesList)
             if (productsList.isNotEmpty()) productDao.insertAll(productsList)
             if (salesList.isNotEmpty()) saleDao.insertAllSales(salesList)
@@ -217,7 +213,6 @@ class ShopRepository(
             if (customersList.isNotEmpty()) customerDao.insertAll(customersList)
             if (udhaarTxsList.isNotEmpty()) udhaarDao.insertAll(udhaarTxsList)
             if (adjustmentsList.isNotEmpty()) stockAdjustmentDao.insertAll(adjustmentsList)
-            if (usersList.isNotEmpty()) userDao.insertAll(usersList)
         }
         if (database != null) database.withTransaction { operation() } else operation()
     }

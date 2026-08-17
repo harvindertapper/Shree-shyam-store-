@@ -950,9 +950,6 @@ class ShopViewModel(
                 val adjList = repository.getAllStockAdjustmentsList()
                 uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "stock_adjustments", adjList, StockAdjustment::class.java)
 
-                _syncMessage.value = "Backing up Users..."
-                val usersList = repository.getAllUsers()
-                uploadResults += com.example.utils.FirebaseSyncService.uploadTable(url, prefix, "users", usersList, User::class.java)
                 if (uploadResults.any { !it }) {
                     throw IllegalStateException("One or more backup tables failed to upload")
                 }
@@ -1019,11 +1016,8 @@ class ShopViewModel(
                 _syncMessage.value = "Downloading Adjustments..."
                 val adjList = com.example.utils.FirebaseSyncService.downloadTable(url, prefix, "stock_adjustments", StockAdjustment::class.java)
 
-                _syncMessage.value = "Downloading Accounts..."
-                val usersList = com.example.utils.FirebaseSyncService.downloadTable(url, prefix, "users", User::class.java)
-
                 if (catList.isEmpty() && prodList.isEmpty() && salesList.isEmpty() && saleItemsList.isEmpty() &&
-                    customersList.isEmpty() && udhaarList.isEmpty() && adjList.isEmpty() && usersList.isEmpty()) {
+                    customersList.isEmpty() && udhaarList.isEmpty() && adjList.isEmpty()) {
                     _syncInProgress.value = false
                     _syncMessage.value = null
                     onResult(false, "No backup data found under prefix '$prefix' at this database URL.")
@@ -1032,16 +1026,14 @@ class ShopViewModel(
 
                 // Clear & Insert
                 _syncMessage.value = "Restoring Database..."
-                repository.clearAllLocalTables()
-                repository.insertRestoredData(
+                repository.replaceCloudRestorableTables(
                     categoriesList = catList,
                     productsList = prodList,
                     salesList = salesList,
                     saleItemsList = saleItemsList,
                     customersList = customersList,
                     udhaarTxsList = udhaarList,
-                    adjustmentsList = adjList,
-                    usersList = usersList
+                    adjustmentsList = adjList
                 )
 
                 _syncMessage.value = "Database Restored!"

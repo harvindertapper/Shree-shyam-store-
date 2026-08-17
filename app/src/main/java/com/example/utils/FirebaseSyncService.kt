@@ -9,7 +9,6 @@ import com.example.data.SaleItem
 import com.example.data.SettingsDataStore
 import com.example.data.StockAdjustment
 import com.example.data.UdhaarTransaction
-import com.example.data.User
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.FirebaseFirestore
@@ -50,7 +49,6 @@ class FirebaseSyncService(
             val categories = database.categoryDao().getUnsyncedCategories()
             val udhaar = database.udhaarDao().getUnsyncedTransactions()
             val adjustments = database.stockAdjustmentDao().getUnsyncedAdjustments()
-            val users = database.userDao().getUnsyncedUsers()
 
             val shop = firestore.collection("shops").document(uid)
             val writes = buildList {
@@ -61,7 +59,6 @@ class FirebaseSyncService(
                 categories.forEach { add(shop.collection("categories").document(it.id.toString()) to it.toCloudMap()) }
                 udhaar.forEach { add(shop.collection("udhaar_transactions").document(it.id.toString()) to it.toCloudMap()) }
                 adjustments.forEach { add(shop.collection("stock_adjustments").document(it.id.toString()) to it.toCloudMap()) }
-                users.forEach { add(shop.collection("users").document(it.id.toString()) to it.toCloudMap()) }
             }
 
             // Firestore limits a write batch to 500 operations. Keep headroom
@@ -81,7 +78,6 @@ class FirebaseSyncService(
             if (categories.isNotEmpty()) database.categoryDao().markCategoriesSynced(categories.map { it.id })
             if (udhaar.isNotEmpty()) database.udhaarDao().markTransactionsSynced(udhaar.map { it.id })
             if (adjustments.isNotEmpty()) database.stockAdjustmentDao().markAdjustmentsSynced(adjustments.map { it.id })
-            if (users.isNotEmpty()) database.userDao().markUsersSynced(users.map { it.id })
             true
         } catch (_: Exception) {
             false
@@ -103,7 +99,6 @@ class FirebaseSyncService(
             pullSaleItems(shop, lastSyncTime, now)
             pullUdhaar(shop, lastSyncTime, now)
             pullAdjustments(shop, lastSyncTime, now)
-            pullUsers(shop, lastSyncTime, now)
             now
         } catch (_: Exception) {
             // Keep the previous cursor so a transient failure is retried rather
@@ -272,27 +267,6 @@ class FirebaseSyncService(
         })
     }
 
-    private suspend fun pullUsers(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("users").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
-        database.userDao().insertAll(docs.mapNotNull { doc ->
-            User(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
-                uid = doc.getString("uid").orEmpty(),
-                username = doc.getString("username") ?: return@mapNotNull null,
-                email = doc.getString("email") ?: return@mapNotNull null,
-                passwordHash = doc.getString("passwordHash").orEmpty(),
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
-            )
-        })
-    }
-
     private fun Product.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "name" to name, "categoryId" to categoryId, "mrp" to mrp,
         "sellingPrice" to sellingPrice, "purchasePrice" to purchasePrice,
@@ -336,12 +310,6 @@ class FirebaseSyncService(
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
     )
 
-    private fun User.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "uid" to uid, "username" to username, "email" to email,
-        "passwordHash" to passwordHash, "createdAt" to createdAt,
-        "updatedAt" to updatedAt, "isDeleted" to isDeleted
-    )
-
     companion object {
         private const val MAX_BATCH_WRITES = 450
         private const val FIRESTORE_TIMEOUT_SECONDS = 15L
@@ -368,7 +336,7 @@ class FirebaseSyncService(
             val base = normalizedBaseUrl(url) ?: return null
             val cleanPrefix = prefix.trim().trim('/').ifEmpty { DEFAULT_PREFIX }
             val cleanTable = table.trim().trim('/')
-            if (cleanTable.isEmpty()) return null
+            if (!CloudSyncPolicy.isCloudBusinessTable(cleanTable)) return null
             return "$base/$cleanPrefix/$cleanTable.json"
         }
 
