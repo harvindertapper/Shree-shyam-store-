@@ -40,10 +40,11 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.7.0'
+      - name: Validate Gradle wrapper
+        run: ./gradlew --version
+
+      - name: Check repository whitespace
+        run: git diff --check
 
       - name: Create debug signing key
         shell: bash
@@ -61,18 +62,19 @@ jobs:
           fi
 
       - name: Assemble debug APK
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: ./gradlew --no-daemon --stacktrace assembleDebug
 
       - name: Run lint
-        run: gradle --no-daemon --stacktrace lintDebug
+        run: ./gradlew --no-daemon --stacktrace lintDebug
 
       # The native Compose screenshot test is intentionally excluded here because
       # it requires a graphics-capable Robolectric environment and can hang on a
       # headless runner. Stable unit/Robolectric tests remain a required CI gate.
       - name: Run stable unit and Robolectric tests
         run: >-
-          gradle --no-daemon --stacktrace testDebugUnitTest
+          ./gradlew --no-daemon --stacktrace testDebugUnitTest
           --tests com.example.SecurityUtilsTest
+          --tests com.example.RestoreSecurityTest
           --tests com.example.ExampleUnitTest
           --tests com.example.ExampleRobolectricTest
 
