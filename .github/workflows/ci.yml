@@ -73,14 +73,14 @@ jobs:
       - name: Run stable unit and Robolectric tests
         run: >-
           ./gradlew --no-daemon --stacktrace testDebugUnitTest
-          --tests com.example.SecurityUtilsTest
-          --tests com.example.RestoreSecurityTest
-          --tests com.example.CheckoutInvariantsTest
-          --tests com.example.CommerceValidationTest
-          --tests com.example.StableSyncMigrationTest
-          --tests com.example.SyncOutboxTest
-          --tests com.example.ExampleUnitTest
-          --tests com.example.ExampleRobolectricTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.SecurityUtilsTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
 
       - name: Upload debug APK
         if: always()
