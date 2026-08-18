@@ -7,6 +7,7 @@ import com.example.data.Customer
 import com.example.data.Product
 import com.example.data.Sale
 import com.example.data.SaleItem
+import com.example.commerce.LedgerActor
 import com.example.data.ShopRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -25,6 +26,8 @@ import org.robolectric.annotation.Config
 class CheckoutInvariantsTest {
     private lateinit var database: AppDatabase
     private lateinit var repository: ShopRepository
+
+    private val testActor = LedgerActor("owner-1", "Test Owner", "OWNER", "test-device")
 
     @Before
     fun setUp() {
@@ -89,7 +92,12 @@ class CheckoutInvariantsTest {
         val item = item(productId = productId, unitPrice = 12_000L, quantity = 1.0, lineTotal = 12_000L)
 
         expectIllegalArgument {
-            database.saleDao().completeBillCheckout(sale, listOf(item), customerId)
+            database.saleDao().completeBillCheckout(
+                sale = sale,
+                items = listOf(item),
+                selectedCustomerId = customerId,
+                ledgerActor = testActor
+            )
         }
 
         assertEquals(0, database.saleDao().countAllSales())
@@ -101,15 +109,67 @@ class CheckoutInvariantsTest {
     fun receivedPaymentIsRoundedAndRequiresAnActiveCustomer() = runBlocking {
         val customerId = database.customerDao().insertCustomer(Customer(name = "Payment Customer"))
 
-        repository.recordUdhaarPayment(customerId, 1235L, "cash")
+        repository.recordUdhaarPayment(customerId, 1235L, "cash", testActor)
         val transaction = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
 
         assertEquals("PAYMENT", transaction.type)
         assertEquals(1235L, transaction.amount)
+        assertEquals(-1235L, transaction.balanceEffect)
+        assertEquals("owner-1", transaction.actorUid)
 
         expectIllegalArgument {
-            repository.recordUdhaarPayment(99999L, 100L, "cash")
+            repository.recordUdhaarPayment(99999L, 100L, "cash", testActor)
         }
+    }
+
+    @Test
+    fun ledgerCorrectionIsAppendOnlyAndCannotBeAppliedTwice() = runBlocking {
+        val customerId = database.customerDao().insertCustomer(Customer(name = "Correction Customer"))
+        repository.recordUdhaarPayment(customerId, 1000L, "cash", testActor)
+        val original = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
+
+        val correctionId = repository.correctUdhaarTransaction(
+            customerId = customerId,
+            eventId = original.eventId,
+            correctedAmountMinorUnits = 700L,
+            reason = "Entered amount was incorrect",
+            actor = testActor
+        )
+        val rows = database.udhaarDao().getTransactionsForCustomerList(customerId)
+        val correction = rows.single { it.id == correctionId }
+
+        assertEquals(2, rows.size)
+        assertEquals(-700L, database.udhaarDao().getCustomerBalance(customerId))
+        assertEquals(-1000L, original.balanceEffect)
+        assertEquals(300L, correction.balanceEffect)
+        assertEquals(original.eventId, correction.correctsEventId)
+
+        expectIllegalArgument {
+            repository.correctUdhaarTransaction(
+                customerId = customerId,
+                eventId = original.eventId,
+                correctedAmountMinorUnits = 600L,
+                reason = "Second correction must fail",
+                actor = testActor
+            )
+        }
+    }
+
+    @Test
+    fun cashierCannotCorrectLedgerEvents() = runBlocking {
+        val customerId = database.customerDao().insertCustomer(Customer(name = "Authorization Customer"))
+        repository.recordUdhaarPayment(customerId, 1000L, "cash", testActor)
+        val original = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
+
+        expectIllegalArgument {
+            repository.reverseUdhaarTransaction(
+                customerId = customerId,
+                eventId = original.eventId,
+                reason = "Cashier correction attempt",
+                actor = LedgerActor("cashier-1", "Cashier", "CASHIER", "device-1")
+            )
+        }
+        assertEquals(1, database.udhaarDao().getTransactionsForCustomerList(customerId).size)
     }
 
     @Test

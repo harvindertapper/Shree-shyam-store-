@@ -752,13 +752,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
 
     val customerBalanceMap = remember(allUdhaarTransactions) {
         allUdhaarTransactions.groupBy { it.customerId }.mapValues { (_, list) ->
-            list.sumOf {
-                when (it.type) {
-                    "CREDIT" -> it.amount
-                    "PAYMENT" -> -it.amount
-                    else -> 0L
-                }
-            }
+                list.sumOf { it.balanceEffect }
         }
     }
 

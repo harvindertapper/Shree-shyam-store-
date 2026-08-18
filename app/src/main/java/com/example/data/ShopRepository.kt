@@ -1,6 +1,8 @@
 package com.example.data
 
 import androidx.room.withTransaction
+import com.example.commerce.LedgerActor
+import com.example.commerce.LedgerAuditPolicy
 import com.example.commerce.UdhaarTransactionType
 import kotlinx.coroutines.flow.Flow
 
@@ -55,25 +57,28 @@ class ShopRepository(
     suspend fun completeBillCheckout(
         sale: Sale,
         items: List<SaleItem>,
-        selectedCustomerId: Long? = null
+        selectedCustomerId: Long? = null,
+        ledgerActor: LedgerActor? = null
     ): Long {
-        return saleDao.completeBillCheckout(sale, items, selectedCustomerId)
+        return saleDao.completeBillCheckout(sale, items, selectedCustomerId, ledgerActor)
     }
 
     suspend fun insertSaleWithItems(
         sale: Sale,
         items: List<SaleItem>,
-        selectedCustomerId: Long? = null
+        selectedCustomerId: Long? = null,
+        ledgerActor: LedgerActor? = null
     ): Long {
-        return completeBillCheckout(sale, items, selectedCustomerId)
+        return completeBillCheckout(sale, items, selectedCustomerId, ledgerActor)
     }
 
     suspend fun insertSaleWithNewCustomer(
         sale: Sale,
         items: List<SaleItem>,
-        newCustomer: Customer
+        newCustomer: Customer,
+        ledgerActor: LedgerActor? = null
     ): Long {
-        return saleDao.completeBillCheckoutWithNewCustomer(sale, items, newCustomer)
+        return saleDao.completeBillCheckoutWithNewCustomer(sale, items, newCustomer, ledgerActor)
     }
 
     // Customers
@@ -106,35 +111,139 @@ class ShopRepository(
     suspend fun getTotalUdhaar(): Long =
         udhaarDao.getTotalUdhaar()
 
-    suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long =
-        udhaarDao.insertTransaction(transaction)
-
-    suspend fun recordUdhaarPayment(customerId: Long, amountMinorUnits: Long, note: String?): Long {
-        val operation: suspend () -> Long = {
+    suspend fun recordUdhaarPayment(
+        customerId: Long,
+        amountMinorUnits: Long,
+        note: String?,
+        actor: LedgerActor
+    ): Long {
+        val normalizedActor = LedgerAuditPolicy.requireCanRecord(actor)
+        return inLedgerTransaction {
             require(amountMinorUnits > 0L) {
                 "Payment amount must be positive"
             }
-            val customer = customerDao.getCustomerById(customerId)
-            require(customer != null && !customer.isDeleted) {
+            require(customerDao.getCustomerById(customerId)?.isDeleted == false) {
                 "Payment requires an active customer"
             }
-            udhaarDao.insertTransaction(
+            val now = System.currentTimeMillis()
+            val transactionId = udhaarDao.insertTransaction(
                 UdhaarTransaction(
                     customerId = customerId,
                     type = UdhaarTransactionType.PAYMENT.name,
                     amount = amountMinorUnits,
+                    balanceEffect = -amountMinorUnits,
                     note = note?.trim()?.ifEmpty { "Payment received" } ?: "Payment received",
+                    actorUid = normalizedActor.actorUid,
+                    actorName = normalizedActor.actorName,
+                    actorRole = normalizedActor.actorRole,
+                    actorDeviceId = normalizedActor.actorDeviceId,
                     isSynced = false,
-                    createdAt = System.currentTimeMillis(),
-                    updatedAt = System.currentTimeMillis()
+                    createdAt = now,
+                    updatedAt = now
                 )
             )
+            customerDao.touchCustomer(customerId, now)
+            transactionId
         }
-        return database?.withTransaction { operation() } ?: operation()
     }
 
-    suspend fun deleteUdhaarTransaction(transaction: UdhaarTransaction) =
-        udhaarDao.deleteTransaction(transaction)
+    suspend fun reverseUdhaarTransaction(
+        customerId: Long,
+        eventId: String,
+        reason: String,
+        actor: LedgerActor
+    ): Long {
+        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(actor)
+        val normalizedReason = LedgerAuditPolicy.requireReason(reason)
+        return inLedgerTransaction {
+            val target = udhaarDao.getActiveEventById(eventId)
+            require(target != null && target.customerId == customerId) {
+                "Ledger event was not found for this customer"
+            }
+            require(target.type == UdhaarTransactionType.CREDIT.name || target.type == UdhaarTransactionType.PAYMENT.name) {
+                "Only original ledger events can be reversed"
+            }
+            require(udhaarDao.countActiveCorrectionsFor(target.eventId) == 0) {
+                "Ledger event has already been corrected"
+            }
+            val now = System.currentTimeMillis()
+            val reversalId = udhaarDao.insertTransaction(
+                UdhaarTransaction(
+                    customerId = customerId,
+                    saleId = target.saleId,
+                    type = UdhaarTransactionType.REVERSAL.name,
+                    amount = target.amount,
+                    balanceEffect = -target.balanceEffect,
+                    note = "Reversal of ${target.eventId}",
+                    correctsEventId = target.eventId,
+                    correctionReason = normalizedReason,
+                    actorUid = normalizedActor.actorUid,
+                    actorName = normalizedActor.actorName,
+                    actorRole = normalizedActor.actorRole,
+                    actorDeviceId = normalizedActor.actorDeviceId,
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+            customerDao.touchCustomer(customerId, now)
+            reversalId
+        }
+    }
+
+    suspend fun correctUdhaarTransaction(
+        customerId: Long,
+        eventId: String,
+        correctedAmountMinorUnits: Long,
+        reason: String,
+        actor: LedgerActor
+    ): Long {
+        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(actor)
+        val normalizedReason = LedgerAuditPolicy.requireReason(reason)
+        require(correctedAmountMinorUnits > 0L) { "Corrected amount must be positive" }
+        return inLedgerTransaction {
+            val target = udhaarDao.getActiveEventById(eventId)
+            require(target != null && target.customerId == customerId) {
+                "Ledger event was not found for this customer"
+            }
+            require(target.type == UdhaarTransactionType.CREDIT.name || target.type == UdhaarTransactionType.PAYMENT.name) {
+                "Only original ledger events can be corrected"
+            }
+            require(udhaarDao.countActiveCorrectionsFor(target.eventId) == 0) {
+                "Ledger event has already been corrected"
+            }
+            val replacementEffect = if (target.balanceEffect >= 0L) {
+                correctedAmountMinorUnits
+            } else {
+                -correctedAmountMinorUnits
+            }
+            val now = System.currentTimeMillis()
+            val correctionId = udhaarDao.insertTransaction(
+                UdhaarTransaction(
+                    customerId = customerId,
+                    saleId = target.saleId,
+                    type = UdhaarTransactionType.CORRECTION.name,
+                    amount = correctedAmountMinorUnits,
+                    balanceEffect = replacementEffect - target.balanceEffect,
+                    note = "Correction of ${target.eventId}",
+                    correctsEventId = target.eventId,
+                    correctionReason = normalizedReason,
+                    actorUid = normalizedActor.actorUid,
+                    actorName = normalizedActor.actorName,
+                    actorRole = normalizedActor.actorRole,
+                    actorDeviceId = normalizedActor.actorDeviceId,
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+            customerDao.touchCustomer(customerId, now)
+            correctionId
+        }
+    }
+
+    private suspend fun <T> inLedgerTransaction(operation: suspend () -> T): T =
+        database?.withTransaction { operation() } ?: operation()
 
     // Stock Adjustments
     val allStockAdjustments: Flow<List<StockAdjustment>> = stockAdjustmentDao.getAllAdjustments()

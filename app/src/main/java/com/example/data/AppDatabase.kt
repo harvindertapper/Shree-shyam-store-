@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StockAdjustment::class,
         User::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -232,6 +232,25 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN eventId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN balanceEffect INTEGER NOT NULL DEFAULT 0")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN correctsEventId TEXT")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN correctionReason TEXT")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN actorUid TEXT NOT NULL DEFAULT 'legacy-local'")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN actorName TEXT NOT NULL DEFAULT 'Legacy local record'")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN actorRole TEXT NOT NULL DEFAULT 'OWNER'")
+                database.execSQL("ALTER TABLE udhaar_transactions ADD COLUMN actorDeviceId TEXT NOT NULL DEFAULT 'legacy-device'")
+                database.execSQL("UPDATE udhaar_transactions SET eventId = 'legacy-' || id WHERE eventId = ''")
+                database.execSQL(
+                    "UPDATE udhaar_transactions SET balanceEffect = " +
+                        "CASE WHEN type = 'CREDIT' THEN amount " +
+                        "WHEN type = 'PAYMENT' THEN -amount ELSE 0 END"
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -239,7 +258,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .addCallback(seedCategoriesCallback())
                     .build()
                     .also { INSTANCE = it }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import java.io.IOException
+import java.util.UUID
 
 private const val DEFAULT_FIREBASE_PREFIX = "shreeshyam_sync"
 
@@ -29,6 +30,8 @@ data class StoreSettings(
     val loggedInUid: String = "",
     val loggedInUsername: String = "",
     val loggedInEmail: String = "",
+    val loggedInRole: String = "OWNER",
+    val auditDeviceId: String = "",
     val isUserLoggedIn: Boolean = false,
     val appLockEnabled: Boolean = true,
     val biometricEnabled: Boolean = false,
@@ -51,6 +54,8 @@ class SettingsDataStore(private val context: Context) {
         private val LOGGED_IN_UID = stringPreferencesKey("logged_in_uid")
         private val LOGGED_IN_USERNAME = stringPreferencesKey("logged_in_username")
         private val LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
+        private val LOGGED_IN_ROLE = stringPreferencesKey("logged_in_role")
+        private val AUDIT_DEVICE_ID = stringPreferencesKey("audit_device_id")
         private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
         private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
@@ -81,6 +86,8 @@ class SettingsDataStore(private val context: Context) {
                 loggedInUid = preferences[LOGGED_IN_UID].orEmpty(),
                 loggedInUsername = preferences[LOGGED_IN_USERNAME].orEmpty(),
                 loggedInEmail = preferences[LOGGED_IN_EMAIL].orEmpty(),
+                loggedInRole = preferences[LOGGED_IN_ROLE]?.trim()?.ifEmpty { "OWNER" } ?: "OWNER",
+                auditDeviceId = preferences[AUDIT_DEVICE_ID].orEmpty(),
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
                 biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
@@ -161,17 +168,31 @@ class SettingsDataStore(private val context: Context) {
         it[AUTO_SYNC_ENABLED] = enabled
     }
 
-    suspend fun saveSession(uid: String, username: String, email: String) = context.dataStore.edit {
+    suspend fun saveSession(uid: String, username: String, email: String, role: String = "OWNER") = context.dataStore.edit {
         it[LOGGED_IN_UID] = uid.trim()
         it[LOGGED_IN_USERNAME] = username.trim()
         it[LOGGED_IN_EMAIL] = email.trim()
+        it[LOGGED_IN_ROLE] = role.trim().ifEmpty { "OWNER" }
         it[IS_USER_LOGGED_IN] = true
+    }
+
+    suspend fun getOrCreateAuditDeviceId(): String {
+        var resolved = ""
+        context.dataStore.edit {
+            resolved = it[AUDIT_DEVICE_ID]?.trim().orEmpty()
+            if (resolved.isEmpty()) {
+                resolved = UUID.randomUUID().toString()
+                it[AUDIT_DEVICE_ID] = resolved
+            }
+        }
+        return resolved
     }
 
     suspend fun clearSession() = context.dataStore.edit {
         it[LOGGED_IN_UID] = ""
         it[LOGGED_IN_USERNAME] = ""
         it[LOGGED_IN_EMAIL] = ""
+        it[LOGGED_IN_ROLE] = "OWNER"
         it[IS_USER_LOGGED_IN] = false
     }
 }

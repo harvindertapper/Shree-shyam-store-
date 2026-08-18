@@ -122,12 +122,13 @@ object PdfReportUtils {
             var totalRepaid = 0L
             val sortedTxs = transactions.sortedBy { it.createdAt }
             sortedTxs.forEach { tx ->
-                when (tx.type.uppercase(Locale.ENGLISH)) {
-                    "CREDIT" -> totalUdhaar += tx.amount
-                    "PAYMENT" -> totalRepaid += tx.amount
+                if (tx.balanceEffect >= 0L) {
+                    totalUdhaar += tx.balanceEffect
+                } else {
+                    totalRepaid += -tx.balanceEffect
                 }
             }
-            val netBalance = (totalUdhaar - totalRepaid).coerceAtLeast(0L)
+            val netBalance = totalUdhaar - totalRepaid
 
             val custBoxRect = RectF(margin, y, pageWidth - margin, y + 74f)
             canvas.drawRoundRect(custBoxRect, 8f, 8f, linePaint)
@@ -218,12 +219,8 @@ object PdfReportUtils {
                         startContinuationPage()
                     }
 
-                    val isCredit = tx.type.equals("CREDIT", ignoreCase = true) || tx.type.equals("UDHAAR", ignoreCase = true)
-                    if (isCredit) {
-                        runningBalance += tx.amount
-                    } else {
-                        runningBalance = (runningBalance - tx.amount).coerceAtLeast(0L)
-                    }
+                    val isCredit = tx.balanceEffect >= 0L
+                    runningBalance += tx.balanceEffect
 
                     // Row underline
                     canvas.drawLine(margin, y + 20f, pageWidth - margin, y + 20f, linePaint)
@@ -294,17 +291,18 @@ object PdfReportUtils {
 
             val sorted = transactions.sortedBy { it.createdAt }
             for (tx in sorted) {
-                val isCredit = tx.type.equals("CREDIT", ignoreCase = true) || tx.type.equals("UDHAAR", ignoreCase = true)
-                if (isCredit) {
-                    runningBalance += tx.amount
-                } else {
-                    runningBalance = (runningBalance - tx.amount).coerceAtLeast(0L)
-                }
+                val isCredit = tx.balanceEffect >= 0L
+                runningBalance += tx.balanceEffect
 
-                writer.append("${tx.id},")
+                writer.append("${tx.eventId},")
                 writer.append("\"${df.format(Date(tx.createdAt))}\",")
-                writer.append("\"${if (isCredit) "UDHAAR" else "JAMA"}\",")
-                writer.append(MoneyUtils.toInputString(tx.amount)).append(",")
+                val typeLabel = when (tx.type.uppercase(Locale.ENGLISH)) {
+                    "CREDIT" -> "UDHAAR"
+                    "PAYMENT" -> "JAMA"
+                    else -> "CORRECTION"
+                }
+                writer.append("\"$typeLabel\",")
+                writer.append(MoneyUtils.toInputString(tx.balanceEffect)).append(",")
                 writer.append(MoneyUtils.toInputString(runningBalance)).append(",")
                 writer.append("\"${(tx.note ?: "").replace("\"", "\"\"")}\"\n")
             }

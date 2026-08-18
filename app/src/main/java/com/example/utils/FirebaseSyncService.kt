@@ -230,13 +230,30 @@ class FirebaseSyncService(
             TimeUnit.SECONDS
         ).documents
         database.udhaarDao().insertAll(docs.mapNotNull { doc ->
+            val id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L
+            val type = doc.getString("type") ?: "CREDIT"
+            val amount = doc.moneyMinor("amount")
+            val eventId = doc.getString("eventId")?.trim()?.ifEmpty { "legacy-$id" } ?: "legacy-$id"
+            val balanceEffect = doc.long("balanceEffect") ?: when (type) {
+                "CREDIT" -> amount
+                "PAYMENT" -> -amount
+                else -> 0L
+            }
             UdhaarTransaction(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                eventId = eventId,
                 customerId = doc.long("customerId") ?: return@mapNotNull null,
                 saleId = doc.long("saleId"),
-                type = doc.getString("type") ?: "CREDIT",
-                amount = doc.moneyMinor("amount"),
+                type = type,
+                amount = amount,
+                balanceEffect = balanceEffect,
                 note = doc.getString("note"),
+                correctsEventId = doc.getString("correctsEventId"),
+                correctionReason = doc.getString("correctionReason"),
+                actorUid = doc.getString("actorUid")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
+                actorName = doc.getString("actorName")?.trim()?.ifEmpty { "Legacy cloud record" } ?: "Legacy cloud record",
+                actorRole = doc.getString("actorRole")?.trim()?.ifEmpty { "OWNER" } ?: "OWNER",
+                actorDeviceId = doc.getString("actorDeviceId")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
@@ -303,9 +320,12 @@ class FirebaseSyncService(
     )
 
     private fun UdhaarTransaction.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "customerId" to customerId, "saleId" to saleId, "type" to type,
-        "amount" to amount, "moneyScale" to 2L, "note" to note, "createdAt" to createdAt,
-        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "id" to id, "eventId" to eventId, "customerId" to customerId, "saleId" to saleId, "type" to type,
+        "amount" to amount, "balanceEffect" to balanceEffect, "moneyScale" to 2L,
+        "note" to note, "correctsEventId" to correctsEventId, "correctionReason" to correctionReason,
+        "actorUid" to actorUid, "actorName" to actorName, "actorRole" to actorRole,
+        "actorDeviceId" to actorDeviceId, "createdAt" to createdAt, "updatedAt" to updatedAt,
+        "isDeleted" to isDeleted
     )
 
     private fun StockAdjustment.toCloudMap(): Map<String, Any?> = mapOf(

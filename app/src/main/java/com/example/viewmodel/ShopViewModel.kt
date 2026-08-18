@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.commerce.CommerceValidation
+import com.example.commerce.LedgerActor
 import com.example.data.*
 import com.example.utils.CurrencyUtils
 import com.example.utils.SecurityUtils
@@ -47,6 +48,24 @@ class ShopViewModel(
     private val settingsDataStore: SettingsDataStore,
     private val context: Context? = null
 ) : ViewModel() {
+
+    private suspend fun currentLedgerActor(): LedgerActor {
+        val settings = settingsDataStore.settingsFlow.first()
+        require(settings.isUserLoggedIn) { "Authenticated actor is required" }
+        val uid = settings.loggedInUid.trim()
+            .ifEmpty { settings.loggedInEmail.trim() }
+        val name = settings.loggedInUsername.trim()
+            .ifEmpty { settings.loggedInEmail.trim() }
+            .ifEmpty { uid }
+        val deviceId = settings.auditDeviceId.trim()
+            .ifEmpty { settingsDataStore.getOrCreateAuditDeviceId() }
+        return LedgerActor(
+            actorUid = uid,
+            actorName = name,
+            actorRole = settings.loggedInRole,
+            actorDeviceId = deviceId
+        ).normalized()
+    }
 
     fun triggerAutoSync() {
         context?.let { ctx ->
@@ -591,6 +610,7 @@ class ShopViewModel(
                 val billNo = "BILL-${formatter.format(Date())}-${UUID.randomUUID().toString().take(8).uppercase(Locale.ENGLISH)}"
 
                 val isUdhaar = paymentMode.trim().equals("UDHAAR", ignoreCase = true)
+                val ledgerActor = if (isUdhaar) currentLedgerActor() else null
                 var newCustomer: Customer? = null
                 val finalCustomerId = if (isUdhaar) {
                     if (customerId != null) {
@@ -640,9 +660,9 @@ class ShopViewModel(
                 )
 
                 val savedSaleId = if (newCustomer != null) {
-                    repository.insertSaleWithNewCustomer(sale, saleItems, newCustomer)
+                    repository.insertSaleWithNewCustomer(sale, saleItems, newCustomer, ledgerActor)
                 } else {
-                    repository.insertSaleWithItems(sale, saleItems, finalCustomerId)
+                    repository.insertSaleWithItems(sale, saleItems, finalCustomerId, ledgerActor)
                 }
                 val savedSale = repository.getSaleById(savedSaleId)
                 if (savedSale != null) {
@@ -709,7 +729,12 @@ class ShopViewModel(
     fun addUdhaarPayment(customerId: Long, amountMinorUnits: Long, note: String?) {
         viewModelScope.launch {
             try {
-                repository.recordUdhaarPayment(customerId, amountMinorUnits, note)
+                repository.recordUdhaarPayment(
+                    customerId = customerId,
+                    amountMinorUnits = amountMinorUnits,
+                    note = note,
+                    actor = currentLedgerActor()
+                )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
                 Toast.makeText(
@@ -719,6 +744,48 @@ class ShopViewModel(
                 ).show()
             } catch (_: Exception) {
                 Toast.makeText(context, "Payment could not be saved", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun reverseUdhaarTransaction(customerId: Long, eventId: String, reason: String) {
+        viewModelScope.launch {
+            try {
+                repository.reverseUdhaarTransaction(
+                    customerId = customerId,
+                    eventId = eventId,
+                    reason = reason,
+                    actor = currentLedgerActor()
+                )
+                triggerAutoSync()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(context, error.message ?: "Ledger reversal was not saved", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Ledger reversal could not be saved", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    fun correctUdhaarTransaction(
+        customerId: Long,
+        eventId: String,
+        correctedAmountMinorUnits: Long,
+        reason: String
+    ) {
+        viewModelScope.launch {
+            try {
+                repository.correctUdhaarTransaction(
+                    customerId = customerId,
+                    eventId = eventId,
+                    correctedAmountMinorUnits = correctedAmountMinorUnits,
+                    reason = reason,
+                    actor = currentLedgerActor()
+                )
+                triggerAutoSync()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(context, error.message ?: "Ledger correction was not saved", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Ledger correction could not be saved", Toast.LENGTH_LONG).show()
             }
         }
     }
