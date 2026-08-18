@@ -52,9 +52,9 @@ class CheckoutInvariantsTest {
 
     @Test
     fun checkoutRejectsLineTotalMismatchBeforeWritingAnything() = runBlocking {
-        val productId = insertProduct(price = 10.0, stock = 5.0)
-        val sale = sale(total = 10.0)
-        val item = item(productId = productId, unitPrice = 10.0, quantity = 1.0, lineTotal = 9.0)
+        val productId = insertProduct(price = 1000L, stock = 5.0)
+        val sale = sale(total = 1000L)
+        val item = item(productId = productId, unitPrice = 1000L, quantity = 1.0, lineTotal = 900L)
 
         expectIllegalArgument {
             database.saleDao().completeBillCheckout(sale, listOf(item))
@@ -66,9 +66,9 @@ class CheckoutInvariantsTest {
 
     @Test
     fun checkoutRejectsStockUnderflowAndRollsBackSale() = runBlocking {
-        val productId = insertProduct(price = 10.0, stock = 1.0)
-        val sale = sale(total = 20.0)
-        val item = item(productId = productId, unitPrice = 10.0, quantity = 2.0, lineTotal = 20.0)
+        val productId = insertProduct(price = 1000L, stock = 1.0)
+        val sale = sale(total = 2000L)
+        val item = item(productId = productId, unitPrice = 1000L, quantity = 2.0, lineTotal = 2000L)
 
         expectIllegalArgument {
             database.saleDao().completeBillCheckout(sale, listOf(item))
@@ -82,11 +82,11 @@ class CheckoutInvariantsTest {
     @Test
     fun udhaarCheckoutRejectsProjectedBalanceAboveCreditLimit() = runBlocking {
         val customerId = database.customerDao().insertCustomer(
-            Customer(name = "Limit Customer", creditLimit = 100.0)
+            Customer(name = "Limit Customer", creditLimit = 10_000L)
         )
-        val productId = insertProduct(price = 120.0, stock = 5.0)
-        val sale = sale(total = 120.0, paymentMode = "UDHAAR", customerId = customerId)
-        val item = item(productId = productId, unitPrice = 120.0, quantity = 1.0, lineTotal = 120.0)
+        val productId = insertProduct(price = 12_000L, stock = 5.0)
+        val sale = sale(total = 12_000L, paymentMode = "UDHAAR", customerId = customerId)
+        val item = item(productId = productId, unitPrice = 12_000L, quantity = 1.0, lineTotal = 12_000L)
 
         expectIllegalArgument {
             database.saleDao().completeBillCheckout(sale, listOf(item), customerId)
@@ -101,22 +101,22 @@ class CheckoutInvariantsTest {
     fun receivedPaymentIsRoundedAndRequiresAnActiveCustomer() = runBlocking {
         val customerId = database.customerDao().insertCustomer(Customer(name = "Payment Customer"))
 
-        repository.recordUdhaarPayment(customerId, 12.345, "cash")
+        repository.recordUdhaarPayment(customerId, 1235L, "cash")
         val transaction = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
 
         assertEquals("PAYMENT", transaction.type)
-        assertEquals(12.35, transaction.amount, 0.0)
+        assertEquals(1235L, transaction.amount)
 
         expectIllegalArgument {
-            repository.recordUdhaarPayment(99999L, 1.0, "cash")
+            repository.recordUdhaarPayment(99999L, 100L, "cash")
         }
     }
 
     @Test
     fun duplicateBillNumberIsRejectedBeforeSecondWrite() = runBlocking {
-        val productId = insertProduct(price = 10.0, stock = 3.0)
-        val sale = sale(total = 10.0)
-        val item = item(productId = productId, unitPrice = 10.0, quantity = 1.0, lineTotal = 10.0)
+        val productId = insertProduct(price = 1000L, stock = 3.0)
+        val sale = sale(total = 1000L)
+        val item = item(productId = productId, unitPrice = 1000L, quantity = 1.0, lineTotal = 1000L)
 
         database.saleDao().completeBillCheckout(sale, listOf(item))
         expectIllegalArgument {
@@ -129,21 +129,21 @@ class CheckoutInvariantsTest {
 
     @Test
     fun successfulCheckoutPersistsRoundedAmountsAndDeductsStockAtomically() = runBlocking {
-        val productId = insertProduct(price = 12.345, stock = 3.0)
-        val sale = sale(total = 24.70)
-        val item = item(productId = productId, unitPrice = 12.345, quantity = 2.0, lineTotal = 24.70)
+        val productId = insertProduct(price = 1235L, stock = 3.0)
+        val sale = sale(total = 2470L)
+        val item = item(productId = productId, unitPrice = 1235L, quantity = 2.0, lineTotal = 2470L)
 
         val saleId = database.saleDao().completeBillCheckout(sale, listOf(item))
         val savedSale = database.saleDao().getSaleById(saleId)!!
         val savedItem = database.saleDao().getSaleItemsForSaleList(saleId).single()
 
-        assertEquals(24.70, savedSale.totalAmount, 0.0)
-        assertEquals(12.35, savedItem.unitPrice, 0.0)
-        assertEquals(24.70, savedItem.lineTotal, 0.0)
+        assertEquals(2470L, savedSale.totalAmount)
+        assertEquals(1235L, savedItem.unitPrice)
+        assertEquals(2470L, savedItem.lineTotal)
         assertEquals(1.0, database.productDao().getProductById(productId)!!.currentStock, 0.0)
     }
 
-    private suspend fun insertProduct(price: Double, stock: Double): Long {
+    private suspend fun insertProduct(price: Long, stock: Double): Long {
         return database.productDao().insert(
             Product(
                 name = "Test Product",
@@ -157,7 +157,7 @@ class CheckoutInvariantsTest {
     }
 
     private fun sale(
-        total: Double,
+        total: Long,
         paymentMode: String = "CASH",
         customerId: Long? = null
     ): Sale = Sale(
@@ -169,9 +169,9 @@ class CheckoutInvariantsTest {
 
     private fun item(
         productId: Long,
-        unitPrice: Double,
+        unitPrice: Long,
         quantity: Double,
-        lineTotal: Double
+        lineTotal: Long
     ): SaleItem = SaleItem(
         saleId = 0L,
         productId = productId,

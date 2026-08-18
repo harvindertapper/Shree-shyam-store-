@@ -157,10 +157,10 @@ abstract class SaleDao {
     abstract suspend fun hasActiveCustomer(customerId: Long): Boolean
 
     @Query("SELECT creditLimit FROM customers WHERE id = :customerId AND isDeleted = 0 LIMIT 1")
-    abstract suspend fun getCustomerCreditLimit(customerId: Long): Double?
+    abstract suspend fun getCustomerCreditLimit(customerId: Long): Long?
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
-    abstract suspend fun getCustomerBalance(customerId: Long): Double
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    abstract suspend fun getCustomerBalance(customerId: Long): Long
 
     /**
      * Executes atomic bill checkout transaction in local SQLite:
@@ -197,8 +197,8 @@ abstract class SaleDao {
         }
 
         val paymentMode = PaymentMode.parse(sale.paymentMode)
-        require(sale.totalAmount.isFinite() && sale.totalAmount >= 0.0) {
-            "Sale total must be a finite non-negative amount"
+        require(sale.totalAmount >= 0L) {
+            "Sale total must be a non-negative amount"
         }
 
         items.forEach { item ->
@@ -206,10 +206,10 @@ abstract class SaleDao {
             require(item.quantity.isFinite() && item.quantity > 0.0) {
                 "Sale quantity must be positive"
             }
-            require(item.unitPrice.isFinite() && item.unitPrice >= 0.0) {
+            require(item.unitPrice >= 0L) {
                 "Sale unit price is invalid"
             }
-            require(item.lineTotal.isFinite() && item.lineTotal >= 0.0) {
+            require(item.lineTotal >= 0L) {
                 "Sale line total is invalid"
             }
             require(getProductById(item.productId) != null) {
@@ -233,13 +233,12 @@ abstract class SaleDao {
                 "Udhaar bills require an active customer"
             }
             val creditLimit = getCustomerCreditLimit(customerId)
-            require(creditLimit != null && creditLimit.isFinite() && creditLimit >= 0.0) {
+            require(creditLimit != null && creditLimit >= 0L) {
                 "Customer credit limit is invalid"
             }
             val currentBalance = getCustomerBalance(customerId)
-            require(currentBalance.isFinite()) { "Customer balance is invalid" }
-            val projectedBalance = CommerceValidation.roundCurrency(currentBalance + calculatedTotal)
-            require(projectedBalance <= CommerceValidation.roundCurrency(creditLimit)) {
+            val projectedBalance = currentBalance + calculatedTotal
+            require(projectedBalance <= creditLimit) {
                 "Udhaar credit limit exceeded"
             }
             customerId
@@ -360,17 +359,17 @@ interface UdhaarDao {
     @Query("SELECT * FROM udhaar_transactions WHERE customerId = :customerId")
     suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
-    fun getCustomerBalanceFlow(customerId: Long): Flow<Double>
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    fun getCustomerBalanceFlow(customerId: Long): Flow<Long>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
-    suspend fun getCustomerBalance(customerId: Long): Double
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    suspend fun getCustomerBalance(customerId: Long): Long
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
-    fun getTotalUdhaarFlow(): Flow<Double>
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE isDeleted = 0")
+    fun getTotalUdhaarFlow(): Flow<Long>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0.0 END), 0.0) FROM udhaar_transactions WHERE isDeleted = 0")
-    suspend fun getTotalUdhaar(): Double
+    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE isDeleted = 0")
+    suspend fun getTotalUdhaar(): Long
 
     @Query("SELECT * FROM udhaar_transactions WHERE isSynced = 0")
     suspend fun getUnsyncedTransactions(): List<UdhaarTransaction>

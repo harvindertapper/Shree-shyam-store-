@@ -4,8 +4,12 @@ import com.example.data.SaleItem
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
-import kotlin.math.abs
 
+/**
+ * Pure financial rules shared by checkout validation and deterministic tests.
+ * Monetary values are integer paise at this boundary; Double is retained only
+ * for physical quantities because units such as kg and litres may be fractional.
+ */
 enum class PaymentMode {
     CASH,
     UPI,
@@ -23,37 +27,27 @@ enum class UdhaarTransactionType {
     PAYMENT
 }
 
-/**
- * Pure financial rules shared by checkout validation and deterministic tests.
- * Existing persistence remains Double-compatible in this slice; all new
- * checkout calculations are normalized to two decimal places with HALF_UP
- * rounding until the schema can migrate to minor-unit money values.
- */
 object CommerceValidation {
     const val CURRENCY_SCALE = 2
-    private const val CURRENCY_COMPARISON_EPSILON = 0.000001
 
-    fun roundCurrency(value: Double): Double {
-        require(value.isFinite()) { "Money value must be finite" }
-        return BigDecimal.valueOf(value)
-            .setScale(CURRENCY_SCALE, RoundingMode.HALF_UP)
-            .toDouble()
+    fun normalizeUnitPrice(value: Long): Long {
+        require(value >= 0L) { "Money value cannot be negative" }
+        return value
     }
 
-    fun normalizeUnitPrice(value: Double): Double = roundCurrency(value)
-
-    fun calculateLineTotal(unitPrice: Double, quantity: Double): Double {
+    fun calculateLineTotal(unitPrice: Long, quantity: Double): Long {
         require(quantity.isFinite() && quantity > 0.0) {
             "Quantity must be a finite positive amount"
         }
-        return roundCurrency(normalizeUnitPrice(unitPrice) * quantity)
+        require(unitPrice >= 0L) { "Money value cannot be negative" }
+        return BigDecimal.valueOf(unitPrice)
+            .multiply(BigDecimal.valueOf(quantity))
+            .setScale(0, RoundingMode.HALF_UP)
+            .longValueExact()
     }
 
-    fun calculateBillTotal(items: List<SaleItem>): Double =
-        roundCurrency(items.sumOf { calculateLineTotal(it.unitPrice, it.quantity) })
+    fun calculateBillTotal(items: List<SaleItem>): Long =
+        items.sumOf { calculateLineTotal(it.unitPrice, it.quantity) }
 
-    fun amountsMatch(expected: Double, actual: Double): Boolean {
-        if (!expected.isFinite() || !actual.isFinite()) return false
-        return abs(roundCurrency(expected) - roundCurrency(actual)) < CURRENCY_COMPARISON_EPSILON
-    }
+    fun amountsMatch(expected: Long, actual: Long): Boolean = expected == actual
 }

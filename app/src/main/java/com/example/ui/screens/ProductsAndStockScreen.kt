@@ -35,6 +35,7 @@ import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
 import com.example.utils.LocaleHelper
+import com.example.utils.MoneyUtils
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 
@@ -621,9 +622,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             if (prod != null) {
                 name = prod.name
                 categoryId = prod.categoryId
-                mrp = prod.mrp.toString()
-                sellingPrice = prod.sellingPrice?.toString() ?: ""
-                purchasePrice = prod.purchasePrice?.toString() ?: ""
+                mrp = MoneyUtils.toInputString(prod.mrp)
+                sellingPrice = prod.sellingPrice?.let(MoneyUtils::toInputString) ?: ""
+                purchasePrice = prod.purchasePrice?.let(MoneyUtils::toInputString) ?: ""
                 trackStock = prod.trackStock
                 currentStock = prod.currentStock.toString()
                 lowStockQty = prod.lowStockAlertQty.toString()
@@ -748,7 +749,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                 value = mrp,
                 onValueChange = {
                     mrp = it
-                    if (it.trim().toDoubleOrNull() != null) mrpError = false
+                    if (MoneyUtils.parseMajorUnits(it) != null) mrpError = false
                 },
                 label = { Text(strings.mrpPrice) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -844,9 +845,9 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
             // Save Product
             Button(
                 onClick = {
-                    val mrpValue = mrp.trim().toDoubleOrNull()
-                    val spValue = sellingPrice.trim().toDoubleOrNull()
-                    val purValue = purchasePrice.trim().toDoubleOrNull()
+                    val mrpValue = MoneyUtils.parseMajorUnits(mrp)
+                    val spValue = MoneyUtils.parseMajorUnits(sellingPrice)
+                    val purValue = MoneyUtils.parseMajorUnits(purchasePrice)
                     val stockValue = currentStock.trim().toDoubleOrNull() ?: 0.0
                     val alertValue = lowStockQty.trim().toDoubleOrNull() ?: 5.0
 
@@ -854,18 +855,18 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     if (name.trim().isEmpty()) {
                         nameError = true
                     }
-                    if (mrpValue == null || mrpValue <= 0.0) {
+                    if (mrpValue == null || mrpValue <= 0L) {
                         mrpError = true
                     }
 
-                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0.0) {
+                    if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0L) {
                         viewModel.saveProduct(
                             id = productId ?: 0L,
                             name = name,
                             categoryId = categoryId,
                             mrp = mrpValue,
-                            sellingPrice = if (spValue != null && spValue > 0.0) spValue else null,
-                            purchasePrice = if (purValue != null && purValue > 0) purValue else null,
+                            sellingPrice = if (spValue != null && spValue > 0L) spValue else null,
+                            purchasePrice = if (purValue != null && purValue > 0L) purValue else null,
                             currentStock = if (trackStock) stockValue else 0.0,
                             trackStock = trackStock,
                             lowStockAlertQty = alertValue,
@@ -1069,11 +1070,11 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                         val addNextBtn = if (settings.appLanguage == AppLanguage.HINDI) "सामान जोड़ें" else "Add Product"
                         Button(
                             onClick = {
-                                val mrpValue = mrp.trim().toDoubleOrNull()
-                                val spValue = sp.trim().toDoubleOrNull()
+                                val mrpValue = MoneyUtils.parseMajorUnits(mrp)
+                                val spValue = MoneyUtils.parseMajorUnits(sp)
                                 val stockValue = stock.trim().toDoubleOrNull() ?: 0.0
 
-                                if (name.trim().isEmpty() || mrpValue == null) {
+                                if (name.trim().isEmpty() || mrpValue == null || mrpValue <= 0L) {
                                     val err = if (settings.appLanguage == AppLanguage.HINDI) "नाम और कीमत आवश्यक है!" else "Name and MRP price required!"
                                     Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
                                 } else {
@@ -1082,7 +1083,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                         name = name,
                                         categoryId = catId,
                                         mrp = mrpValue,
-                                        sellingPrice = if (spValue != null && spValue > 0) spValue else null,
+                                        sellingPrice = if (spValue != null && spValue > 0L) spValue else null,
                                         purchasePrice = null,
                                         currentStock = if (trackStock) stockValue else 0.0,
                                         trackStock = trackStock,

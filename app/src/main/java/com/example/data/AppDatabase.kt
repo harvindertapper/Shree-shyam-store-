@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         StockAdjustment::class,
         User::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -62,6 +62,176 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE products RENAME TO products_v3")
+                database.execSQL(
+                    """
+                    CREATE TABLE products (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        categoryId INTEGER NOT NULL,
+                        mrp INTEGER NOT NULL,
+                        sellingPrice INTEGER,
+                        purchasePrice INTEGER,
+                        currentStock REAL NOT NULL,
+                        unit TEXT NOT NULL,
+                        trackStock INTEGER NOT NULL,
+                        lowStockAlertQty REAL NOT NULL,
+                        barcode TEXT NOT NULL,
+                        isActive INTEGER NOT NULL,
+                        isSynced INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO products (
+                        id, name, categoryId, mrp, sellingPrice, purchasePrice,
+                        currentStock, unit, trackStock, lowStockAlertQty, barcode,
+                        isActive, isSynced, createdAt, updatedAt, isDeleted
+                    )
+                    SELECT
+                        id, name, categoryId,
+                        CAST(ROUND(mrp * 100.0) AS INTEGER),
+                        CASE WHEN sellingPrice IS NULL THEN NULL ELSE CAST(ROUND(sellingPrice * 100.0) AS INTEGER) END,
+                        CASE WHEN purchasePrice IS NULL THEN NULL ELSE CAST(ROUND(purchasePrice * 100.0) AS INTEGER) END,
+                        currentStock, unit, trackStock, lowStockAlertQty, barcode,
+                        isActive, isSynced, createdAt, updatedAt, isDeleted
+                    FROM products_v3
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE products_v3")
+
+                database.execSQL("ALTER TABLE sales RENAME TO sales_v3")
+                database.execSQL(
+                    """
+                    CREATE TABLE sales (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        billNumber TEXT NOT NULL,
+                        totalAmount INTEGER NOT NULL,
+                        paymentMode TEXT NOT NULL,
+                        customerId INTEGER,
+                        note TEXT,
+                        isSynced INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO sales (
+                        id, billNumber, totalAmount, paymentMode, customerId, note,
+                        isSynced, createdAt, updatedAt, isDeleted
+                    )
+                    SELECT
+                        id, billNumber, CAST(ROUND(totalAmount * 100.0) AS INTEGER),
+                        paymentMode, customerId, note, isSynced, createdAt, updatedAt, isDeleted
+                    FROM sales_v3
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE sales_v3")
+
+                database.execSQL("ALTER TABLE sale_items RENAME TO sale_items_v3")
+                database.execSQL(
+                    """
+                    CREATE TABLE sale_items (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        saleId INTEGER NOT NULL,
+                        productId INTEGER NOT NULL,
+                        productNameSnapshot TEXT NOT NULL,
+                        quantity REAL NOT NULL,
+                        unit TEXT NOT NULL,
+                        unitPrice INTEGER NOT NULL,
+                        lineTotal INTEGER NOT NULL,
+                        isSynced INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO sale_items (
+                        id, saleId, productId, productNameSnapshot, quantity, unit,
+                        unitPrice, lineTotal, isSynced, updatedAt, isDeleted
+                    )
+                    SELECT
+                        id, saleId, productId, productNameSnapshot, quantity, unit,
+                        CAST(ROUND(unitPrice * 100.0) AS INTEGER),
+                        CAST(ROUND(lineTotal * 100.0) AS INTEGER),
+                        isSynced, updatedAt, isDeleted
+                    FROM sale_items_v3
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE sale_items_v3")
+
+                database.execSQL("ALTER TABLE customers RENAME TO customers_v3")
+                database.execSQL(
+                    """
+                    CREATE TABLE customers (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        phone TEXT,
+                        creditLimit INTEGER NOT NULL,
+                        isSynced INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO customers (
+                        id, name, phone, creditLimit, isSynced, createdAt, updatedAt, isDeleted
+                    )
+                    SELECT
+                        id, name, phone, CAST(ROUND(creditLimit * 100.0) AS INTEGER),
+                        isSynced, createdAt, updatedAt, isDeleted
+                    FROM customers_v3
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE customers_v3")
+
+                database.execSQL("ALTER TABLE udhaar_transactions RENAME TO udhaar_transactions_v3")
+                database.execSQL(
+                    """
+                    CREATE TABLE udhaar_transactions (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        customerId INTEGER NOT NULL,
+                        saleId INTEGER,
+                        type TEXT NOT NULL,
+                        amount INTEGER NOT NULL,
+                        note TEXT,
+                        isSynced INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO udhaar_transactions (
+                        id, customerId, saleId, type, amount, note,
+                        isSynced, createdAt, updatedAt, isDeleted
+                    )
+                    SELECT
+                        id, customerId, saleId, type, CAST(ROUND(amount * 100.0) AS INTEGER),
+                        note, isSynced, createdAt, updatedAt, isDeleted
+                    FROM udhaar_transactions_v3
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE udhaar_transactions_v3")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -69,11 +239,8 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4)
                     .addCallback(seedCategoriesCallback())
-                    // Keep recovery for databases from development snapshots whose
-                    // original schema is unavailable, while version 2 -> 3 remains safe.
-                    .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
             }

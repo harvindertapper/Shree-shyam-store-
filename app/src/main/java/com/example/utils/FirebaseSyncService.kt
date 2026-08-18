@@ -138,9 +138,9 @@ class FirebaseSyncService(
                 id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
                 name = name,
                 categoryId = doc.long("categoryId") ?: 0L,
-                mrp = doc.number("mrp"),
-                sellingPrice = doc.optionalNumber("sellingPrice"),
-                purchasePrice = doc.optionalNumber("purchasePrice"),
+                mrp = doc.moneyMinor("mrp"),
+                sellingPrice = doc.optionalMoneyMinor("sellingPrice"),
+                purchasePrice = doc.optionalMoneyMinor("purchasePrice"),
                 currentStock = doc.number("currentStock"),
                 unit = doc.getString("unit") ?: "pcs",
                 trackStock = doc.getBoolean("trackStock") ?: true,
@@ -167,7 +167,7 @@ class FirebaseSyncService(
                 id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
                 name = name,
                 phone = doc.getString("phone"),
-                creditLimit = doc.number("creditLimit", 5000.0),
+                creditLimit = doc.moneyMinor("creditLimit", 500_000L),
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
@@ -187,7 +187,7 @@ class FirebaseSyncService(
             Sale(
                 id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
                 billNumber = number,
-                totalAmount = doc.number("totalAmount"),
+                totalAmount = doc.moneyMinor("totalAmount"),
                 paymentMode = doc.getString("paymentMode") ?: "CASH",
                 customerId = doc.long("customerId"),
                 note = doc.getString("note"),
@@ -214,8 +214,8 @@ class FirebaseSyncService(
                 productNameSnapshot = productName,
                 quantity = doc.number("quantity", 1.0),
                 unit = doc.getString("unit") ?: "pcs",
-                unitPrice = doc.number("unitPrice"),
-                lineTotal = doc.number("lineTotal"),
+                unitPrice = doc.moneyMinor("unitPrice"),
+                lineTotal = doc.moneyMinor("lineTotal"),
                 isSynced = true,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
                 isDeleted = doc.getBoolean("isDeleted") ?: false
@@ -235,7 +235,7 @@ class FirebaseSyncService(
                 customerId = doc.long("customerId") ?: return@mapNotNull null,
                 saleId = doc.long("saleId"),
                 type = doc.getString("type") ?: "CREDIT",
-                amount = doc.number("amount"),
+                amount = doc.moneyMinor("amount"),
                 note = doc.getString("note"),
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
@@ -270,6 +270,7 @@ class FirebaseSyncService(
     private fun Product.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "name" to name, "categoryId" to categoryId, "mrp" to mrp,
         "sellingPrice" to sellingPrice, "purchasePrice" to purchasePrice,
+        "moneyScale" to 2L,
         "currentStock" to currentStock, "unit" to unit, "trackStock" to trackStock,
         "lowStockAlertQty" to lowStockAlertQty, "barcode" to barcode, "isActive" to isActive,
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
@@ -277,6 +278,7 @@ class FirebaseSyncService(
 
     private fun Sale.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "billNumber" to billNumber, "totalAmount" to totalAmount,
+        "moneyScale" to 2L,
         "paymentMode" to paymentMode, "customerId" to customerId, "note" to note,
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
     )
@@ -285,11 +287,13 @@ class FirebaseSyncService(
         "id" to id, "saleId" to saleId, "productId" to productId,
         "productNameSnapshot" to productNameSnapshot, "quantity" to quantity,
         "unit" to unit, "unitPrice" to unitPrice, "lineTotal" to lineTotal,
+        "moneyScale" to 2L,
         "updatedAt" to updatedAt, "isDeleted" to isDeleted
     )
 
     private fun Customer.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "name" to name, "phone" to phone, "creditLimit" to creditLimit,
+        "moneyScale" to 2L,
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
     )
 
@@ -300,7 +304,7 @@ class FirebaseSyncService(
 
     private fun UdhaarTransaction.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "customerId" to customerId, "saleId" to saleId, "type" to type,
-        "amount" to amount, "note" to note, "createdAt" to createdAt,
+        "amount" to amount, "moneyScale" to 2L, "note" to note, "createdAt" to createdAt,
         "updatedAt" to updatedAt, "isDeleted" to isDeleted
     )
 
@@ -397,3 +401,27 @@ private fun com.google.firebase.firestore.DocumentSnapshot.number(field: String,
 
 private fun com.google.firebase.firestore.DocumentSnapshot.optionalNumber(field: String): Double? =
     getDouble(field) ?: getLong(field)?.toDouble()
+
+private fun com.google.firebase.firestore.DocumentSnapshot.moneyMinor(
+    field: String,
+    default: Long = 0L
+): Long {
+    val scale = long("moneyScale")
+    return if (scale == 2L) {
+        long(field) ?: default
+    } else {
+        getDouble(field)?.let { MoneyUtils.fromLegacyMajor(it) }
+            ?: getLong(field)?.let { MoneyUtils.fromLegacyMajor(it.toDouble()) }
+            ?: default
+    }
+}
+
+private fun com.google.firebase.firestore.DocumentSnapshot.optionalMoneyMinor(field: String): Long? {
+    val scale = long("moneyScale")
+    return if (scale == 2L) {
+        long(field)
+    } else {
+        getDouble(field)?.let { MoneyUtils.fromLegacyMajor(it) }
+            ?: getLong(field)?.let { MoneyUtils.fromLegacyMajor(it.toDouble()) }
+    }
+}

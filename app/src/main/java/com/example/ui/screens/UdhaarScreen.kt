@@ -30,6 +30,7 @@ import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
 import com.example.utils.LocaleHelper
+import com.example.utils.MoneyUtils
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 
@@ -55,7 +56,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                 when (tx.type) {
                     "CREDIT" -> tx.amount
                     "PAYMENT" -> -tx.amount
-                    else -> 0.0
+                    else -> 0L
                 }
             }
         }
@@ -71,7 +72,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
     var filterDebtorsOnly by remember { mutableStateOf(false) }
     val displayCustomers = remember(filteredCustomers, customerBalances, filterDebtorsOnly) {
         if (filterDebtorsOnly) {
-            filteredCustomers.filter { (customerBalances[it.id] ?: 0.0) > 0.01 }
+            filteredCustomers.filter { (customerBalances[it.id] ?: 0L) > 0L }
         } else {
             filteredCustomers
         }
@@ -201,7 +202,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                     }
                 } else {
                     items(displayCustomers) { cust ->
-                        val balance = customerBalances[cust.id] ?: 0.0
+                        val balance = customerBalances[cust.id] ?: 0L
 
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -254,11 +255,11 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                                             text = CurrencyUtils.formatRupees(balance),
                                             fontSize = 18.sp,
                                             fontWeight = FontWeight.Black,
-                                            color = if (balance > 0.01) ErrorRed else SuccessGreen
+                                            color = if (balance > 0L) ErrorRed else SuccessGreen
                                         )
                                     }
 
-                                    if (balance > 0.01) {
+                                    if (balance > 0L) {
                                         IconButton(
                                             onClick = { viewModel.sendUdhaarReminder(context, cust, balance) },
                                             modifier = Modifier.size(36.dp)
@@ -384,7 +385,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
     var customer by remember { mutableStateOf<Customer?>(null) }
-    var currentBalance by remember { mutableStateOf(0.0) }
+    var currentBalance by remember { mutableStateOf(0L) }
 
     var showReceivePaymentDialog by remember { mutableStateOf(false) }
 
@@ -686,14 +687,14 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             val confirmDepositText = if (settings.appLanguage == AppLanguage.HINDI) "जमा सुरक्षित करें" else "Save Payment"
                             Button(
                                 onClick = {
-                                    val amtValue = amount.trim().toDoubleOrNull()
-                                    if (amtValue == null || amtValue <= 0.0) {
+                                    val amtValue = MoneyUtils.parseMajorUnits(amount)
+                                    if (amtValue == null || amtValue <= 0L) {
                                         val validAmtMsg = if (settings.appLanguage == AppLanguage.HINDI) "वैध रकम आवश्यक है!" else "Valid positive amount required!"
                                         Toast.makeText(context, validAmtMsg, Toast.LENGTH_SHORT).show()
                                     } else {
                                         viewModel.addUdhaarPayment(
                                             customerId = customerId,
-                                            amount = amtValue,
+                                            amountMinorUnits = amtValue,
                                             note = note
                                         )
                                         showReceivePaymentDialog = false

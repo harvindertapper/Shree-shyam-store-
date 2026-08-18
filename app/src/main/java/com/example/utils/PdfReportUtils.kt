@@ -118,8 +118,8 @@ object PdfReportUtils {
             y = margin + 90f
 
             // 2. Customer & Account Summary Box
-            var totalUdhaar = 0.0
-            var totalRepaid = 0.0
+            var totalUdhaar = 0L
+            var totalRepaid = 0L
             val sortedTxs = transactions.sortedBy { it.createdAt }
             sortedTxs.forEach { tx ->
                 when (tx.type.uppercase(Locale.ENGLISH)) {
@@ -127,27 +127,27 @@ object PdfReportUtils {
                     "PAYMENT" -> totalRepaid += tx.amount
                 }
             }
-            val netBalance = (totalUdhaar - totalRepaid).coerceAtLeast(0.0)
+            val netBalance = (totalUdhaar - totalRepaid).coerceAtLeast(0L)
 
             val custBoxRect = RectF(margin, y, pageWidth - margin, y + 74f)
             canvas.drawRoundRect(custBoxRect, 8f, 8f, linePaint)
 
             canvas.drawText("Customer Name: ${customer.name}", margin + 14f, y + 20f, boldPaint)
             canvas.drawText("Phone: ${customer.phone?.ifBlank { "N/A" } ?: "N/A"}", margin + 14f, y + 40f, textPaint)
-            canvas.drawText("Credit Limit: ₹${"%.2f".format(Locale.ENGLISH, customer.creditLimit)}", margin + 14f, y + 60f, subtitlePaint)
+            canvas.drawText("Credit Limit: ${CurrencyUtils.formatRupees(customer.creditLimit)}", margin + 14f, y + 60f, subtitlePaint)
 
             // Right side summary
             val summaryX = pageWidth - margin - 200f
-            canvas.drawText("Total Udhaar Given: ₹${"%.2f".format(Locale.ENGLISH, totalUdhaar)}", summaryX, y + 20f, redPaint)
-            canvas.drawText("Total Repaid (Jama): ₹${"%.2f".format(Locale.ENGLISH, totalRepaid)}", summaryX, y + 40f, greenPaint)
+            canvas.drawText("Total Udhaar Given: ${CurrencyUtils.formatRupees(totalUdhaar)}", summaryX, y + 20f, redPaint)
+            canvas.drawText("Total Repaid (Jama): ${CurrencyUtils.formatRupees(totalRepaid)}", summaryX, y + 40f, greenPaint)
 
             val netBalPaint = Paint().apply {
                 isAntiAlias = true
-                color = if (netBalance > 0.0) Color.rgb(198, 40, 40) else Color.rgb(46, 125, 50)
+                color = if (netBalance > 0L) Color.rgb(198, 40, 40) else Color.rgb(46, 125, 50)
                 textSize = 13f
                 isFakeBoldText = true
             }
-            canvas.drawText("Net Due: ₹${"%.2f".format(Locale.ENGLISH, netBalance)}", summaryX, y + 62f, netBalPaint)
+            canvas.drawText("Net Due: ${CurrencyUtils.formatRupees(netBalance)}", summaryX, y + 62f, netBalPaint)
 
             y += 94f
 
@@ -176,7 +176,7 @@ object PdfReportUtils {
 
             // 4. Table Rows
             val rowDateFormat = SimpleDateFormat("dd/MM/yy hh:mm a", Locale.ENGLISH)
-            var runningBalance = 0.0
+            var runningBalance = 0L
 
             fun startContinuationPage() {
                 pdfDocument.finishPage(page)
@@ -222,7 +222,7 @@ object PdfReportUtils {
                     if (isCredit) {
                         runningBalance += tx.amount
                     } else {
-                        runningBalance = (runningBalance - tx.amount).coerceAtLeast(0.0)
+                        runningBalance = (runningBalance - tx.amount).coerceAtLeast(0L)
                     }
 
                     // Row underline
@@ -231,8 +231,8 @@ object PdfReportUtils {
                     val dateText = rowDateFormat.format(Date(tx.createdAt))
                     val descText = (tx.note ?: if (isCredit) "Store Bill Udhaar" else "Payment Received").take(24)
                     val typeText = if (isCredit) "UDHAAR (+)" else "JAMA (-)"
-                    val amountText = "₹${"%.2f".format(Locale.ENGLISH, tx.amount)}"
-                    val balText = "₹${"%.2f".format(Locale.ENGLISH, runningBalance)}"
+                    val amountText = CurrencyUtils.formatRupees(tx.amount)
+                    val balText = CurrencyUtils.formatRupees(runningBalance)
 
                     canvas.drawText(dateText, colDate, y + 14f, textPaint)
                     canvas.drawText(descText, colDesc, y + 14f, textPaint)
@@ -290,7 +290,7 @@ object PdfReportUtils {
 
             writer.append("Transaction ID,Date,Type,Amount (INR),Running Balance (INR),Note\n")
             val df = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.ENGLISH)
-            var runningBalance = 0.0
+            var runningBalance = 0L
 
             val sorted = transactions.sortedBy { it.createdAt }
             for (tx in sorted) {
@@ -298,14 +298,14 @@ object PdfReportUtils {
                 if (isCredit) {
                     runningBalance += tx.amount
                 } else {
-                    runningBalance = (runningBalance - tx.amount).coerceAtLeast(0.0)
+                    runningBalance = (runningBalance - tx.amount).coerceAtLeast(0L)
                 }
 
                 writer.append("${tx.id},")
                 writer.append("\"${df.format(Date(tx.createdAt))}\",")
                 writer.append("\"${if (isCredit) "UDHAAR" else "JAMA"}\",")
-                writer.append("${tx.amount},")
-                writer.append("$runningBalance,")
+                writer.append(MoneyUtils.toInputString(tx.amount)).append(",")
+                writer.append(MoneyUtils.toInputString(runningBalance)).append(",")
                 writer.append("\"${(tx.note ?: "").replace("\"", "\"\"")}\"\n")
             }
             writer.flush()

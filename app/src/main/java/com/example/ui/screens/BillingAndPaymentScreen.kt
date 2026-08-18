@@ -38,6 +38,8 @@ import com.example.ui.theme.*
 import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.LocaleHelper
+import com.example.utils.MoneyUtils
+import com.example.commerce.CommerceValidation
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 
@@ -420,7 +422,9 @@ fun BillingScreen(viewModel: ShopViewModel) {
                                                 horizontalArrangement = Arrangement.SpaceBetween
                                             ) {
                                                 Text(
-                                                    text = CurrencyUtils.formatRupees(product.getEffectivePrice() * quantity),
+                                                    text = CurrencyUtils.formatRupees(
+                                                        CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
+                                                    ),
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.SemiBold,
                                                     color = SaffronDark
@@ -693,7 +697,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
                             val saveAndAddText = if (settings.appLanguage == AppLanguage.HINDI) "सेव करें व बिल में जोड़ें" else "Save & Add to Bill"
                             Button(
                                 onClick = {
-                                    val mrpValue = newMrp.toDoubleOrNull()
+                                    val mrpValue = MoneyUtils.parseMajorUnits(newMrp)
                                     val stockValue = initialStock.toDoubleOrNull() ?: 0.0
                                     if (newName.trim().isEmpty() || mrpValue == null) {
                                         val reqMsg = if (settings.appLanguage == AppLanguage.HINDI) "नाम और वैध कीमत आवश्यक है!" else "Name and valid price required!"
@@ -730,7 +734,7 @@ fun BillingScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
+fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
@@ -752,7 +756,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
                 when (it.type) {
                     "CREDIT" -> it.amount
                     "PAYMENT" -> -it.amount
-                    else -> 0.0
+                    else -> 0L
                 }
             }
         }
@@ -761,7 +765,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Double) {
     var showUdhaarCustomerDialog by remember { mutableStateOf(false) }
     var showCreditLimitWarningDialog by remember { mutableStateOf(false) }
     var pendingCreditLimitCustomer by remember { mutableStateOf<Customer?>(null) }
-    var pendingProjectedBalance by remember { mutableDoubleStateOf(0.0) }
+    var pendingProjectedBalance by remember { mutableLongStateOf(0L) }
 
     Scaffold(
         topBar = {
