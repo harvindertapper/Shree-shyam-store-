@@ -77,6 +77,8 @@ jobs:
           --tests com.example.RestoreSecurityTest
           --tests com.example.CheckoutInvariantsTest
           --tests com.example.CommerceValidationTest
+          --tests com.example.StableSyncMigrationTest
+          --tests com.example.SyncOutboxTest
           --tests com.example.ExampleUnitTest
           --tests com.example.ExampleRobolectricTest
 
