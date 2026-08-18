@@ -67,3 +67,13 @@ The owner still needs to decide the production application ID/package identity, 
 **Evidence:** A source scan of `app/src/main` and `app/src/test` on 18 August 2026 found no `fallbackToDestructiveMigration` reference. `AppDatabase.getDatabase()` uses `Room.databaseBuilder(...).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)` and no destructive fallback.
 
 **Follow-up:** Enable Room schema export and retain generated schema artifacts in a reviewable migration directory once the project’s schema-artifact policy is established. Continue adding migration tests for every version transition; the existing money, udhaar-audit, and stable-sync migration tests remain required gates.
+
+## ADR-009: Use the configured production application namespace
+
+**Status:** Implemented on `feat/rename-production-package` for review
+
+**Decision:** Use `com.aistudio.shreeshyamstore.pqwzkb` as both the Android namespace and application ID. Kotlin production, unit-test, and instrumentation sources are organized under the matching package path, and CI selectors use the renamed fully qualified test classes.
+
+**Safety scope:** This is a source/build identity change only. Room database name, schema version, table names, cloud business-document identifiers, DataStore keys, sync global IDs, and Firebase shop namespace derivation are unchanged. Relative manifest component names and the `${applicationId}.fileprovider` authority continue to resolve from the configured application ID.
+
+**Release limitation:** Package identity alignment does not by itself complete release readiness. Signing ownership, release keystore handling, versioning, minification/R8 validation, Firebase project configuration, Play/App distribution, privacy disclosures, and migration/restore rehearsal remain separate gates. A rollback is a code/build revert before distributing an artifact under the renamed ID; already-installed builds under the old ID are not treated as an in-place upgrade without an explicit product migration plan.

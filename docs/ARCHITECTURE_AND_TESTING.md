@@ -32,7 +32,7 @@ The target data model should use stable global record identity for multi-device 
 
 Local development requires Java 21, Android SDK platform/build tools 36, and the committed Gradle wrapper 9.7.0. The app's secrets plugin reads `.env` and falls back to `.env.example`; `.env` is local-only and must never be committed. Firebase URL/configuration and any future service credentials must be supplied by the appropriate local, staging, or production environment. No production credential, customer export, or private Firebase rules file belongs in this repository.
 
-The current package identity is prototype-like (`com.example` namespace and AI-Studio application ID). A production identity, signing key ownership, versioning scheme, Firebase project, privacy disclosures, and release channel must be decided before public distribution. Until then, only debug artifacts should be treated as development outputs.
+The package namespace and application ID now use `com.aistudio.shreeshyamstore.pqwzkb`, matching the configured production identity. Signing key ownership, versioning scheme, Firebase project, privacy disclosures, release channel, and release-build optimization remain separate production gates; until those are complete, only debug artifacts should be treated as development outputs.
 
 ## Test layers
 

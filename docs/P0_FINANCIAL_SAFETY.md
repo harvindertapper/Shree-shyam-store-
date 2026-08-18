@@ -37,8 +37,8 @@ This slice does not claim complete enterprise financial readiness. The following
 
 ```bash
 ./gradlew --no-daemon --stacktrace compileDebugKotlin
-./gradlew --no-daemon --stacktrace testDebugUnitTest --tests com.example.CheckoutInvariantsTest
-./gradlew --no-daemon --stacktrace testDebugUnitTest --tests com.example.CommerceValidationTest
+./gradlew --no-daemon --stacktrace testDebugUnitTest --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
+./gradlew --no-daemon --stacktrace testDebugUnitTest --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
 ./gradlew --no-daemon --stacktrace lintDebug
 ./gradlew --no-daemon --stacktrace assembleDebug
 ```
