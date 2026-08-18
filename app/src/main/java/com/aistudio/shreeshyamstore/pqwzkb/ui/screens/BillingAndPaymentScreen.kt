@@ -40,6 +40,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 
@@ -48,13 +49,13 @@ import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BillingScreen(viewModel: ShopViewModel) {
+fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    val products by viewModel.products.collectAsState()
-    val categories by viewModel.categories.collectAsState()
+    val products by inventoryViewModel.products.collectAsState()
+    val categories by inventoryViewModel.categories.collectAsState()
     val cart by viewModel.cartState.collectAsState()
     val cartTotal by viewModel.cartTotal.collectAsState()
 

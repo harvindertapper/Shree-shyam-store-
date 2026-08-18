@@ -36,6 +36,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.DateTimeUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 
@@ -44,13 +45,13 @@ import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProductsScreen(viewModel: ShopViewModel) {
+fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    val products by viewModel.products.collectAsState()
-    val categories by viewModel.categories.collectAsState()
+    val products by inventoryViewModel.products.collectAsState()
+    val categories by inventoryViewModel.categories.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
@@ -510,7 +511,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                             val addBtnText = if (settings.appLanguage == AppLanguage.HINDI) "जोड़ें" else "Add"
                             Button(onClick = {
                                 if (newCatName.trim().isNotEmpty()) {
-                                    viewModel.addCategory(newCatName)
+                                    inventoryViewModel.addCategory(newCatName)
                                     newCatName = ""
                                 }
                             }) {
@@ -537,7 +538,7 @@ fun ProductsScreen(viewModel: ShopViewModel) {
                                 val changeBtn = if (settings.appLanguage == AppLanguage.HINDI) "बदलें" else "Update"
                                 Button(onClick = {
                                     renamingCat?.let {
-                                        viewModel.renameCategory(it, renameText)
+                                        inventoryViewModel.renameCategory(it, renameText)
                                         renamingCat = null
                                         renameText = ""
                                     }
@@ -592,11 +593,15 @@ fun ProductsScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
+fun AddEditProductScreen(
+    viewModel: ShopViewModel,
+    inventoryViewModel: InventoryViewModel,
+    productId: Long?
+) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
-    val categories by viewModel.categories.collectAsState()
+    val categories by inventoryViewModel.categories.collectAsState()
 
     var name by remember { mutableStateOf("") }
     var categoryId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
@@ -618,7 +623,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
 
     LaunchedEffect(productId) {
         if (productId != null) {
-            val prod = viewModel.getProduct(productId)
+            val prod = inventoryViewModel.getProduct(productId)
             if (prod != null) {
                 name = prod.name
                 categoryId = prod.categoryId
@@ -860,7 +865,7 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
                     }
 
                     if (name.trim().isNotEmpty() && mrpValue != null && mrpValue > 0L) {
-                        viewModel.saveProduct(
+                        inventoryViewModel.saveProduct(
                             id = productId ?: 0L,
                             name = name,
                             categoryId = categoryId,
@@ -912,13 +917,13 @@ fun AddEditProductScreen(viewModel: ShopViewModel, productId: Long?) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OpeningStockScreen(viewModel: ShopViewModel) {
+fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    val categories by viewModel.categories.collectAsState()
-    val products by viewModel.products.collectAsState()
+    val categories by inventoryViewModel.categories.collectAsState()
+    val products by inventoryViewModel.products.collectAsState()
 
     var selectedCatId by remember { mutableStateOf<Long?>(null) }
     
@@ -1078,7 +1083,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                     val err = if (settings.appLanguage == AppLanguage.HINDI) "नाम और कीमत आवश्यक है!" else "Name and MRP price required!"
                                     Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
                                 } else {
-                                    viewModel.saveProduct(
+                                    inventoryViewModel.saveProduct(
                                         id = 0L,
                                         name = name,
                                         categoryId = catId,
@@ -1165,7 +1170,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
                                             val stockLabel = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक" else "Stock"
                                             Text("$stockLabel: ${itemInfo.currentStock}", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                                             IconButton(onClick = {
-                                                viewModel.saveProduct(
+                                                inventoryViewModel.saveProduct(
                                                     id = itemInfo.id,
                                                     name = itemInfo.name,
                                                     categoryId = itemInfo.categoryId,
@@ -1201,7 +1206,11 @@ fun OpeningStockScreen(viewModel: ShopViewModel) {
 // ==========================================
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
+fun StockAdjustmentScreen(
+    viewModel: ShopViewModel,
+    inventoryViewModel: InventoryViewModel,
+    productId: Long
+) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
@@ -1217,10 +1226,10 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
         listOf("Stock count correction", "Purchase added", "Damaged or expired", "Opening stock entry", "Other")
     }
 
-    val adjustmentHistory = viewModel.getAdjustmentsForProduct(productId).collectAsState(initial = emptyList())
+    val adjustmentHistory = inventoryViewModel.getAdjustmentsForProduct(productId).collectAsState(initial = emptyList())
 
     LaunchedEffect(productId) {
-        product = viewModel.getProduct(productId)
+        product = inventoryViewModel.getProduct(productId)
         product?.let {
             countedStock = it.currentStock.toString()
         }
@@ -1322,7 +1331,7 @@ fun StockAdjustmentScreen(viewModel: ShopViewModel, productId: Long) {
                                     val err = if (settings.appLanguage == AppLanguage.HINDI) "वैध स्टॉक संख्या आवश्यक है!" else "Valid stock quantity required!"
                                     Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
                                 } else {
-                                    viewModel.adjustStock(
+                                    inventoryViewModel.adjustStock(
                                         productId = productId,
                                         actualStockCounted = countVal,
                                         reason = selectedReason
