@@ -397,7 +397,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
             when (tx.type) {
                 "CREDIT" -> tx.amount
                 "PAYMENT" -> -tx.amount
-                else -> 0.0
+                else -> 0L
             }
         }
     }
