@@ -23,6 +23,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.SettingsDataStore
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import com.aistudio.shreeshyamstore.pqwzkb.ui.screens.*
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.MyApplicationTheme
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModelFactory
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModelFactory
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
@@ -32,6 +34,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModelFactory
 class MainActivity : FragmentActivity() {
     private lateinit var viewModel: ShopViewModel
     private lateinit var reportsViewModel: ReportsViewModel
+    private lateinit var inventoryViewModel: InventoryViewModel
     private var wasInBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -73,6 +76,10 @@ class MainActivity : FragmentActivity() {
             this,
             ReportsViewModelFactory(repo, settingsStore)
         )[ReportsViewModel::class.java]
+        inventoryViewModel = ViewModelProvider(
+            this,
+            InventoryViewModelFactory(repo) { viewModel.triggerAutoSync() }
+        )[InventoryViewModel::class.java]
 
         setContent {
             MyApplicationTheme {
@@ -178,19 +185,19 @@ class MainActivity : FragmentActivity() {
                                 is Screen.Welcome -> WelcomeScreen(viewModel)
                                 is Screen.Login -> LoginScreen(viewModel)
                                 is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
-                                is Screen.Home -> HomeScreen(viewModel, reportsViewModel)
-                                is Screen.Billing -> BillingScreen(viewModel)
+                                is Screen.Home -> HomeScreen(viewModel, reportsViewModel, inventoryViewModel)
+                                is Screen.Billing -> BillingScreen(viewModel, inventoryViewModel)
                                 is Screen.Payment -> PaymentScreen(viewModel, screen.invoiceTotal)
                                 is Screen.BillSuccess -> BillSuccessScreen(viewModel)
-                                is Screen.Products -> ProductsScreen(viewModel)
-                                is Screen.AddEditProduct -> AddEditProductScreen(viewModel, screen.productId)
-                                is Screen.OpeningStock -> OpeningStockScreen(viewModel)
-                                is Screen.StockAdjustment -> StockAdjustmentScreen(viewModel, screen.productId)
+                                is Screen.Products -> ProductsScreen(viewModel, inventoryViewModel)
+                                is Screen.AddEditProduct -> AddEditProductScreen(viewModel, inventoryViewModel, screen.productId)
+                                is Screen.OpeningStock -> OpeningStockScreen(viewModel, inventoryViewModel)
+                                is Screen.StockAdjustment -> StockAdjustmentScreen(viewModel, inventoryViewModel, screen.productId)
                                 is Screen.Udhaar -> UdhaarScreen(viewModel)
                                 is Screen.CustomerDetail -> CustomerDetailScreen(viewModel, screen.customerId)
                                 is Screen.Reports -> ReportsScreen(viewModel, reportsViewModel)
                                 is Screen.Settings -> SettingsScreen(viewModel)
-                                else -> HomeScreen(viewModel, reportsViewModel)
+                                else -> HomeScreen(viewModel, reportsViewModel, inventoryViewModel)
                             }
                         }
                     }

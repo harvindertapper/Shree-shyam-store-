@@ -443,146 +443,6 @@ class ShopViewModel(
         }
     }
 
-    // --- Category State ---
-    val categories: StateFlow<List<Category>> = repository.allCategories
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun addCategory(name: String) {
-        viewModelScope.launch {
-            if (name.trim().isNotEmpty()) {
-                val existing = repository.getCategoryByName(name.trim())
-                if (existing == null) {
-                    repository.insertCategory(Category(name = name.trim()))
-                    triggerAutoSync()
-                }
-            }
-        }
-    }
-
-    fun renameCategory(category: Category, newName: String) {
-        viewModelScope.launch {
-            if (newName.trim().isNotEmpty()) {
-                repository.updateCategory(category.copy(name = newName.trim(), updatedAt = System.currentTimeMillis()))
-                triggerAutoSync()
-            }
-        }
-    }
-
-    // --- Product State ---
-    val products: StateFlow<List<Product>> = repository.allProducts
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun saveProduct(
-        id: Long,
-        name: String,
-        categoryId: Long,
-        mrp: Long,
-        sellingPrice: Long?,
-        purchasePrice: Long?,
-        currentStock: Double,
-        unit: String = "pcs",
-        trackStock: Boolean,
-        lowStockAlertQty: Double,
-        isActive: Boolean,
-        barcode: String = ""
-    ) {
-        viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            if (id == 0L) {
-                // Insert
-                val product = Product(
-                    name = name.trim(),
-                    categoryId = categoryId,
-                    mrp = mrp,
-                    sellingPrice = sellingPrice,
-                    purchasePrice = purchasePrice,
-                    currentStock = currentStock,
-                    unit = unit.trim().ifEmpty { "pcs" },
-                    trackStock = trackStock,
-                    lowStockAlertQty = lowStockAlertQty,
-                    barcode = barcode.trim(),
-                    isActive = isActive,
-                    createdAt = now,
-                    updatedAt = now
-                )
-                val newProductId = repository.insertProduct(product)
-                // Log stock adjustment for opening entry
-                if (trackStock && currentStock > 0.0) {
-                    val adjustment = StockAdjustment(
-                        productId = newProductId,
-                        oldStock = 0.0,
-                        newStock = currentStock,
-                        difference = currentStock,
-                        reason = "Opening stock entry",
-                        createdAt = now,
-                        updatedAt = now
-                    )
-                    repository.insertStockAdjustment(adjustment)
-                }
-            } else {
-                // Update
-                val existing = repository.getProductById(id)
-                if (existing != null) {
-                    var finalStock = currentStock
-                    if (!trackStock) {
-                        finalStock = existing.currentStock // maintain old value
-                    }
-                    val product = existing.copy(
-                        name = name.trim(),
-                        categoryId = categoryId,
-                        mrp = mrp,
-                        sellingPrice = sellingPrice,
-                        purchasePrice = purchasePrice,
-                        currentStock = finalStock,
-                        unit = unit.trim().ifEmpty { existing.unit },
-                        trackStock = trackStock,
-                        lowStockAlertQty = lowStockAlertQty,
-                        barcode = barcode.trim(),
-                        isActive = isActive,
-                        updatedAt = now
-                    )
-                    repository.updateProduct(product)
-
-                    // Log difference adjustment if stock manual update occurred
-                    if (trackStock && currentStock != existing.currentStock) {
-                        val diff = currentStock - existing.currentStock
-                        val adjustment = StockAdjustment(
-                            productId = id,
-                            oldStock = existing.currentStock,
-                            newStock = currentStock,
-                            difference = diff,
-                            reason = "Manual correction during edit",
-                            createdAt = now,
-                            updatedAt = now
-                        )
-                        repository.insertStockAdjustment(adjustment)
-                    }
-                }
-            }
-            triggerAutoSync()
-        }
-    }
-
-    suspend fun getProduct(id: Long): Product? = repository.getProductById(id)
-
-    fun adjustStock(productId: Long, actualStockCounted: Double, reason: String) {
-        viewModelScope.launch {
-            repository.adjustProductStock(productId, actualStockCounted, reason)
-            triggerAutoSync()
-        }
-    }
-
-    fun getAdjustmentsForProduct(productId: Long): Flow<List<StockAdjustment>> = repository.getAdjustmentsForProduct(productId)
-
-
     // --- Billing State (Cart) ---
     private val _cartState = MutableStateFlow<Map<Product, Double>>(emptyMap())
     val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
@@ -970,15 +830,18 @@ class ShopViewModel(
         )
     }
 
-    fun exportStockCsv(context: Context) {
+    fun exportStockCsv(
+        context: Context,
+        products: List<Product>,
+        categories: List<Category>
+    ) {
         val settings = storeSettings.value
         val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
-        val prods = products.value
-        val catMap = categories.value.associate { it.id to it.name }
+        val catMap = categories.associate { it.id to it.name }
         com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.exportStockCsv(
             context = context,
-            products = prods,
+            products = products,
             categoryNameMap = catMap,
             shopName = shopDisplayName
         )
@@ -996,11 +859,11 @@ class ShopViewModel(
         )
     }
 
-    fun generateReorderText(lowStockList: List<Product>): String {
+    fun generateReorderText(lowStockList: List<Product>, categories: List<Category>): String {
         val settings = storeSettings.value
         val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
-        val catMap = categories.value.associate { it.id to it.name }
+        val catMap = categories.associate { it.id to it.name }
         return com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.generateReorderListText(
             shopName = shopDisplayName,
             lowStockItems = lowStockList,
@@ -1008,8 +871,13 @@ class ShopViewModel(
         )
     }
 
-    fun shareReorderListViaWhatsApp(context: Context, lowStockList: List<Product>, wholesalerPhone: String? = null) {
-        val text = generateReorderText(lowStockList)
+    fun shareReorderListViaWhatsApp(
+        context: Context,
+        lowStockList: List<Product>,
+        categories: List<Category>,
+        wholesalerPhone: String? = null
+    ) {
+        val text = generateReorderText(lowStockList, categories)
         com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.shareText(
             context = context,
             text = text,
@@ -1018,8 +886,12 @@ class ShopViewModel(
         )
     }
 
-    fun copyReorderListToClipboard(context: Context, lowStockList: List<Product>) {
-        val text = generateReorderText(lowStockList)
+    fun copyReorderListToClipboard(
+        context: Context,
+        lowStockList: List<Product>,
+        categories: List<Category>
+    ) {
+        val text = generateReorderText(lowStockList, categories)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("Re-order List", text)
         clipboard.setPrimaryClip(clip)

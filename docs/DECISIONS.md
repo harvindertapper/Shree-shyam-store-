@@ -109,3 +109,13 @@ The owner still needs to decide the production application ID/package identity, 
 **Reason:** Reporting is predominantly read-only and can be moved without crossing checkout, inventory, udhaar, identity, sync, or restore transaction boundaries. The temporary dual injection avoids duplicate customer state by leaving customer ownership with `ShopViewModel`; both ViewModels observe the same Room source of truth for the data they own.
 
 **Follow-up:** Extract inventory/catalog, billing/cart, udhaar/ledger, settings/identity, and sync/restore in separate reviewable slices. Remove compatibility methods only after all screen and test call sites have moved. Jetpack Navigation migration remains a separate phase after state ownership stabilizes.
+
+## ADR-013: Extract catalog and inventory orchestration before billing
+
+**Status:** Implemented on `refactor/inventory-viewmodel` for review
+
+**Decision:** Introduce `InventoryViewModel` for category/product flows, category mutations, product edits, product lookup, and stock-adjustment history/delegation. It uses the existing `ShopRepository` and receives an `onMutation` callback from the composition root for the existing auto-sync trigger. Billing cart/checkout, billing quick-add, navigation, exports, and sync orchestration remain on `ShopViewModel` during this slice.
+
+**Reason:** Catalog and inventory screens have a cohesive boundary and can be migrated without moving checkout transaction logic. The ViewModel delegates stock correction to `ShopRepository.adjustProductStock()`, preserving the existing atomic product-plus-audit write. Product edit/opening-stock behavior is intentionally kept equivalent to the existing flow; transactional hardening of opening-stock edits is a separate repository slice rather than an incidental architecture refactor.
+
+**Follow-up:** Extract billing/cart next only after preserving cart state, checkout idempotency, payment validation, actor propagation, and transaction error handling. Do not remove `ShopViewModel` quick-add or export compatibility methods until every billing/inventory call site has moved.
