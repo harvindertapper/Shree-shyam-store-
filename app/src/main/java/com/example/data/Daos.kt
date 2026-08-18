@@ -12,6 +12,7 @@ import com.example.commerce.LedgerActor
 import com.example.commerce.LedgerAuditPolicy
 import com.example.commerce.PaymentMode
 import com.example.commerce.UdhaarTransactionType
+import com.example.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -28,8 +29,14 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE isSynced = 0")
     suspend fun getUnsyncedCategories(): List<Category>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM categories WHERE globalId = :globalId LIMIT 1")
+    suspend fun getSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE categories SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markCategoriesSynced(ids: List<Long>)
+
+    @Query("UPDATE categories SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    suspend fun markCategorySyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(category: Category): Long
@@ -64,8 +71,14 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE isSynced = 0")
     suspend fun getUnsyncedProducts(): List<Product>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM products WHERE globalId = :globalId LIMIT 1")
+    suspend fun getSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE products SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markProductsSynced(ids: List<Long>)
+
+    @Query("UPDATE products SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    suspend fun markProductSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(product: Product): Long
@@ -100,8 +113,14 @@ abstract class SaleDao {
     @Query("SELECT * FROM sales WHERE isSynced = 0")
     abstract suspend fun getUnsyncedSales(): List<Sale>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM sales WHERE globalId = :globalId LIMIT 1")
+    abstract suspend fun getSaleSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE sales SET isSynced = 1 WHERE id IN (:ids)")
     abstract suspend fun markSalesSynced(ids: List<Long>)
+
+    @Query("UPDATE sales SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    abstract suspend fun markSaleSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertSale(sale: Sale): Long
@@ -118,8 +137,14 @@ abstract class SaleDao {
     @Query("SELECT * FROM sale_items WHERE isSynced = 0")
     abstract suspend fun getUnsyncedSaleItems(): List<SaleItem>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM sale_items WHERE globalId = :globalId LIMIT 1")
+    abstract suspend fun getSaleItemSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE sale_items SET isSynced = 1 WHERE id IN (:ids)")
     abstract suspend fun markSaleItemsSynced(ids: List<Long>)
+
+    @Query("UPDATE sale_items SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    abstract suspend fun markSaleItemSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertSaleItem(saleItem: SaleItem): Long
@@ -152,8 +177,8 @@ abstract class SaleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertCustomer(customer: Customer): Long
 
-    @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
-    abstract suspend fun touchCustomer(customerId: Long, updatedAt: Long)
+    @Query("UPDATE customers SET updatedAt = :updatedAt, mutationVersion = :updatedAt, mutationDeviceId = :mutationDeviceId, isSynced = 0 WHERE id = :customerId")
+    abstract suspend fun touchCustomer(customerId: Long, updatedAt: Long, mutationDeviceId: String)
 
     @Query("SELECT COUNT(*) > 0 FROM customers WHERE id = :customerId AND isDeleted = 0")
     abstract suspend fun hasActiveCustomer(customerId: Long): Boolean
@@ -264,6 +289,8 @@ abstract class SaleDao {
             paymentMode = paymentMode.name,
             createdAt = if (sale.createdAt > 0) sale.createdAt else now,
             updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = sale.mutationDeviceId,
             isSynced = false
         )
         val saleId = insertSale(finalizedSale)
@@ -275,6 +302,8 @@ abstract class SaleDao {
                 unitPrice = CommerceValidation.normalizeUnitPrice(item.unitPrice),
                 lineTotal = calculatedLineTotal,
                 updatedAt = now,
+                mutationVersion = now,
+                mutationDeviceId = item.mutationDeviceId,
                 isSynced = false
             )
             insertSaleItem(itemToSave)
@@ -294,6 +323,7 @@ abstract class SaleDao {
 
                 insertStockAdjustment(
                     StockAdjustment(
+                        globalId = SyncIdentity.newGlobalId(),
                         productId = product.id,
                         oldStock = product.currentStock,
                         newStock = newStock,
@@ -311,6 +341,7 @@ abstract class SaleDao {
             val actor = validatedLedgerActor ?: error("Validated udhaar actor is missing")
             insertUdhaarTransaction(
                     UdhaarTransaction(
+                        globalId = SyncIdentity.newGlobalId(),
                         customerId = finalCustomerId,
                         saleId = saleId,
                         type = UdhaarTransactionType.CREDIT.name,
@@ -321,12 +352,14 @@ abstract class SaleDao {
                         actorName = actor.actorName,
                         actorRole = actor.actorRole,
                         actorDeviceId = actor.actorDeviceId,
+                        mutationVersion = now,
+                        mutationDeviceId = actor.actorDeviceId,
                         isSynced = false,
                         createdAt = now,
                         updatedAt = now
                     )
             )
-            touchCustomer(finalCustomerId, now)
+            touchCustomer(finalCustomerId, now, actor.actorDeviceId)
         }
 
         return saleId
@@ -347,8 +380,14 @@ interface CustomerDao {
     @Query("SELECT * FROM customers WHERE isSynced = 0")
     suspend fun getUnsyncedCustomers(): List<Customer>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM customers WHERE globalId = :globalId LIMIT 1")
+    suspend fun getSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE customers SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markCustomersSynced(ids: List<Long>)
+
+    @Query("UPDATE customers SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    suspend fun markCustomerSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertCustomer(customer: Customer): Long
@@ -359,8 +398,8 @@ interface CustomerDao {
     @Update
     suspend fun updateCustomer(customer: Customer)
 
-    @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
-    suspend fun touchCustomer(customerId: Long, updatedAt: Long)
+    @Query("UPDATE customers SET updatedAt = :updatedAt, mutationVersion = :updatedAt, mutationDeviceId = :mutationDeviceId, isSynced = 0 WHERE id = :customerId")
+    suspend fun touchCustomer(customerId: Long, updatedAt: Long, mutationDeviceId: String)
 
     @Delete
     suspend fun deleteCustomer(customer: Customer)
@@ -395,8 +434,14 @@ interface UdhaarDao {
     @Query("SELECT * FROM udhaar_transactions WHERE isSynced = 0")
     suspend fun getUnsyncedTransactions(): List<UdhaarTransaction>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM udhaar_transactions WHERE globalId = :globalId LIMIT 1")
+    suspend fun getSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE udhaar_transactions SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markTransactionsSynced(ids: List<Long>)
+
+    @Query("UPDATE udhaar_transactions SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    suspend fun markTransactionSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Query("SELECT * FROM udhaar_transactions WHERE eventId = :eventId AND isDeleted = 0 LIMIT 1")
     suspend fun getActiveEventById(eventId: String): UdhaarTransaction?
@@ -425,8 +470,14 @@ interface StockAdjustmentDao {
     @Query("SELECT * FROM stock_adjustments WHERE isSynced = 0")
     suspend fun getUnsyncedAdjustments(): List<StockAdjustment>
 
+    @Query("SELECT id, globalId, mutationVersion, mutationDeviceId FROM stock_adjustments WHERE globalId = :globalId LIMIT 1")
+    suspend fun getSyncStamp(globalId: String): SyncRecordStamp?
+
     @Query("UPDATE stock_adjustments SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markAdjustmentsSynced(ids: List<Long>)
+
+    @Query("UPDATE stock_adjustments SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
+    suspend fun markAdjustmentSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAdjustment(adjustment: StockAdjustment): Long

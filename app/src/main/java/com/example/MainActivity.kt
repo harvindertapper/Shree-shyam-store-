@@ -44,6 +44,7 @@ class MainActivity : FragmentActivity() {
 
         // 1. Core Data Initializations (Room + DataStore)
         val database = AppDatabase.getDatabase(applicationContext)
+        val settingsStore = SettingsDataStore(applicationContext)
         val repo = ShopRepository(
             categoryDao = database.categoryDao(),
             productDao = database.productDao(),
@@ -52,9 +53,9 @@ class MainActivity : FragmentActivity() {
             udhaarDao = database.udhaarDao(),
             stockAdjustmentDao = database.stockAdjustmentDao(),
             userDao = database.userDao(),
-            database = database
+            database = database,
+            settingsDataStore = settingsStore
         )
-        val settingsStore = SettingsDataStore(applicationContext)
 
         // Initialize WorkManager Sync Engine and Network Callback
         com.example.utils.SyncManager.registerNetworkCallback(applicationContext)
