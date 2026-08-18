@@ -51,7 +51,7 @@ class StableSyncMigrationTest {
         assertEquals(500L, product.mutationVersion)
         assertEquals(SyncIdentity.LEGACY_DEVICE_ID, product.mutationDeviceId)
         assertEquals(0, migrated.syncOutboxDao().countByState("PENDING"))
-        assertTrue(migrated.openHelper.writableDatabase.rawQuery("PRAGMA index_list(products)", null).use { it.count > 0 })
+        assertTrue(migrated.openHelper.writableDatabase.query("PRAGMA index_list(products)").use { it.count > 0 })
 
         migrated.close()
     }
