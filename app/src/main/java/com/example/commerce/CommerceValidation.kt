@@ -24,7 +24,9 @@ enum class PaymentMode {
 
 enum class UdhaarTransactionType {
     CREDIT,
-    PAYMENT
+    PAYMENT,
+    REVERSAL,
+    CORRECTION
 }
 
 object CommerceValidation {

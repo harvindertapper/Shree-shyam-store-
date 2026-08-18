@@ -8,6 +8,8 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import com.example.commerce.CommerceValidation
+import com.example.commerce.LedgerActor
+import com.example.commerce.LedgerAuditPolicy
 import com.example.commerce.PaymentMode
 import com.example.commerce.UdhaarTransactionType
 import kotlinx.coroutines.flow.Flow
@@ -159,7 +161,7 @@ abstract class SaleDao {
     @Query("SELECT creditLimit FROM customers WHERE id = :customerId AND isDeleted = 0 LIMIT 1")
     abstract suspend fun getCustomerCreditLimit(customerId: Long): Long?
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(balanceEffect), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
     abstract suspend fun getCustomerBalance(customerId: Long): Long
 
     /**
@@ -174,13 +176,15 @@ abstract class SaleDao {
     open suspend fun completeBillCheckoutWithNewCustomer(
         sale: Sale,
         items: List<SaleItem>,
-        newCustomer: Customer
+        newCustomer: Customer,
+        ledgerActor: LedgerActor? = null
     ): Long {
         val customerId = insertCustomer(newCustomer)
         return completeBillCheckout(
             sale = sale.copy(customerId = customerId),
             items = items,
-            selectedCustomerId = customerId
+            selectedCustomerId = customerId,
+            ledgerActor = ledgerActor
         )
     }
 
@@ -188,7 +192,8 @@ abstract class SaleDao {
     open suspend fun completeBillCheckout(
         sale: Sale,
         items: List<SaleItem>,
-        selectedCustomerId: Long? = null
+        selectedCustomerId: Long? = null,
+        ledgerActor: LedgerActor? = null
     ): Long {
         require(items.isNotEmpty()) { "A bill must contain at least one item" }
         require(sale.billNumber.trim().isNotEmpty()) { "Bill number is required" }
@@ -227,6 +232,13 @@ abstract class SaleDao {
         }
 
         val now = System.currentTimeMillis()
+        val validatedLedgerActor = if (paymentMode == PaymentMode.UDHAAR) {
+            LedgerAuditPolicy.requireCanRecord(
+                ledgerActor ?: throw IllegalArgumentException("Authenticated actor is required for udhaar")
+            )
+        } else {
+            null
+        }
         val finalCustomerId = if (paymentMode == PaymentMode.UDHAAR) {
             val customerId = selectedCustomerId ?: sale.customerId
             require(customerId != null && hasActiveCustomer(customerId)) {
@@ -296,17 +308,23 @@ abstract class SaleDao {
         }
 
         if (paymentMode == PaymentMode.UDHAAR && finalCustomerId != null) {
+            val actor = validatedLedgerActor ?: error("Validated udhaar actor is missing")
             insertUdhaarTransaction(
-                UdhaarTransaction(
-                    customerId = finalCustomerId,
-                    saleId = saleId,
-                    type = UdhaarTransactionType.CREDIT.name,
-                    amount = calculatedTotal,
-                    note = "Bill No: ${sale.billNumber}",
-                    isSynced = false,
-                    createdAt = now,
-                    updatedAt = now
-                )
+                    UdhaarTransaction(
+                        customerId = finalCustomerId,
+                        saleId = saleId,
+                        type = UdhaarTransactionType.CREDIT.name,
+                        amount = calculatedTotal,
+                        balanceEffect = calculatedTotal,
+                        note = "Bill No: ${sale.billNumber}",
+                        actorUid = actor.actorUid,
+                        actorName = actor.actorName,
+                        actorRole = actor.actorRole,
+                        actorDeviceId = actor.actorDeviceId,
+                        isSynced = false,
+                        createdAt = now,
+                        updatedAt = now
+                    )
             )
             touchCustomer(finalCustomerId, now)
         }
@@ -359,16 +377,16 @@ interface UdhaarDao {
     @Query("SELECT * FROM udhaar_transactions WHERE customerId = :customerId")
     suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(balanceEffect), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
     fun getCustomerBalanceFlow(customerId: Long): Flow<Long>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(balanceEffect), 0) FROM udhaar_transactions WHERE customerId = :customerId AND isDeleted = 0")
     suspend fun getCustomerBalance(customerId: Long): Long
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(balanceEffect), 0) FROM udhaar_transactions WHERE isDeleted = 0")
     fun getTotalUdhaarFlow(): Flow<Long>
 
-    @Query("SELECT COALESCE(SUM(CASE WHEN type = 'CREDIT' THEN amount WHEN type = 'PAYMENT' THEN -amount ELSE 0 END), 0) FROM udhaar_transactions WHERE isDeleted = 0")
+    @Query("SELECT COALESCE(SUM(balanceEffect), 0) FROM udhaar_transactions WHERE isDeleted = 0")
     suspend fun getTotalUdhaar(): Long
 
     @Query("SELECT * FROM udhaar_transactions WHERE isSynced = 0")
@@ -377,14 +395,17 @@ interface UdhaarDao {
     @Query("UPDATE udhaar_transactions SET isSynced = 1 WHERE id IN (:ids)")
     suspend fun markTransactionsSynced(ids: List<Long>)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Query("SELECT * FROM udhaar_transactions WHERE eventId = :eventId AND isDeleted = 0 LIMIT 1")
+    suspend fun getActiveEventById(eventId: String): UdhaarTransaction?
+
+    @Query("SELECT COUNT(*) FROM udhaar_transactions WHERE correctsEventId = :eventId AND isDeleted = 0")
+    suspend fun countActiveCorrectionsFor(eventId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertTransaction(transaction: UdhaarTransaction): Long
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<UdhaarTransaction>)
-
-    @Delete
-    suspend fun deleteTransaction(transaction: UdhaarTransaction)
 
     @Query("DELETE FROM udhaar_transactions")
     suspend fun clearAllTransactions()

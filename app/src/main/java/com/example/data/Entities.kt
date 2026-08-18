@@ -1,7 +1,9 @@
 package com.example.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.UUID
 
 @Entity(tableName = "shop_profiles")
 data class ShopProfile(
@@ -123,12 +125,25 @@ data class Customer(
 @Entity(tableName = "udhaar_transactions")
 data class UdhaarTransaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val eventId: String = UUID.randomUUID().toString(),
     val customerId: Long,
     val saleId: Long? = null,
-    val type: String, // "CREDIT", "PAYMENT"
-    /** Ledger amount in integer paise. */
+    val type: String, // "CREDIT", "PAYMENT", "REVERSAL", "CORRECTION"
+    /** Ledger amount magnitude in integer paise; it is always positive. */
     val amount: Long,
+    /** Signed effect of this event on the customer balance in integer paise. */
+    @ColumnInfo(defaultValue = "0") val balanceEffect: Long = when (type) {
+        "CREDIT" -> amount
+        "PAYMENT" -> -amount
+        else -> 0L
+    },
     val note: String? = null,
+    val correctsEventId: String? = null,
+    val correctionReason: String? = null,
+    @ColumnInfo(defaultValue = "'legacy-local'") val actorUid: String = "legacy-local",
+    @ColumnInfo(defaultValue = "'Legacy local record'") val actorName: String = "Legacy local record",
+    @ColumnInfo(defaultValue = "'OWNER'") val actorRole: String = "OWNER",
+    @ColumnInfo(defaultValue = "'legacy-device'") val actorDeviceId: String = "legacy-device",
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),

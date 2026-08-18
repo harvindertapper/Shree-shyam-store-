@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.Customer
+import com.example.data.UdhaarTransaction
 import com.example.ui.theme.*
 import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
@@ -52,13 +53,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 
     val customerBalances = remember(transactions) {
         transactions.groupBy { it.customerId }.mapValues { (_, txList) ->
-            txList.sumOf { tx ->
-                when (tx.type) {
-                    "CREDIT" -> tx.amount
-                    "PAYMENT" -> -tx.amount
-                    else -> 0L
-                }
-            }
+            txList.sumOf { it.balanceEffect }
         }
     }
 
@@ -388,18 +383,13 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     var currentBalance by remember { mutableStateOf(0L) }
 
     var showReceivePaymentDialog by remember { mutableStateOf(false) }
+    var selectedLedgerEvent by remember { mutableStateOf<UdhaarTransaction?>(null) }
 
     val customerTransactions = viewModel.getTransactionsForCustomer(customerId).collectAsState(initial = emptyList())
 
     LaunchedEffect(customerId, customerTransactions.value) {
         customer = viewModel.customers.value.find { it.id == customerId }
-        currentBalance = customerTransactions.value.sumOf { tx ->
-            when (tx.type) {
-                "CREDIT" -> tx.amount
-                "PAYMENT" -> -tx.amount
-                else -> 0L
-            }
-        }
+        currentBalance = customerTransactions.value.sumOf { it.balanceEffect }
     }
 
     LaunchedEffect(customerId) {
@@ -471,7 +461,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             )
                         }
 
-                        if (currentBalance > 0.01) {
+                        if (currentBalance > 0L) {
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = { viewModel.sendUdhaarReminder(context, cust, currentBalance) },
@@ -519,6 +509,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         items(customerTransactions.value) { record ->
                             val isCredit = record.type == "CREDIT"
                             val isPayment = record.type == "PAYMENT"
+                            val isCorrection = record.type == "REVERSAL" || record.type == "CORRECTION"
 
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -542,6 +533,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                                     when {
                                                         isCredit -> Color(0xFFFFF1F2)
                                                         isPayment -> Color(0xFFF0FDF4)
+                                                        isCorrection -> Color(0xFFF3E8FF)
                                                         else -> Color(0xFFFFF8E1)
                                                     },
                                                     shape = RoundedCornerShape(8.dp)
@@ -552,12 +544,14 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                                 imageVector = when {
                                                     isCredit -> Icons.Default.ArrowOutward
                                                     isPayment -> Icons.Default.CallReceived
+                                                    isCorrection -> Icons.Default.EditNote
                                                     else -> Icons.Default.Info
                                                 },
                                                 contentDescription = null,
                                                 tint = when {
                                                     isCredit -> ErrorRed
                                                     isPayment -> SuccessGreen
+                                                    isCorrection -> PurpleAccent
                                                     else -> WarningOrange
                                                 }
                                             )
@@ -567,6 +561,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                             val txTypeLabel = when {
                                                 isCredit -> if (settings.appLanguage == AppLanguage.HINDI) "उधार दिया" else "Credit Given"
                                                 isPayment -> if (settings.appLanguage == AppLanguage.HINDI) "रकम प्राप्त हुई" else "Payment Received"
+                                                isCorrection -> if (settings.appLanguage == AppLanguage.HINDI) "सुधार / रिवर्सल" else "Correction / Reversal"
                                                 else -> if (settings.appLanguage == AppLanguage.HINDI) "अमान्य प्रविष्टि" else "Invalid ledger entry"
                                             }
                                             Text(
@@ -592,20 +587,33 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         }
                                     }
 
-                                    Text(
-                                        text = when {
-                                            isCredit -> "+${CurrencyUtils.formatRupees(record.amount)}"
-                                            isPayment -> "-${CurrencyUtils.formatRupees(record.amount)}"
-                                            else -> CurrencyUtils.formatRupees(record.amount)
-                                        },
-                                        fontWeight = FontWeight.Black,
-                                        fontSize = 16.sp,
-                                        color = when {
-                                            isCredit -> ErrorRed
-                                            isPayment -> SuccessGreen
-                                            else -> WarningOrange
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        Text(
+                                            text = when {
+                                                record.balanceEffect >= 0L -> "+${CurrencyUtils.formatRupees(record.balanceEffect)}"
+                                                else -> CurrencyUtils.formatRupees(record.balanceEffect)
+                                            },
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 16.sp,
+                                            color = when {
+                                                isCredit -> ErrorRed
+                                                isPayment -> SuccessGreen
+                                                isCorrection -> PurpleAccent
+                                                else -> WarningOrange
+                                            }
+                                        )
+                                        if ((isCredit || isPayment) && record.correctsEventId == null) {
+                                            IconButton(
+                                                onClick = { selectedLedgerEvent = record },
+                                                modifier = Modifier.testTag("ledger_event_actions_${record.eventId}")
+                                            ) {
+                                                Icon(Icons.Default.MoreVert, contentDescription = "Ledger actions", tint = TextMediumGray)
+                                            }
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -708,6 +716,85 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                     .testTag("confirm_payment_button")
                             ) {
                                 Text(confirmDepositText)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        selectedLedgerEvent?.let { record ->
+            Dialog(onDismissRequest = { selectedLedgerEvent = null }) {
+                var correctedAmount by remember(record.eventId) { mutableStateOf(MoneyUtils.toInputString(record.amount)) }
+                var reason by remember(record.eventId) { mutableStateOf("") }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .background(Color.White)
+                            .padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        val title = if (settings.appLanguage == AppLanguage.HINDI) "लेजर सुधार" else "Correct Ledger Entry"
+                        Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PurpleAccent)
+                        Text(
+                            text = "${record.type}: ${CurrencyUtils.formatRupees(record.amount)}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMediumGray
+                        )
+                        OutlinedTextField(
+                            value = correctedAmount,
+                            onValueChange = { correctedAmount = it },
+                            label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "सही रकम *" else "Correct Amount *") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth().testTag("ledger_correction_amount_input")
+                        )
+                        OutlinedTextField(
+                            value = reason,
+                            onValueChange = { reason = it },
+                            label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "कारण *" else "Reason *") },
+                            modifier = Modifier.fillMaxWidth().testTag("ledger_correction_reason_input")
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(
+                                onClick = { selectedLedgerEvent = null },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(strings.cancel)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    if (reason.trim().isEmpty()) {
+                                        Toast.makeText(context, "Correction reason is required", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        viewModel.reverseUdhaarTransaction(customerId, record.eventId, reason)
+                                        selectedLedgerEvent = null
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(if (settings.appLanguage == AppLanguage.HINDI) "रिवर्स" else "Reverse")
+                            }
+                            Button(
+                                onClick = {
+                                    val amountValue = MoneyUtils.parseMajorUnits(correctedAmount)
+                                    if (amountValue == null || amountValue <= 0L || reason.trim().isEmpty()) {
+                                        Toast.makeText(context, "Valid amount and reason are required", Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        viewModel.correctUdhaarTransaction(customerId, record.eventId, amountValue, reason)
+                                        selectedLedgerEvent = null
+                                    }
+                                },
+                                modifier = Modifier.weight(1.2f)
+                            ) {
+                                Text(if (settings.appLanguage == AppLanguage.HINDI) "सुधार" else "Correct")
                             }
                         }
                     }
