@@ -2,13 +2,16 @@ package com.aistudio.shreeshyamstore.pqwzkb.viewmodel
 
 import android.content.Context
 import android.widget.Toast
+import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -175,14 +178,38 @@ class ShopViewModel(
             settingsDataStore.updateWelcomeChantEnabled(welcomeChantEnabled)
             settingsDataStore.updateStaticPaytmQrImageUri(qrImageUri)
             settingsDataStore.updateSecurityPin(securityPin)
+            settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
         }
     }
 
     fun updateSecurityPin(pin: String) {
         viewModelScope.launch {
             settingsDataStore.updateSecurityPin(pin)
+            settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
         }
     }
+
+    fun verifyAppLockPin(pin: String, onResult: (PinUnlockResult) -> Unit) {
+        viewModelScope.launch {
+            onResult(settingsDataStore.evaluateAppLockPin(pin, System.currentTimeMillis()))
+        }
+    }
+
+    fun recordSuccessfulAppUnlock() {
+        viewModelScope.launch {
+            settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
+        }
+    }
+
+    fun isBiometricAvailable(): Boolean {
+        val appContext = context ?: return false
+        return BiometricManager.from(appContext).canAuthenticate(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG
+        ) == BiometricManager.BIOMETRIC_SUCCESS
+    }
+
+    fun sessionRequiresUnlock(nowEpochMs: Long = System.currentTimeMillis()): Boolean =
+        AppLockPolicy.sessionExpired(storeSettings.value.lastUnlockAtEpochMs, nowEpochMs)
 
     fun completeFirstLaunch() {
         viewModelScope.launch {
@@ -271,13 +298,14 @@ class ShopViewModel(
         viewModelScope.launch {
             settingsDataStore.updateSecurityPin(pin)
             settingsDataStore.updateAppLockEnabled(true)
-            settingsDataStore.updateBiometricEnabled(enableBiometric)
+            settingsDataStore.updateBiometricEnabled(enableBiometric && isBiometricAvailable())
+            settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
         }
     }
 
     fun toggleBiometric(enabled: Boolean) {
         viewModelScope.launch {
-            settingsDataStore.updateBiometricEnabled(enabled)
+            settingsDataStore.updateBiometricEnabled(enabled && isBiometricAvailable())
         }
     }
 

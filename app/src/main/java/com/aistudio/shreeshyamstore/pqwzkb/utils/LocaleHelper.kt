@@ -36,6 +36,12 @@ interface AppStrings {
     val secureAppLock: String
     val enterSecurityPin: String
     val incorrectPin: String
+    val pinAttemptsRemaining: (Int) -> String
+    val pinLockedOut: (Long) -> String
+    val biometricUnavailable: String
+    val biometricNotRecognized: String
+    val biometricFailed: String
+    val sessionTimedOut: String
     val storeUnlocked: String
     val unlockStore: String
     val verifyBiometric: String
@@ -207,6 +213,12 @@ object HindiStrings : AppStrings {
     override val secureAppLock = "सुरक्षित ऐप लॉक"
     override val enterSecurityPin = "4-अंकों का सिक्योरिटी पिन दर्ज करें"
     override val incorrectPin = "गलत पिन! पुनः प्रयास करें"
+    override val pinAttemptsRemaining: (Int) -> String = { attempts -> "शेष प्रयास: $attempts" }
+    override val pinLockedOut: (Long) -> String = { seconds -> "बहुत अधिक गलत प्रयास। $seconds सेकंड बाद पुनः प्रयास करें या बायोमेट्रिक का उपयोग करें।" }
+    override val biometricUnavailable = "बायोमेट्रिक उपलब्ध नहीं है। पिन का उपयोग करें।"
+    override val biometricNotRecognized = "बायोमेट्रिक पहचान नहीं हुई। पिन का उपयोग करें।"
+    override val biometricFailed = "बायोमेट्रिक अनलॉक विफल हुआ। पिन का उपयोग करें।"
+    override val sessionTimedOut = "सुरक्षा के लिए सत्र लॉक हो गया। जारी रखने के लिए पिन दर्ज करें।"
     override val storeUnlocked = "दुकान अनलॉक हो गई! 🙏"
     override val unlockStore = "दुकान अनलॉक करें"
     override val verifyBiometric = "फिंगरप्रिंट या फेस से पहचान सत्यापित करें"
@@ -369,6 +381,12 @@ object EnglishStrings : AppStrings {
     override val secureAppLock = "Secure App Lock"
     override val enterSecurityPin = "Enter 4-Digit Security PIN"
     override val incorrectPin = "Incorrect PIN! Please try again"
+    override val pinAttemptsRemaining: (Int) -> String = { attempts -> "Attempts remaining: $attempts" }
+    override val pinLockedOut: (Long) -> String = { seconds -> "Too many failed attempts. Try again in ${seconds}s or use biometric unlock." }
+    override val biometricUnavailable = "Biometric unlock is unavailable. Use your PIN."
+    override val biometricNotRecognized = "Biometric not recognized. Use your PIN."
+    override val biometricFailed = "Biometric unlock failed. Use your PIN."
+    override val sessionTimedOut = "The session was locked for your security. Enter your PIN to continue."
     override val storeUnlocked = "Store Unlocked! 🙏"
     override val unlockStore = "Unlock Store"
     override val verifyBiometric = "Verify identity with fingerprint or face"

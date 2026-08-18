@@ -39,7 +39,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AuthManager
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
-import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 import kotlinx.coroutines.launch
@@ -388,41 +388,79 @@ fun LoginScreen(viewModel: ShopViewModel) {
     var showForgotPinDialog by remember { mutableStateOf(false) }
 
     fun checkPin(pin: String) {
-        if (SecurityUtils.verifyPin(pin, settings.securityPin)) {
-            pinError = null
-            Toast.makeText(context, strings.storeUnlocked, Toast.LENGTH_SHORT).show()
-            if (settings.firstLaunchCompleted) {
-                viewModel.navigateTo(Screen.Home)
-            } else {
-                viewModel.navigateTo(Screen.Setup)
-            }
-        } else {
-            pinError = strings.incorrectPin
-            enteredPin = ""
-        }
-    }
-
-    fun launchBiometricPrompt() {
-        if (context is FragmentActivity) {
-            val executor = ContextCompat.getMainExecutor(context)
-            val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle(strings.unlockStore)
-                .setSubtitle(strings.verifyBiometric)
-                .setNegativeButtonText(strings.usePin)
-                .build()
-
-            val biometricPrompt = BiometricPrompt(context, executor, object : BiometricPrompt.AuthenticationCallback() {
-                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                    super.onAuthenticationSucceeded(result)
-                    Toast.makeText(context, strings.identityVerified, Toast.LENGTH_SHORT).show()
+        viewModel.verifyAppLockPin(pin) { result ->
+            when (result) {
+                PinUnlockResult.Success -> {
+                    pinError = null
+                    Toast.makeText(context, strings.storeUnlocked, Toast.LENGTH_SHORT).show()
                     if (settings.firstLaunchCompleted) {
                         viewModel.navigateTo(Screen.Home)
                     } else {
                         viewModel.navigateTo(Screen.Setup)
                     }
                 }
-            })
-            biometricPrompt.authenticate(promptInfo)
+                is PinUnlockResult.Invalid -> {
+                    pinError = "${strings.incorrectPin} ${strings.pinAttemptsRemaining(result.remainingAttempts)}"
+                    enteredPin = ""
+                }
+                is PinUnlockResult.Locked -> {
+                    val remainingSeconds = ((result.untilEpochMs - System.currentTimeMillis()) / 1_000L)
+                        .coerceAtLeast(1L)
+                    pinError = strings.pinLockedOut(remainingSeconds)
+                    enteredPin = ""
+                }
+            }
+        }
+    }
+
+    fun launchBiometricPrompt() {
+        if (context !is FragmentActivity || !viewModel.isBiometricAvailable()) {
+            pinError = strings.biometricUnavailable
+            viewModel.toggleBiometric(false)
+            return
+        }
+        val activity = context
+        val executor = ContextCompat.getMainExecutor(activity)
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle(strings.unlockStore)
+            .setSubtitle(strings.verifyBiometric)
+            .setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+            .setNegativeButtonText(strings.usePin)
+            .build()
+
+        val biometricPrompt = BiometricPrompt(activity, executor, object : BiometricPrompt.AuthenticationCallback() {
+            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                super.onAuthenticationSucceeded(result)
+                viewModel.recordSuccessfulAppUnlock()
+                pinError = null
+                Toast.makeText(activity, strings.identityVerified, Toast.LENGTH_SHORT).show()
+                if (settings.firstLaunchCompleted) {
+                    viewModel.navigateTo(Screen.Home)
+                } else {
+                    viewModel.navigateTo(Screen.Setup)
+                }
+            }
+
+            override fun onAuthenticationFailed() {
+                super.onAuthenticationFailed()
+                pinError = strings.biometricNotRecognized
+            }
+
+            override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                super.onAuthenticationError(errorCode, errString)
+                if (errorCode != BiometricPrompt.ERROR_CANCELED &&
+                    errorCode != BiometricPrompt.ERROR_USER_CANCELED
+                ) {
+                    pinError = strings.biometricFailed
+                }
+            }
+        })
+        biometricPrompt.authenticate(promptInfo)
+    }
+
+    LaunchedEffect(settings.lastUnlockAtEpochMs) {
+        if (settings.lastUnlockAtEpochMs > 0L && viewModel.sessionRequiresUnlock()) {
+            pinError = strings.sessionTimedOut
         }
     }
 

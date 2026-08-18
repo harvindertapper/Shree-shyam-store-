@@ -74,6 +74,7 @@ jobs:
         run: >-
           ./gradlew --no-daemon --stacktrace testDebugUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SecurityUtilsTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest

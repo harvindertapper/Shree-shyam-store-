@@ -205,6 +205,7 @@ class MainActivity : FragmentActivity() {
                 val settings = viewModel.storeSettings.value
                 val currentScreen = viewModel.currentScreen.value
                 if (settings.firstLaunchCompleted && settings.appLockEnabled &&
+                    viewModel.sessionRequiresUnlock() &&
                     currentScreen !is Screen.Welcome && currentScreen !is Screen.Setup && currentScreen !is Screen.Login) {
                     viewModel.navigateTo(Screen.Login)
                 }

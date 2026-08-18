@@ -34,6 +34,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppPrimaryButton
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
@@ -770,6 +771,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     if (shopName.trim().isEmpty()) {
                         val nameReq = if (settings.appLanguage == AppLanguage.HINDI) "दुकान का नाम आवश्यक है!" else "Shop name is required!"
                         Toast.makeText(context, nameReq, Toast.LENGTH_SHORT).show()
+                    } else if (securityPin.isNotEmpty() && !SecurityUtils.isAcceptableNewPin(securityPin)) {
+                        val pinReq = if (settings.appLanguage == AppLanguage.HINDI) {
+                            "नया पिन 4 अंकों का हो और default, दोहराए गए या लगातार अंक न हों"
+                        } else {
+                            "New PIN must be 4 digits and cannot be default, repeated, or sequential"
+                        }
+                        Toast.makeText(context, pinReq, Toast.LENGTH_SHORT).show()
                     } else {
                         val pinToSave = if (securityPin.length == 4) securityPin else settings.securityPin
                         viewModel.updateSettings(

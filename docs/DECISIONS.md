@@ -77,3 +77,15 @@ The owner still needs to decide the production application ID/package identity, 
 **Safety scope:** This is a source/build identity change only. Room database name, schema version, table names, cloud business-document identifiers, DataStore keys, sync global IDs, and Firebase shop namespace derivation are unchanged. Relative manifest component names and the `${applicationId}.fileprovider` authority continue to resolve from the configured application ID.
 
 **Release limitation:** Package identity alignment does not by itself complete release readiness. Signing ownership, release keystore handling, versioning, minification/R8 validation, Firebase project configuration, Play/App distribution, privacy disclosures, and migration/restore rehearsal remain separate gates. A rollback is a code/build revert before distributing an artifact under the renamed ID; already-installed builds under the old ID are not treated as an in-place upgrade without an explicit product migration plan.
+
+## ADR-010: Bound local app-lock attempts and require strong biometric fallback
+
+**Status:** Implemented on `feat/security-app-lock-hardening` for review
+
+**Decision:** App-lock PIN evaluation is serialized through DataStore and uses a bounded policy of five failed attempts followed by a 30-second cooldown. A successful PIN or strong biometric unlock resets the failure counter and records the unlock timestamp. The app requires re-unlock after 15 minutes of inactivity when app lock is enabled. Biometric prompts request `BIOMETRIC_STRONG` only; unavailable, canceled, failed, and weak-hardware cases remain on the PIN fallback path.
+
+**New-PIN policy:** First-run setup no longer pre-fills `1234`. New or changed four-digit PINs reject the historical default, its reverse, repeated digits, and obvious ascending/descending sequences. Legacy plaintext/blank PIN verification remains temporarily readable for migration compatibility, but every newly saved value is hashed and resets stale lockout state.
+
+**Boundary:** Attempt counters, cooldown timestamps, unlock timestamps, PIN verifiers, and biometric settings remain device-local DataStore state. They are not part of cloud sync, outbox JSON, manual backup/restore payloads, logs, analytics, or crash reports. Logout clears the app-lock state so a new identity cannot inherit the previous identity’s unlock history.
+
+**Follow-up:** Replace the legacy SHA-256 PIN/password compatibility path with a slow, salted credential verifier and add registration/login rate limiting in a separate security slice. Add domain-level role permission checks and negative authorization tests separately; this ADR does not treat a UI role string as authorization by itself.

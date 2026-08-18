@@ -5,10 +5,15 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockState
+import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -37,6 +42,9 @@ data class StoreSettings(
     val appLockEnabled: Boolean = true,
     val biometricEnabled: Boolean = false,
     val securityPin: String = SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+    val failedPinAttempts: Int = 0,
+    val pinLockedUntilEpochMs: Long = 0L,
+    val lastUnlockAtEpochMs: Long = 0L,
     val firebaseUrl: String = "",
     val firebasePrefix: String = DEFAULT_FIREBASE_PREFIX,
     val lastSyncTime: String = "Never Synced",
@@ -62,6 +70,9 @@ class SettingsDataStore(private val context: Context) {
         private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         private val SECURITY_PIN = stringPreferencesKey("security_pin")
+        private val FAILED_PIN_ATTEMPTS = intPreferencesKey("failed_pin_attempts")
+        private val PIN_LOCKED_UNTIL_EPOCH_MS = longPreferencesKey("pin_locked_until_epoch_ms")
+        private val LAST_UNLOCK_AT_EPOCH_MS = longPreferencesKey("last_unlock_at_epoch_ms")
         private val FIREBASE_URL = stringPreferencesKey("firebase_url")
         private val FIREBASE_PREFIX = stringPreferencesKey("firebase_prefix")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
@@ -104,6 +115,9 @@ class SettingsDataStore(private val context: Context) {
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
                 biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
                 securityPin = preferences[SECURITY_PIN] ?: SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+                failedPinAttempts = (preferences[FAILED_PIN_ATTEMPTS] ?: 0).coerceAtLeast(0),
+                pinLockedUntilEpochMs = (preferences[PIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
+                lastUnlockAtEpochMs = (preferences[LAST_UNLOCK_AT_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
                 firebaseUrl = preferences[FIREBASE_URL].orEmpty(),
                 firebasePrefix = preferences[FIREBASE_PREFIX]
                     ?.trim()
@@ -133,6 +147,37 @@ class SettingsDataStore(private val context: Context) {
                 SecurityUtils.hashPin(normalized)
             }
         }
+        it[FAILED_PIN_ATTEMPTS] = 0
+        it[PIN_LOCKED_UNTIL_EPOCH_MS] = 0L
+        it[LAST_UNLOCK_AT_EPOCH_MS] = 0L
+    }
+
+    suspend fun updateAppLockState(state: AppLockState) = context.dataStore.edit {
+        it[FAILED_PIN_ATTEMPTS] = state.failedAttempts.coerceAtLeast(0)
+        it[PIN_LOCKED_UNTIL_EPOCH_MS] = state.lockedUntilEpochMs.coerceAtLeast(0L)
+        it[LAST_UNLOCK_AT_EPOCH_MS] = state.lastUnlockAtEpochMs.coerceAtLeast(0L)
+    }
+
+    suspend fun evaluateAppLockPin(enteredPin: String, nowEpochMs: Long): PinUnlockResult {
+        var result: PinUnlockResult? = null
+        context.dataStore.edit { preferences ->
+            val currentState = AppLockState(
+                failedAttempts = (preferences[FAILED_PIN_ATTEMPTS] ?: 0).coerceAtLeast(0),
+                lockedUntilEpochMs = (preferences[PIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
+                lastUnlockAtEpochMs = (preferences[LAST_UNLOCK_AT_EPOCH_MS] ?: 0L).coerceAtLeast(0L)
+            )
+            val (nextResult, nextState) = AppLockPolicy.verifyPin(
+                enteredPin = enteredPin,
+                storedHash = preferences[SECURITY_PIN] ?: SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+                state = currentState,
+                nowEpochMs = nowEpochMs
+            )
+            result = nextResult
+            preferences[FAILED_PIN_ATTEMPTS] = nextState.failedAttempts
+            preferences[PIN_LOCKED_UNTIL_EPOCH_MS] = nextState.lockedUntilEpochMs
+            preferences[LAST_UNLOCK_AT_EPOCH_MS] = nextState.lastUnlockAtEpochMs
+        }
+        return result ?: error("App-lock evaluation did not produce a result")
     }
 
     suspend fun updateAppLockEnabled(enabled: Boolean) = context.dataStore.edit {
@@ -225,6 +270,9 @@ class SettingsDataStore(private val context: Context) {
         it[LOGGED_IN_EMAIL] = ""
         it[LOGGED_IN_ROLE] = "OWNER"
         it.remove(IDENTITY_PROVIDER)
+        it[FAILED_PIN_ATTEMPTS] = 0
+        it[PIN_LOCKED_UNTIL_EPOCH_MS] = 0L
+        it[LAST_UNLOCK_AT_EPOCH_MS] = 0L
         it[IS_USER_LOGGED_IN] = false
     }
 }
