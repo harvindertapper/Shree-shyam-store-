@@ -99,3 +99,13 @@ The owner still needs to decide the production application ID/package identity, 
 **Reason:** The app stores local PIN verifiers, session/identity metadata, Room business records, customer/ledger data, and exported files. Opaque automatic backup or device transfer must not bypass the app’s validated manual backup/restore privacy and atomicity boundaries. Barcode scanning remains optional and requests camera access only when the scanner is opened; system photo picking does not require broad storage permissions.
 
 **Operational consequence:** Device migration and reinstall do not automatically restore the local store. Operators must use and rehearse the explicit in-app backup/restore workflow. Release smoke tests must verify that a clean install does not assume automatic restoration and that manual recovery remains available.
+
+## ADR-012: Extract reporting state before broader ViewModel decomposition
+
+**Status:** Implemented on `refactor/reports-viewmodel` for review
+
+**Decision:** Introduce `ReportsViewModel` as the first focused extraction from `ShopViewModel`. It owns sales report flows, sale-item queries, and sales CSV export, using the existing `ShopRepository` and `SettingsDataStore` through manual constructor injection. Customer state remains on `ShopViewModel` until the Udhaar/ledger extraction because customer mutations and balances are still coupled to that domain. Home and Reports screens receive both ViewModels during the compatibility period: navigation, settings, inventory dashboard, and invoice sharing remain on `ShopViewModel`, while report state/export use `ReportsViewModel`.
+
+**Reason:** Reporting is predominantly read-only and can be moved without crossing checkout, inventory, udhaar, identity, sync, or restore transaction boundaries. The temporary dual injection avoids duplicate customer state by leaving customer ownership with `ShopViewModel`; both ViewModels observe the same Room source of truth for the data they own.
+
+**Follow-up:** Extract inventory/catalog, billing/cart, udhaar/ledger, settings/identity, and sync/restore in separate reviewable slices. Remove compatibility methods only after all screen and test call sites have moved. Jetpack Navigation migration remains a separate phase after state ownership stabilizes.
