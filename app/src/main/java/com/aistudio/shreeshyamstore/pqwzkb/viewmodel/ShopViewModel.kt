@@ -912,16 +912,6 @@ class ShopViewModel(
         }
     }
 
-    // --- Daily Sales and History (Reports) ---
-    val salesHistory: StateFlow<List<Sale>> = repository.allSales
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    fun getSaleItems(saleId: Long): Flow<List<SaleItem>> = repository.getSaleItemsForSale(saleId)
-
     // Helper functions for clipboard copy text and sharing
     fun generateInvoiceText(customSale: Sale? = null, customItems: List<SaleItem>? = null): String {
         val sale = customSale ?: _lastSale.value ?: return "No Invoice Found"
@@ -977,17 +967,6 @@ class ShopViewModel(
             text = msg,
             title = "Send Udhaar Reminder",
             phoneNumber = customer.phone
-        )
-    }
-
-    fun exportSalesCsv(context: Context, salesToExport: List<Sale>) {
-        val settings = storeSettings.value
-        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
-        val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
-        com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.exportSalesCsv(
-            context = context,
-            sales = salesToExport,
-            shopName = shopDisplayName
         )
     }
 

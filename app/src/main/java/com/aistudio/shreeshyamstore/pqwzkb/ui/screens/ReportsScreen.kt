@@ -33,18 +33,19 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.DateTimeUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportsScreen(viewModel: ShopViewModel) {
+fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    val sales by viewModel.salesHistory.collectAsState()
+    val sales by reportsViewModel.salesHistory.collectAsState()
     val customers by viewModel.customers.collectAsState()
 
     var selectedIntervalTab by remember { mutableStateOf(0) } // 0: Today, 1: This Month, 2: All Time
@@ -91,7 +92,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
                 },
                 actions = {
                     IconButton(
-                        onClick = { viewModel.exportSalesCsv(context, filteredSales) },
+                        onClick = { reportsViewModel.exportSalesCsv(context, filteredSales) },
                         modifier = Modifier.testTag("export_sales_csv_button")
                     ) {
                         Icon(Icons.Default.Download, contentDescription = "Export Sales CSV", tint = SaffronPrimary)
@@ -365,7 +366,7 @@ fun ReportsScreen(viewModel: ShopViewModel) {
 
         // --- DETAILED INVOICE MODAL DIALOG ---
         selectedViewSale?.let { sale ->
-            val saleItems = viewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
+            val saleItems = reportsViewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
             val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
 
             Dialog(onDismissRequest = { selectedViewSale = null }) {

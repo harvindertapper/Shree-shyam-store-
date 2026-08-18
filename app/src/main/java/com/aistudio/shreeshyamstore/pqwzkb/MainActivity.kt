@@ -23,12 +23,15 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.SettingsDataStore
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import com.aistudio.shreeshyamstore.pqwzkb.ui.screens.*
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.MyApplicationTheme
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModelFactory
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModelFactory
 
 class MainActivity : FragmentActivity() {
     private lateinit var viewModel: ShopViewModel
+    private lateinit var reportsViewModel: ReportsViewModel
     private var wasInBackground = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +69,10 @@ class MainActivity : FragmentActivity() {
             this,
             ShopViewModelFactory(repo, settingsStore, applicationContext)
         )[ShopViewModel::class.java]
+        reportsViewModel = ViewModelProvider(
+            this,
+            ReportsViewModelFactory(repo, settingsStore)
+        )[ReportsViewModel::class.java]
 
         setContent {
             MyApplicationTheme {
@@ -171,7 +178,7 @@ class MainActivity : FragmentActivity() {
                                 is Screen.Welcome -> WelcomeScreen(viewModel)
                                 is Screen.Login -> LoginScreen(viewModel)
                                 is Screen.Setup -> FirstLaunchSetupScreen(viewModel)
-                                is Screen.Home -> HomeScreen(viewModel)
+                                is Screen.Home -> HomeScreen(viewModel, reportsViewModel)
                                 is Screen.Billing -> BillingScreen(viewModel)
                                 is Screen.Payment -> PaymentScreen(viewModel, screen.invoiceTotal)
                                 is Screen.BillSuccess -> BillSuccessScreen(viewModel)
@@ -181,9 +188,9 @@ class MainActivity : FragmentActivity() {
                                 is Screen.StockAdjustment -> StockAdjustmentScreen(viewModel, screen.productId)
                                 is Screen.Udhaar -> UdhaarScreen(viewModel)
                                 is Screen.CustomerDetail -> CustomerDetailScreen(viewModel, screen.customerId)
-                                is Screen.Reports -> ReportsScreen(viewModel)
+                                is Screen.Reports -> ReportsScreen(viewModel, reportsViewModel)
                                 is Screen.Settings -> SettingsScreen(viewModel)
-                                else -> HomeScreen(viewModel)
+                                else -> HomeScreen(viewModel, reportsViewModel)
                             }
                         }
                     }

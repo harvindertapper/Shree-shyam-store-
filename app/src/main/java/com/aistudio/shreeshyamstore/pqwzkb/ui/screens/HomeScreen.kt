@@ -30,16 +30,17 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.DateTimeUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 import kotlinx.coroutines.delay
 
 @Composable
-fun HomeScreen(viewModel: ShopViewModel) {
+fun HomeScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
-    val sales by viewModel.salesHistory.collectAsState()
+    val sales by reportsViewModel.salesHistory.collectAsState()
     val products by viewModel.products.collectAsState()
 
     // Keep time-based dashboard values fresh while this screen remains visible.
