@@ -57,3 +57,13 @@ The owner still needs to decide the production application ID/package identity, 
 **Reason:** The application previously treated Firebase Auth, local Room credentials, and a DataStore boolean as interchangeable authentication signals. An explicit authority prevents silent cross-account mixing while retaining offline local usability during the migration period. A stable local namespace also removes the old empty-UID/email/username fallback chain from sync and backup consumers.
 
 **Follow-up:** The next security slice must add rate limiting/lockout and harden local credential/PIN migration. The authorization slice must add repository/domain permission checks for privileged actions and negative tests; this ADR does not by itself grant permissions based on the UI role string.
+
+## ADR-008: Never recover production Room data through destructive fallback
+
+**Status:** Accepted and verified on merged `main` at `7d890cc`
+
+**Decision:** `AppDatabase` must register every supported migration explicitly and must not call `fallbackToDestructiveMigration()`. The current database is Room version 6 and registers the complete `MIGRATION_2_3` through `MIGRATION_5_6` chain. An unknown or missing schema migration is a release-blocking failure requiring an explicit recovery procedure, not permission to erase local business data.
+
+**Evidence:** A source scan of `app/src/main` and `app/src/test` on 18 August 2026 found no `fallbackToDestructiveMigration` reference. `AppDatabase.getDatabase()` uses `Room.databaseBuilder(...).addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)` and no destructive fallback.
+
+**Follow-up:** Enable Room schema export and retain generated schema artifacts in a reviewable migration directory once the project’s schema-artifact policy is established. Continue adding migration tests for every version transition; the existing money, udhaar-audit, and stable-sync migration tests remain required gates.
