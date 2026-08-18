@@ -77,7 +77,7 @@ class InventoryCatalogMigrationTest {
                 isSynced, createdAt, updatedAt, isDeleted, mutationVersion, mutationDeviceId
             ) VALUES (?, ?, ?, 0, 1000, NULL, NULL, 2.0, 'pcs', 1, 1.0, ?, 1, 0, 100, 500, ?, 500, 'migration-test-device')
             """.trimIndent(),
-            arrayOf(id, "migration-product-$id", name, barcode, if (isDeleted) 1 else 0)
+            arrayOf<Any?>(id, "migration-product-$id", name, barcode, if (isDeleted) 1 else 0)
         )
     }
 
