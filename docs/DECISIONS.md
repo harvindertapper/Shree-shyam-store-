@@ -119,3 +119,15 @@ The owner still needs to decide the production application ID/package identity, 
 **Reason:** Catalog and inventory screens have a cohesive boundary and can be migrated without moving checkout transaction logic. The ViewModel delegates stock correction to `ShopRepository.adjustProductStock()`, preserving the existing atomic product-plus-audit write. Product edit/opening-stock behavior is intentionally kept equivalent to the existing flow; transactional hardening of opening-stock edits is a separate repository slice rather than an incidental architecture refactor.
 
 **Follow-up:** Extract billing/cart next only after preserving cart state, checkout idempotency, payment validation, actor propagation, and transaction error handling. Do not remove `ShopViewModel` quick-add or export compatibility methods until every billing/inventory call site has moved.
+
+## ADR-014: Shared tenant-aware platform contracts before cross-product features
+
+**Status:** Implemented on `feat/p0-platform-contracts` for review
+
+**Decision:** Add a shared contract layer for `TenantScope`, `PlatformActor`, `CommandMetadata`, payment lifecycle states, marketplace availability states, platform event types, and versioned event metadata before introducing Control Plane or Marketplace integration code. The contract layer is deliberately schema-neutral in this slice; Room organization/store/device persistence and server authorization are separate migration/API slices.
+
+**Reason:** The Merchant Android app, future Admin Panel, and future Marketplace must share stable identity, idempotency, actor, payment, availability, and event semantics. Separate ad-hoc models would create incompatible APIs, unsafe tenant assumptions, and migration rework. The client must never be the authority for tenant scope, role, entitlement, price, stock, payment, or order acceptance.
+
+**Security boundary:** Credentials, PIN verifiers, local password material, access tokens, biometric state, and provider secrets are never valid event or backup payload fields. Future server commands must derive effective tenant scope from authenticated membership and validate all client-supplied scope hints.
+
+**Follow-up:** Introduce persisted `organizationId`, `storeId`, `membershipId`, `deviceId`, and installation identity through a versioned Room migration with legacy mapping and negative authorization tests. Publish a versioned API/event contract from the future Control Plane before enabling cross-repository writes.
