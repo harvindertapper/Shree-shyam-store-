@@ -89,3 +89,13 @@ The owner still needs to decide the production application ID/package identity, 
 **Boundary:** Attempt counters, cooldown timestamps, unlock timestamps, PIN verifiers, and biometric settings remain device-local DataStore state. They are not part of cloud sync, outbox JSON, manual backup/restore payloads, logs, analytics, or crash reports. Logout clears the app-lock state so a new identity cannot inherit the previous identity’s unlock history.
 
 **Follow-up:** Replace the legacy SHA-256 PIN/password compatibility path with a slow, salted credential verifier and add registration/login rate limiting in a separate security slice. Add domain-level role permission checks and negative authorization tests separately; this ADR does not treat a UI role string as authorization by itself.
+
+## ADR-011: Disable automatic Android backup and keep permissions least-privilege
+
+**Status:** Implemented on `chore/permissions-backup-policy` for review
+
+**Decision:** Retain only `INTERNET`, `ACCESS_NETWORK_STATE`, and optional on-demand `CAMERA` permissions. Do not add broad storage, location, contacts, phone, SMS, or notification permissions without a separately approved user journey and runtime rationale. Disable Android automatic backup with `android:allowBackup="false"` and explicitly exclude the private root in both legacy backup and Android 12+ data-extraction resources.
+
+**Reason:** The app stores local PIN verifiers, session/identity metadata, Room business records, customer/ledger data, and exported files. Opaque automatic backup or device transfer must not bypass the app’s validated manual backup/restore privacy and atomicity boundaries. Barcode scanning remains optional and requests camera access only when the scanner is opened; system photo picking does not require broad storage permissions.
+
+**Operational consequence:** Device migration and reinstall do not automatically restore the local store. Operators must use and rehearse the explicit in-app backup/restore workflow. Release smoke tests must verify that a clean install does not assume automatic restoration and that manual recovery remains available.
