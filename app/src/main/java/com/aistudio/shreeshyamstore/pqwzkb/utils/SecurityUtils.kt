@@ -20,12 +20,26 @@ object SecurityUtils {
 
         val digest = MessageDigest.getInstance("SHA-256")
             .digest(normalized.toByteArray(Charsets.UTF_8))
-        return digest.joinToString(separator = "") { byte -> "%02x".format(byte) }
+        return digest.joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }
     }
 
     /** Returns true when [value] is a canonical SHA-256 hexadecimal digest. */
     fun isSha256Hash(value: String): Boolean =
         value.trim().length == SHA256_HEX_LENGTH && value.trim().all { it in "0123456789abcdefABCDEF" }
+
+    /**
+     * New PINs must be four digits and must not use the historical default or
+     * obvious repeated/sequential values.
+     */
+    fun isAcceptableNewPin(pin: String): Boolean {
+        val normalized = pin.trim()
+        if (normalized.length != 4 || normalized.any { !it.isDigit() }) return false
+        if (normalized == DEFAULT_PIN || normalized == DEFAULT_PIN.reversed()) return false
+        if (normalized.all { it == normalized.first() }) return false
+        val ascending = normalized.zipWithNext().all { (left, right) -> right.code == left.code + 1 }
+        val descending = normalized.zipWithNext().all { (left, right) -> right.code == left.code - 1 }
+        return !ascending && !descending
+    }
 
     /**
      * Verifies a PIN without exposing timing differences for hashed values.

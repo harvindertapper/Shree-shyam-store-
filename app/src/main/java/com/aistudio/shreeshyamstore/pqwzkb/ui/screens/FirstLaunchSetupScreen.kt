@@ -27,6 +27,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppPrimaryButton
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
 
 @Composable
@@ -49,7 +50,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
     var shopName by remember { mutableStateOf(currentSettings.shopName.ifEmpty { strings.defaultShopName }) }
     var ownerName by remember(initialOwnerName) { mutableStateOf(initialOwnerName) }
     var ownerPhone by remember { mutableStateOf(currentSettings.ownerPhone) }
-    var securityPin by remember { mutableStateOf("1234") }
+    var securityPin by remember { mutableStateOf("") }
     var enableBiometric by remember { mutableStateOf(false) }
 
     var shopNameError by remember { mutableStateOf(false) }
@@ -219,7 +220,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             leadingIcon = {
                                 Icon(Icons.Default.Lock, contentDescription = null, tint = SaffronPrimary)
                             },
-                            placeholder = "1234",
+                            placeholder = "4-digit PIN",
                             isError = pinError != null,
                             supportingText = {
                                 if (pinError != null) {
@@ -248,7 +249,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
 
                             Switch(
                                 checked = enableBiometric,
-                                onCheckedChange = { enableBiometric = it },
+                                onCheckedChange = { enableBiometric = it && viewModel.isBiometricAvailable() },
                                 colors = SwitchDefaults.colors(
                                     checkedThumbColor = SaffronPrimary,
                                     checkedTrackColor = SaffronLight
@@ -273,8 +274,12 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             phoneError = if (currentSettings.appLanguage == AppLanguage.HINDI) "कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें" else "Please enter valid 10 digit phone number"
                             return@AppPrimaryButton
                         }
-                        if (securityPin.length != 4) {
-                            pinError = if (currentSettings.appLanguage == AppLanguage.HINDI) "कृपया 4 अंकों का पिन सेट करें (उदा. 1234)" else "Please enter a 4-digit PIN (e.g. 1234)"
+                        if (!SecurityUtils.isAcceptableNewPin(securityPin)) {
+                            pinError = if (currentSettings.appLanguage == AppLanguage.HINDI) {
+                                "कृपया 1234, दोहराए गए या लगातार अंकों के बिना मजबूत 4-अंकों का पिन सेट करें"
+                            } else {
+                                "Set a strong 4-digit PIN; default, repeated, and sequential PINs are not allowed"
+                            }
                             return@AppPrimaryButton
                         }
 
