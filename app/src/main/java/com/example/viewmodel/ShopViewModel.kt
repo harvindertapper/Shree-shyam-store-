@@ -24,7 +24,7 @@ sealed class Screen {
     object Setup : Screen()
     object Home : Screen()
     object Billing : Screen()
-    data class Payment(val invoiceTotal: Double) : Screen()
+    data class Payment(val invoiceTotal: Long) : Screen()
     object BillSuccess : Screen()
     object Products : Screen()
     data class AddEditProduct(val productId: Long? = null) : Screen()
@@ -361,9 +361,9 @@ class ShopViewModel(
         id: Long,
         name: String,
         categoryId: Long,
-        mrp: Double,
-        sellingPrice: Double?,
-        purchasePrice: Double?,
+        mrp: Long,
+        sellingPrice: Long?,
+        purchasePrice: Long?,
         currentStock: Double,
         unit: String = "pcs",
         trackStock: Boolean,
@@ -464,15 +464,14 @@ class ShopViewModel(
     private val _cartState = MutableStateFlow<Map<Product, Double>>(emptyMap())
     val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
 
-    val cartTotal: StateFlow<Double> = _cartState.map { cart ->
-        val rawTotal = cart.entries.sumOf { (product, quantity) ->
-            product.getEffectivePrice() * quantity
+    val cartTotal: StateFlow<Long> = _cartState.map { cart ->
+        cart.entries.sumOf { (product, quantity) ->
+            CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
         }
-        if (rawTotal.isFinite()) CommerceValidation.roundCurrency(rawTotal) else 0.0
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0.0
+        initialValue = 0L
     )
 
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
@@ -515,7 +514,7 @@ class ShopViewModel(
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
      */
-    fun quickAddProduct(name: String, mrp: Double, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs", barcode: String = "") {
+    fun quickAddProduct(name: String, mrp: Long, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs", barcode: String = "") {
         viewModelScope.launch {
             val now = System.currentTimeMillis()
             val prod = Product(
@@ -688,29 +687,29 @@ class ShopViewModel(
             initialValue = emptyList()
         )
 
-    val totalUdhaarAmount: StateFlow<Double> = repository.getTotalUdhaarFlow()
+    val totalUdhaarAmount: StateFlow<Long> = repository.getTotalUdhaarFlow()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = 0.0
+            initialValue = 0L
         )
 
     fun getTransactionsForCustomer(customerId: Long): Flow<List<UdhaarTransaction>> {
         return repository.getTransactionsForCustomer(customerId)
     }
 
-    fun getCustomerBalanceFlow(customerId: Long): Flow<Double> {
+    fun getCustomerBalanceFlow(customerId: Long): Flow<Long> {
         return repository.getCustomerBalanceFlow(customerId)
     }
 
-    suspend fun calculateCustomerBalance(customerId: Long): Double {
+    suspend fun calculateCustomerBalance(customerId: Long): Long {
         return repository.getCustomerBalance(customerId)
     }
 
-    fun addUdhaarPayment(customerId: Long, amount: Double, note: String?) {
+    fun addUdhaarPayment(customerId: Long, amountMinorUnits: Long, note: String?) {
         viewModelScope.launch {
             try {
-                repository.recordUdhaarPayment(customerId, amount, note)
+                repository.recordUdhaarPayment(customerId, amountMinorUnits, note)
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
                 Toast.makeText(
@@ -791,7 +790,7 @@ class ShopViewModel(
         )
     }
 
-    fun sendUdhaarReminder(context: Context, customer: Customer, balance: Double) {
+    fun sendUdhaarReminder(context: Context, customer: Customer, balance: Long) {
         val settings = storeSettings.value
         val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
@@ -835,7 +834,7 @@ class ShopViewModel(
         )
     }
 
-    fun exportUdhaarCsv(context: Context, debtorCustomers: List<Customer>, balances: Map<Long, Double>) {
+    fun exportUdhaarCsv(context: Context, debtorCustomers: List<Customer>, balances: Map<Long, Long>) {
         val settings = storeSettings.value
         val strings = com.example.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }

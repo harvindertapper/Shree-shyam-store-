@@ -1,7 +1,6 @@
 package com.example.data
 
 import androidx.room.withTransaction
-import com.example.commerce.CommerceValidation
 import com.example.commerce.UdhaarTransactionType
 import kotlinx.coroutines.flow.Flow
 
@@ -95,25 +94,25 @@ class ShopRepository(
     suspend fun getTransactionsForCustomerList(customerId: Long): List<UdhaarTransaction> = 
         udhaarDao.getTransactionsForCustomerList(customerId)
 
-    fun getCustomerBalanceFlow(customerId: Long): Flow<Double> =
+    fun getCustomerBalanceFlow(customerId: Long): Flow<Long> =
         udhaarDao.getCustomerBalanceFlow(customerId)
 
-    suspend fun getCustomerBalance(customerId: Long): Double =
+    suspend fun getCustomerBalance(customerId: Long): Long =
         udhaarDao.getCustomerBalance(customerId)
 
-    fun getTotalUdhaarFlow(): Flow<Double> =
+    fun getTotalUdhaarFlow(): Flow<Long> =
         udhaarDao.getTotalUdhaarFlow()
 
-    suspend fun getTotalUdhaar(): Double =
+    suspend fun getTotalUdhaar(): Long =
         udhaarDao.getTotalUdhaar()
 
     suspend fun insertUdhaarTransaction(transaction: UdhaarTransaction): Long =
         udhaarDao.insertTransaction(transaction)
 
-    suspend fun recordUdhaarPayment(customerId: Long, amount: Double, note: String?): Long {
+    suspend fun recordUdhaarPayment(customerId: Long, amountMinorUnits: Long, note: String?): Long {
         val operation: suspend () -> Long = {
-            require(amount.isFinite() && amount > 0.0) {
-                "Payment amount must be finite and positive"
+            require(amountMinorUnits > 0L) {
+                "Payment amount must be positive"
             }
             val customer = customerDao.getCustomerById(customerId)
             require(customer != null && !customer.isDeleted) {
@@ -123,7 +122,7 @@ class ShopRepository(
                 UdhaarTransaction(
                     customerId = customerId,
                     type = UdhaarTransactionType.PAYMENT.name,
-                    amount = CommerceValidation.roundCurrency(amount),
+                    amount = amountMinorUnits,
                     note = note?.trim()?.ifEmpty { "Payment received" } ?: "Payment received",
                     isSynced = false,
                     createdAt = System.currentTimeMillis(),

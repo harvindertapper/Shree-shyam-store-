@@ -70,7 +70,7 @@ object ShareUtils {
     fun formatUdhaarReminder(
         shopName: String,
         customerName: String,
-        balance: Double,
+        balance: Long,
         ownerPhone: String? = null,
         ownerName: String? = null,
         upiId: String? = null
@@ -91,9 +91,9 @@ object ShareUtils {
             else -> null
         }
 
-        if (effectiveUpiPa != null && balance > 0.0) {
+        if (effectiveUpiPa != null && balance > 0L) {
             val encodedShop = Uri.encode(shopName.trim())
-            val amountFormatted = "%.2f".format(Locale.ENGLISH, balance)
+            val amountFormatted = MoneyUtils.toInputString(balance)
             val upiUri = "upi://pay?pa=$effectiveUpiPa&pn=$encodedShop&am=$amountFormatted&cu=INR"
             sb.append("कृपया नीचे दिए गए UPI लिंक पर क्लिक करके भुगतान करें:\n")
             sb.append("$upiUri\n\n")
@@ -118,7 +118,7 @@ object ShareUtils {
     fun generateUdhaarReminderText(
         shopName: String,
         customerName: String,
-        balance: Double,
+        balance: Long,
         ownerPhone: String? = null,
         ownerName: String? = null,
         upiId: String? = null
@@ -134,7 +134,7 @@ object ShareUtils {
         billNumber: String,
         dateFormatted: String,
         items: List<SaleItem>,
-        totalAmount: Double,
+        totalAmount: Long,
         paymentMode: String,
         ownerPhone: String? = null,
         ownerName: String? = null
@@ -155,7 +155,7 @@ object ShareUtils {
             sb.append("   ${itm.quantity} ${itm.unit} x ${CurrencyUtils.formatRupees(itm.unitPrice)} = ${CurrencyUtils.formatRupees(itm.lineTotal)}\n")
         }
         sb.append("----------------------------\n")
-        sb.append("*कुल राशि / Total: ${CurrencyUtils.formatRupees(totalAmount)}*\n")
+            sb.append("*कुल राशि / Total: ${CurrencyUtils.formatRupees(totalAmount)}*\n")
         val modeText = when (paymentMode.uppercase()) {
             "UPI" -> "UPI / QR"
             "UDHAAR" -> "उधार / Udhaar"
@@ -188,7 +188,7 @@ object ShareUtils {
             val cat = categoryNameMap[item.categoryId]?.let { " ($it)" } ?: ""
             sb.append("${index + 1}. *${item.name}*$cat\n")
             val current = if (item.currentStock <= 0) "ख़त्म (0 stock)" else "बचा: ${item.currentStock} पीस"
-            sb.append("   ▸ वर्तमान स्टॉक: $current | MRP: ₹${item.mrp}\n")
+            sb.append("   ▸ वर्तमान स्टॉक: $current | MRP: ${CurrencyUtils.formatRupees(item.mrp)}\n")
         }
 
         sb.append("\n----------------------------\n")
@@ -222,7 +222,7 @@ object ShareUtils {
                 writer.append(csvField(s.billNumber)).append(",")
                 writer.append(csvField(df.format(Date(s.createdAt)))).append(",")
                 writer.append(csvField(s.paymentMode)).append(",")
-                writer.append("${s.totalAmount},")
+                writer.append(MoneyUtils.toInputString(s.totalAmount)).append(",")
                 writer.append(csvField(s.customerId?.toString().orEmpty())).append(",")
                 writer.append("${s.createdAt}\n")
             }
@@ -260,8 +260,8 @@ object ShareUtils {
                 val status = if (!p.trackStock) "Not Tracked" else if (p.currentStock <= 0) "Out of Stock" else if (p.currentStock <= 5) "Low Stock" else "In Stock"
                 writer.append(csvField(p.name)).append(",")
                 writer.append(csvField(catName)).append(",")
-                writer.append("${p.mrp},")
-                writer.append("${p.sellingPrice ?: p.mrp},")
+                writer.append(MoneyUtils.toInputString(p.mrp)).append(",")
+                writer.append(MoneyUtils.toInputString(p.sellingPrice ?: p.mrp)).append(",")
                 writer.append("${p.currentStock},")
                 writer.append("${p.trackStock},")
                 writer.append(csvField(status)).append("\n")
@@ -281,7 +281,7 @@ object ShareUtils {
     fun exportUdhaarCsv(
         context: Context,
         customers: List<Customer>,
-        balances: Map<Long, Double>,
+        balances: Map<Long, Long>,
         shopName: String
     ) {
         if (customers.isEmpty()) {
@@ -296,11 +296,11 @@ object ShareUtils {
 
             writer.append("Customer Name,Phone,Outstanding Due (INR),Status\n")
             for (c in customers) {
-                val bal = balances[c.id] ?: 0.0
-                val status = if (bal > 0.01) "Pending Due" else "Settled"
+                val bal = balances[c.id] ?: 0L
+                val status = if (bal > 0L) "Pending Due" else "Settled"
                 writer.append(csvField(c.name)).append(",")
                 writer.append(csvField(c.phone.orEmpty())).append(",")
-                writer.append("$bal,")
+                writer.append(MoneyUtils.toInputString(bal)).append(",")
                 writer.append(csvField(status)).append("\n")
             }
             writer.flush()

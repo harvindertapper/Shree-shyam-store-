@@ -32,9 +32,12 @@ data class Product(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val categoryId: Long,
-    val mrp: Double,
-    val sellingPrice: Double? = null,
-    val purchasePrice: Double? = null,
+    /** MRP in integer paise. */
+    val mrp: Long,
+    /** Selling price in integer paise, or null when MRP is used. */
+    val sellingPrice: Long? = null,
+    /** Purchase price in integer paise, or null when not recorded. */
+    val purchasePrice: Long? = null,
     val currentStock: Double = 0.0,
     val unit: String = "pcs", // e.g. "pcs", "kg", "g", "ltr", "pkt"
     val trackStock: Boolean = true,
@@ -46,8 +49,8 @@ data class Product(
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
 ) {
-    fun getEffectivePrice(): Double {
-        return if (sellingPrice != null && sellingPrice > 0.0) sellingPrice else mrp
+    fun getEffectivePrice(): Long {
+        return if (sellingPrice != null && sellingPrice > 0L) sellingPrice else mrp
     }
 
     fun getFormattedStock(): String {
@@ -63,7 +66,8 @@ data class Product(
 data class Sale(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val billNumber: String,
-    val totalAmount: Double,
+    /** Bill total in integer paise. */
+    val totalAmount: Long,
     val paymentMode: String, // "CASH", "UPI", "UDHAAR"
     val customerId: Long? = null,
     val note: String? = null,
@@ -81,8 +85,10 @@ data class SaleItem(
     val productNameSnapshot: String,
     val quantity: Double = 1.0,
     val unit: String = "pcs",
-    val unitPrice: Double,
-    val lineTotal: Double,
+    /** Unit selling price in integer paise. */
+    val unitPrice: Long,
+    /** Line total in integer paise. */
+    val lineTotal: Long,
     val isSynced: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
@@ -106,7 +112,8 @@ data class Customer(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val phone: String? = null,
-    val creditLimit: Double = 5000.0,
+    /** Credit limit in integer paise. */
+    val creditLimit: Long = 500_000L,
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
@@ -119,7 +126,8 @@ data class UdhaarTransaction(
     val customerId: Long,
     val saleId: Long? = null,
     val type: String, // "CREDIT", "PAYMENT"
-    val amount: Double,
+    /** Ledger amount in integer paise. */
+    val amount: Long,
     val note: String? = null,
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

@@ -471,7 +471,7 @@ fun HomeScreen(viewModel: ShopViewModel) {
 @Composable
 fun MetricSummaryTile(
     title: String,
-    amount: Double,
+    amount: Long,
     accentColor: Color,
     containerColor: Color,
     icon: ImageVector,

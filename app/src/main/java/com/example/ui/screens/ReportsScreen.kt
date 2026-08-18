@@ -32,6 +32,7 @@ import com.example.utils.AppLanguage
 import com.example.utils.CurrencyUtils
 import com.example.utils.DateTimeUtils
 import com.example.utils.LocaleHelper
+import com.example.utils.MoneyUtils
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 import kotlinx.coroutines.delay
@@ -524,15 +525,15 @@ fun ReportsScreen(viewModel: ShopViewModel) {
 @Composable
 fun PaymentDistributionDonutChart(
     viewModel: ShopViewModel,
-    cashAmount: Double,
-    upiAmount: Double,
-    udhaarAmount: Double,
-    totalAmount: Double
+    cashAmount: Long,
+    upiAmount: Long,
+    udhaarAmount: Long,
+    totalAmount: Long
 ) {
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    if (totalAmount <= 0.0) {
+    if (totalAmount <= 0L) {
         Card(
             colors = CardDefaults.cardColors(containerColor = Color.White),
             border = BorderStroke(1.2.dp, BorderStrong),
@@ -562,9 +563,9 @@ fun PaymentDistributionDonutChart(
         return
     }
 
-    val cashPct = (cashAmount / totalAmount).toFloat()
-    val upiPct = (upiAmount / totalAmount).toFloat()
-    val udhaarPct = (udhaarAmount / totalAmount).toFloat()
+    val cashPct = (cashAmount.toDouble() / totalAmount.toDouble()).toFloat()
+    val upiPct = (upiAmount.toDouble() / totalAmount.toDouble()).toFloat()
+    val udhaarPct = (udhaarAmount.toDouble() / totalAmount.toDouble()).toFloat()
 
     val cashColor = SuccessGreen
     val upiColor = Color(0xFF0E5A94)
@@ -724,7 +725,7 @@ fun WeeklySalesBarChart(
     // Get sales over the last 7 days
     val last7Days = remember(salesHistory) {
         val daysList = mutableListOf<String>()
-        val dayTotals = mutableListOf<Double>()
+        val dayTotals = mutableListOf<Long>()
         
         val format = java.text.SimpleDateFormat("dd/MM", java.util.Locale.getDefault())
         for (i in 6 downTo 0) {
@@ -753,7 +754,7 @@ fun WeeklySalesBarChart(
 
     val days = last7Days.first
     val totals = last7Days.second
-    val maxVal = remember(totals) { totals.maxOrNull()?.coerceAtLeast(1.0) ?: 1.0 }
+    val maxVal = remember(totals) { totals.maxOrNull()?.coerceAtLeast(1L) ?: 1L }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -783,7 +784,7 @@ fun WeeklySalesBarChart(
                 verticalAlignment = Alignment.Bottom
             ) {
                 totals.forEachIndexed { index, total ->
-                    val fraction = (total / maxVal).toFloat().coerceIn(0.04f, 1f)
+                    val fraction = (total.toDouble() / maxVal.toDouble()).toFloat().coerceIn(0.04f, 1f)
                     
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -791,7 +792,11 @@ fun WeeklySalesBarChart(
                     ) {
                         if (total > 0) {
                             Text(
-                                text = if (total >= 1000) String.format("%.1fk", total / 1000.0) else total.toInt().toString(),
+                                text = run {
+                                    val rupees = total.toDouble() / 100.0
+                                    if (rupees >= 1000.0) String.format("%.1fk", rupees / 1000.0)
+                                    else MoneyUtils.toInputString(total)
+                                },
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Black,
                                 color = SaffronDark
