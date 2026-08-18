@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
@@ -499,42 +500,43 @@ class ShopViewModel(
      */
     fun quickAddProduct(name: String, mrp: Long, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs", barcode: String = "") {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val prod = Product(
-                name = name.trim(),
-                categoryId = categoryId,
-                mrp = mrp,
-                sellingPrice = mrp,
-                currentStock = currentStock,
-                unit = unit.trim().ifEmpty { "pcs" },
-                trackStock = trackStock,
-                barcode = barcode.trim(),
-                isActive = true,
-                createdAt = now,
-                updatedAt = now
-            )
-            val newId = repository.insertProduct(prod)
-            val insertedProduct = prod.copy(id = newId)
-
-            if (trackStock && currentStock > 0.0) {
-                repository.insertStockAdjustment(
-                    StockAdjustment(
-                        productId = newId,
-                        oldStock = 0.0,
-                        newStock = currentStock,
-                        difference = currentStock,
-                        reason = "Opening stock entry",
-                        createdAt = now,
-                        updatedAt = now
-                    )
+            try {
+                val normalizedName = InventoryValidation.validateProductName(name)
+                val normalizedMrp = InventoryValidation.validateProductMoney(mrp, "MRP")
+                val normalizedStock = InventoryValidation.validateQuantity(currentStock, "Current stock")
+                val normalizedUnit = InventoryValidation.validateUnit(unit)
+                val normalizedBarcode = InventoryValidation.normalizeBarcode(barcode)
+                require(repository.isBarcodeAvailable(normalizedBarcode.orEmpty())) {
+                    "Barcode already belongs to another active product"
+                }
+                val now = System.currentTimeMillis()
+                val prod = Product(
+                    name = normalizedName,
+                    categoryId = categoryId,
+                    mrp = normalizedMrp,
+                    sellingPrice = normalizedMrp,
+                    currentStock = normalizedStock,
+                    unit = normalizedUnit,
+                    trackStock = trackStock,
+                    barcode = barcode.trim(),
+                    barcodeKey = normalizedBarcode,
+                    isActive = true,
+                    createdAt = now,
+                    updatedAt = now
                 )
-            }
+                val newId = repository.insertProductWithOpeningStock(prod, normalizedStock, now)
 
-            // Add the inserted product directly to our cart
-            addProductToCart(insertedProduct, 1.0)
-            triggerAutoSync()
+                // Add the inserted product directly to our cart.
+                addProductToCart(prod.copy(id = newId), 1.0)
+                triggerAutoSync()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(context, error.message ?: "Product could not be added", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Product could not be added", Toast.LENGTH_LONG).show()
+            }
         }
     }
+
 
 
     // --- Payment & Saving State ---
@@ -900,24 +902,22 @@ class ShopViewModel(
 
     fun bulkRestockProduct(product: Product, quantityToAdd: Double) {
         viewModelScope.launch {
-            if (quantityToAdd <= 0.0) return@launch
-            val updated = product.copy(
-                currentStock = product.currentStock + quantityToAdd,
-                updatedAt = System.currentTimeMillis(),
-                isSynced = false
-            )
-            repository.updateProduct(updated)
-            repository.insertStockAdjustment(
-                StockAdjustment(
-                    productId = product.id,
-                    oldStock = product.currentStock,
-                    newStock = updated.currentStock,
-                    difference = quantityToAdd,
-                    reason = "Bulk Wholesale Restock",
-                    createdAt = System.currentTimeMillis()
+            try {
+                val validatedQuantity = InventoryValidation.validateQuantity(quantityToAdd, "Restock quantity")
+                require(validatedQuantity > 0.0) { "Restock quantity must be greater than zero" }
+                val current = repository.getProductById(product.id)
+                    ?: error("Product was not found")
+                val newStock = InventoryValidation.validateQuantity(
+                    current.currentStock + validatedQuantity,
+                    "New stock"
                 )
-            )
-            triggerAutoSync()
+                repository.adjustProductStock(product.id, newStock, "Bulk Wholesale Restock")
+                triggerAutoSync()
+            } catch (error: IllegalArgumentException) {
+                Toast.makeText(context, error.message ?: "Restock could not be saved", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Restock could not be saved", Toast.LENGTH_LONG).show()
+            }
         }
     }
 

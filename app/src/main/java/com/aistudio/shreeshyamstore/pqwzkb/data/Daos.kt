@@ -23,8 +23,11 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun getCategoryById(id: Long): Category?
 
-    @Query("SELECT * FROM categories WHERE name = :name AND isDeleted = 0 LIMIT 1")
+    @Query("SELECT * FROM categories WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) AND isDeleted = 0 LIMIT 1")
     suspend fun getCategoryByName(name: String): Category?
+
+    @Query("SELECT * FROM categories WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) AND isDeleted = 0 AND id != :excludeId LIMIT 1")
+    suspend fun getCategoryByNameExcludingId(name: String, excludeId: Long): Category?
 
     @Query("SELECT * FROM categories WHERE isSynced = 0")
     suspend fun getUnsyncedCategories(): List<Category>
@@ -61,6 +64,12 @@ interface ProductDao {
 
     @Query("SELECT * FROM products WHERE id = :id")
     suspend fun getProductById(id: Long): Product?
+
+    @Query("SELECT * FROM products WHERE barcodeKey = :barcodeKey AND isDeleted = 0 AND id != :excludeId LIMIT 1")
+    suspend fun getActiveProductByBarcodeKey(barcodeKey: String, excludeId: Long): Product?
+
+    @Query("SELECT * FROM products WHERE UPPER(TRIM(barcode)) = :barcodeKey AND isDeleted = 0 AND id != :excludeId LIMIT 1")
+    suspend fun getActiveProductByLegacyBarcode(barcodeKey: String, excludeId: Long): Product?
 
     @Query("SELECT * FROM products WHERE id = :id")
     fun getProductByIdFlow(id: Long): Flow<Product?>

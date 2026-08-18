@@ -20,7 +20,7 @@ import java.util.UUID
         User::class,
         SyncOutbox::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -254,6 +254,30 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE products ADD COLUMN barcodeKey TEXT")
+                database.execSQL(
+                    """
+                    UPDATE products
+                    SET barcodeKey = UPPER(TRIM(barcode))
+                    WHERE isDeleted = 0
+                      AND TRIM(barcode) <> ''
+                      AND id IN (
+                          SELECT MIN(id)
+                          FROM products
+                          WHERE isDeleted = 0 AND TRIM(barcode) <> ''
+                          GROUP BY UPPER(TRIM(barcode))
+                          HAVING COUNT(*) = 1
+                      )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_products_barcodeKey ON products (barcodeKey)"
+                )
+            }
+        }
+
         internal val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val businessTables = listOf(
@@ -302,7 +326,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                     .addCallback(seedCategoriesCallback())
                     .build()
                     .also { INSTANCE = it }
