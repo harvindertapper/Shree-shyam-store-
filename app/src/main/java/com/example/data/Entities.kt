@@ -2,6 +2,7 @@ package com.example.data
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.util.UUID
 
@@ -19,19 +20,23 @@ data class ShopProfile(
     val isDeleted: Boolean = false
 )
 
-@Entity(tableName = "categories")
+@Entity(tableName = "categories", indices = [Index(value = ["globalId"], unique = true)])
 data class Category(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val name: String,
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "products")
+@Entity(tableName = "products", indices = [Index(value = ["globalId"], unique = true)])
 data class Product(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val name: String,
     val categoryId: Long,
     /** MRP in integer paise. */
@@ -49,7 +54,9 @@ data class Product(
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 ) {
     fun getEffectivePrice(): Long {
         return if (sellingPrice != null && sellingPrice > 0L) sellingPrice else mrp
@@ -64,9 +71,10 @@ data class Product(
     }
 }
 
-@Entity(tableName = "sales")
+@Entity(tableName = "sales", indices = [Index(value = ["globalId"], unique = true)])
 data class Sale(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val billNumber: String,
     /** Bill total in integer paise. */
     val totalAmount: Long,
@@ -76,12 +84,15 @@ data class Sale(
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "sale_items")
+@Entity(tableName = "sale_items", indices = [Index(value = ["globalId"], unique = true)])
 data class SaleItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val saleId: Long,
     val productId: Long,
     val productNameSnapshot: String,
@@ -93,7 +104,9 @@ data class SaleItem(
     val lineTotal: Long,
     val isSynced: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 ) {
     fun getFormattedQuantity(): String {
         return if (quantity % 1.0 == 0.0) {
@@ -109,9 +122,10 @@ typealias Bill = Sale
 typealias BillItem = SaleItem
 typealias Transaction = UdhaarTransaction
 
-@Entity(tableName = "customers")
+@Entity(tableName = "customers", indices = [Index(value = ["globalId"], unique = true)])
 data class Customer(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val name: String,
     val phone: String? = null,
     /** Credit limit in integer paise. */
@@ -119,12 +133,15 @@ data class Customer(
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "udhaar_transactions")
+@Entity(tableName = "udhaar_transactions", indices = [Index(value = ["globalId"], unique = true)])
 data class UdhaarTransaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     @ColumnInfo(defaultValue = "''") val eventId: String = UUID.randomUUID().toString(),
     val customerId: Long,
     val saleId: Long? = null,
@@ -147,12 +164,15 @@ data class UdhaarTransaction(
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "stock_adjustments")
+@Entity(tableName = "stock_adjustments", indices = [Index(value = ["globalId"], unique = true)])
 data class StockAdjustment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
     val productId: Long,
     val oldStock: Double = 0.0,
     val newStock: Double = 0.0,
@@ -161,7 +181,9 @@ data class StockAdjustment(
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
 @Entity(tableName = "users")

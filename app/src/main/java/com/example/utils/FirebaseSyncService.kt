@@ -8,9 +8,12 @@ import com.example.data.Sale
 import com.example.data.SaleItem
 import com.example.data.SettingsDataStore
 import com.example.data.StockAdjustment
+import com.example.data.SyncOutbox
+import com.example.data.SyncOutboxState
 import com.example.data.UdhaarTransaction
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.squareup.moshi.Moshi
@@ -42,47 +45,135 @@ class FirebaseSyncService(
         if (uid.isEmpty()) return@withContext false
 
         try {
-            val products = database.productDao().getUnsyncedProducts()
-            val sales = database.saleDao().getUnsyncedSales()
-            val saleItems = database.saleDao().getUnsyncedSaleItems()
-            val customers = database.customerDao().getUnsyncedCustomers()
-            val categories = database.categoryDao().getUnsyncedCategories()
-            val udhaar = database.udhaarDao().getUnsyncedTransactions()
-            val adjustments = database.stockAdjustmentDao().getUnsyncedAdjustments()
-
+            materializeOutboxEntries()
             val shop = firestore.collection("shops").document(uid)
-            val writes = buildList {
-                products.forEach { add(shop.collection("products").document(it.id.toString()) to it.toCloudMap()) }
-                sales.forEach { add(shop.collection("bills").document(it.id.toString()) to it.toCloudMap()) }
-                saleItems.forEach { add(shop.collection("sale_items").document(it.id.toString()) to it.toCloudMap()) }
-                customers.forEach { add(shop.collection("customers").document(it.id.toString()) to it.toCloudMap()) }
-                categories.forEach { add(shop.collection("categories").document(it.id.toString()) to it.toCloudMap()) }
-                udhaar.forEach { add(shop.collection("udhaar_transactions").document(it.id.toString()) to it.toCloudMap()) }
-                adjustments.forEach { add(shop.collection("stock_adjustments").document(it.id.toString()) to it.toCloudMap()) }
-            }
-
-            // Firestore limits a write batch to 500 operations. Keep headroom
-            // for server-side metadata and make large offline queues safe.
-            writes.chunked(MAX_BATCH_WRITES).forEach { chunk ->
-                val batch = firestore.batch()
-                chunk.forEach { (reference, data) ->
-                    batch.set(reference, data, SetOptions.merge())
+            val now = System.currentTimeMillis()
+            val candidates = database.syncOutboxDao().getEligible(now, MAX_OUTBOX_BATCH)
+            candidates.forEach { candidate ->
+                val leaseNow = System.currentTimeMillis()
+                if (database.syncOutboxDao().claim(candidate.id, leaseNow, leaseNow + OUTBOX_LEASE_MS) != 1) {
+                    return@forEach
                 }
-                Tasks.await(batch.commit(), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                val claimed = database.syncOutboxDao().getById(candidate.id) ?: return@forEach
+                processOutboxEntry(shop, claimed)
             }
-
-            if (products.isNotEmpty()) database.productDao().markProductsSynced(products.map { it.id })
-            if (sales.isNotEmpty()) database.saleDao().markSalesSynced(sales.map { it.id })
-            if (saleItems.isNotEmpty()) database.saleDao().markSaleItemsSynced(saleItems.map { it.id })
-            if (customers.isNotEmpty()) database.customerDao().markCustomersSynced(customers.map { it.id })
-            if (categories.isNotEmpty()) database.categoryDao().markCategoriesSynced(categories.map { it.id })
-            if (udhaar.isNotEmpty()) database.udhaarDao().markTransactionsSynced(udhaar.map { it.id })
-            if (adjustments.isNotEmpty()) database.stockAdjustmentDao().markAdjustmentsSynced(adjustments.map { it.id })
-            true
+            database.syncOutboxDao().countByState(SyncOutboxState.RETRYABLE) == 0
         } catch (_: Exception) {
             false
         }
     }
+
+    private suspend fun materializeOutboxEntries() {
+        val entries = buildList {
+            database.productDao().getUnsyncedProducts().forEach { add(SyncOutboxDraft("products", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.saleDao().getUnsyncedSales().forEach { add(SyncOutboxDraft("sales", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.saleDao().getUnsyncedSaleItems().forEach { add(SyncOutboxDraft("sale_items", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.customerDao().getUnsyncedCustomers().forEach { add(SyncOutboxDraft("customers", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.categoryDao().getUnsyncedCategories().forEach { add(SyncOutboxDraft("categories", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.udhaarDao().getUnsyncedTransactions().forEach { add(SyncOutboxDraft("udhaar_transactions", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.stockAdjustmentDao().getUnsyncedAdjustments().forEach { add(SyncOutboxDraft("stock_adjustments", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+        }
+        val now = System.currentTimeMillis()
+        entries.forEach { draft ->
+            val key = SyncIdentity.idempotencyKey(draft.tableName, draft.globalId, draft.mutationVersion)
+            val payloadJson = cloudMapAdapter.toJson(draft.payload)
+            database.syncOutboxDao().insert(
+                SyncOutbox(
+                    tableName = draft.tableName,
+                    globalId = draft.globalId,
+                    localId = draft.localId,
+                    mutationVersion = draft.mutationVersion,
+                    mutationDeviceId = draft.mutationDeviceId,
+                    idempotencyKey = key,
+                    payloadJson = payloadJson,
+                    tombstone = draft.tombstone,
+                    createdAt = now,
+                    updatedAt = now
+                )
+            )
+        }
+    }
+
+    private suspend fun processOutboxEntry(
+        shop: DocumentReference,
+        entry: SyncOutbox
+    ) {
+        try {
+            val collection = cloudCollection(entry.tableName)
+            val reference = shop.collection(collection).document(entry.globalId)
+            val remote = Tasks.await(reference.get(), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            if (remote.exists()) {
+                val remoteKey = remote.getString("idempotencyKey")
+                val remoteVersion = remote.long("mutationVersion") ?: remote.long("updatedAt") ?: 0L
+                val remoteDevice = remote.syncMutationDeviceId()
+                if (remoteKey == entry.idempotencyKey) {
+                    acknowledge(entry)
+                    return
+                }
+                val comparison = SyncIdentity.compareMutation(
+                    entry.mutationVersion,
+                    entry.mutationDeviceId,
+                    remoteVersion,
+                    remoteDevice
+                )
+                if (comparison < 0 || (comparison == 0 && remoteKey != null)) {
+                    database.syncOutboxDao().markDeadLetter(
+                        entry.id,
+                        entry.attemptCount + 1,
+                        "Remote conflict won for ${entry.tableName}/${entry.globalId}",
+                        System.currentTimeMillis()
+                    )
+                    return
+                }
+            }
+            val payload = cloudMapAdapter.fromJson(entry.payloadJson).orEmpty()
+            Tasks.await(reference.set(payload, SetOptions.merge()), FIRESTORE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            acknowledge(entry)
+        } catch (error: Exception) {
+            val now = System.currentTimeMillis()
+            val nextAttempt = entry.attemptCount + 1
+            if (nextAttempt >= SyncIdentity.MAX_OUTBOX_ATTEMPTS) {
+                database.syncOutboxDao().markDeadLetter(entry.id, nextAttempt, error.message ?: "sync failure", now)
+            } else {
+                database.syncOutboxDao().markRetryable(
+                    entry.id,
+                    nextAttempt,
+                    SyncIdentity.nextRetryAt(now, nextAttempt),
+                    error.message ?: "sync failure",
+                    now
+                )
+            }
+        }
+    }
+
+    private suspend fun acknowledge(entry: SyncOutbox) {
+        val now = System.currentTimeMillis()
+        database.syncOutboxDao().markAcked(entry.id, now)
+        when (entry.tableName) {
+            "categories" -> database.categoryDao().markCategorySyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "products" -> database.productDao().markProductSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "sales" -> database.saleDao().markSaleSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "sale_items" -> database.saleDao().markSaleItemSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "customers" -> database.customerDao().markCustomerSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "udhaar_transactions" -> database.udhaarDao().markTransactionSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "stock_adjustments" -> database.stockAdjustmentDao().markAdjustmentSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+        }
+    }
+
+    private fun cloudCollection(tableName: String): String = when (tableName) {
+        "sales" -> "bills"
+        else -> tableName
+    }
+
+    private data class SyncOutboxDraft(
+        val tableName: String,
+        val localId: Long,
+        val globalId: String,
+        val mutationVersion: Long,
+        val mutationDeviceId: String,
+        val tombstone: Boolean,
+        val payload: Map<String, Any?>
+    )
 
     /** Pulls all changed cloud collections and returns the new high-water mark. */
     suspend fun pullDownstream(shopUid: String, lastSyncTime: Long): Long = withContext(Dispatchers.IO) {
@@ -107,35 +198,95 @@ class FirebaseSyncService(
         }
     }
 
+    private suspend fun localIdForDocument(
+        tableName: String,
+        document: DocumentSnapshot,
+        fallbackTime: Long
+    ): Long {
+        val remoteId = document.long("id") ?: document.id.toLongOrNull() ?: 0L
+        val globalId = document.syncGlobalId(tableName, remoteId)
+        return when (tableName) {
+            "categories" -> database.categoryDao().getSyncStamp(globalId)?.id
+            "products" -> database.productDao().getSyncStamp(globalId)?.id
+            "sales" -> database.saleDao().getSaleSyncStamp(globalId)?.id
+            "sale_items" -> database.saleDao().getSaleItemSyncStamp(globalId)?.id
+            "customers" -> database.customerDao().getSyncStamp(globalId)?.id
+            "udhaar_transactions" -> database.udhaarDao().getSyncStamp(globalId)?.id
+            "stock_adjustments" -> database.stockAdjustmentDao().getSyncStamp(globalId)?.id
+            else -> null
+        } ?: if (remoteId > 0L) remoteId else fallbackTime
+    }
+
+    private suspend fun eligibleDocuments(
+        documents: List<DocumentSnapshot>,
+        tableName: String,
+        fallbackTime: Long
+    ): List<DocumentSnapshot> = documents.filter { document ->
+        val localId = document.long("id") ?: document.id.toLongOrNull() ?: 0L
+        val globalId = document.syncGlobalId(tableName, localId)
+        val remoteVersion = document.syncMutationVersion(fallbackTime)
+        val remoteDevice = document.syncMutationDeviceId()
+        val local = when (tableName) {
+            "categories" -> database.categoryDao().getSyncStamp(globalId)
+            "products" -> database.productDao().getSyncStamp(globalId)
+            "sales" -> database.saleDao().getSaleSyncStamp(globalId)
+            "sale_items" -> database.saleDao().getSaleItemSyncStamp(globalId)
+            "customers" -> database.customerDao().getSyncStamp(globalId)
+            "udhaar_transactions" -> database.udhaarDao().getSyncStamp(globalId)
+            "stock_adjustments" -> database.stockAdjustmentDao().getSyncStamp(globalId)
+            else -> null
+        }
+        local == null || SyncIdentity.compareMutation(
+            remoteVersion,
+            remoteDevice,
+            local.mutationVersion,
+            local.mutationDeviceId
+        ) >= 0
+    }
+
     private suspend fun pullCategories(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("categories").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("categories").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "categories",
+            fallbackTime
+        )
         database.categoryDao().insertAll(docs.mapNotNull { doc ->
+            val id = localIdForDocument("categories", doc, fallbackTime)
             val name = doc.getString("name") ?: return@mapNotNull null
             Category(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("categories", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 name = name,
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullProducts(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("products").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("products").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "products",
+            fallbackTime
+        )
         database.productDao().insertAll(docs.mapNotNull { doc ->
+            val id = localIdForDocument("products", doc, fallbackTime)
             val name = doc.getString("name") ?: return@mapNotNull null
             Product(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("products", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 name = name,
                 categoryId = doc.long("categoryId") ?: 0L,
                 mrp = doc.moneyMinor("mrp"),
@@ -150,42 +301,58 @@ class FirebaseSyncService(
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullCustomers(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("customers").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("customers").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "customers",
+            fallbackTime
+        )
         database.customerDao().insertAll(docs.mapNotNull { doc ->
+            val id = localIdForDocument("customers", doc, fallbackTime)
             val name = doc.getString("name") ?: return@mapNotNull null
             Customer(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("customers", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 name = name,
                 phone = doc.getString("phone"),
                 creditLimit = doc.moneyMinor("creditLimit", 500_000L),
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullSales(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("bills").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("bills").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "sales",
+            fallbackTime
+        )
         database.saleDao().insertAllSales(docs.mapNotNull { doc ->
+            val id = localIdForDocument("sales", doc, fallbackTime)
             val number = doc.getString("billNumber") ?: return@mapNotNull null
             Sale(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("sales", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 billNumber = number,
                 totalAmount = doc.moneyMinor("totalAmount"),
                 paymentMode = doc.getString("paymentMode") ?: "CASH",
@@ -194,21 +361,29 @@ class FirebaseSyncService(
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullSaleItems(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("sale_items").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("sale_items").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "sale_items",
+            fallbackTime
+        )
         database.saleDao().insertAllSaleItems(docs.mapNotNull { doc ->
+            val id = localIdForDocument("sale_items", doc, fallbackTime)
             val productName = doc.getString("productNameSnapshot") ?: return@mapNotNull null
             SaleItem(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("sale_items", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 saleId = doc.long("saleId") ?: return@mapNotNull null,
                 productId = doc.long("productId") ?: return@mapNotNull null,
                 productNameSnapshot = productName,
@@ -218,22 +393,29 @@ class FirebaseSyncService(
                 lineTotal = doc.moneyMinor("lineTotal"),
                 isSynced = true,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullUdhaar(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("udhaar_transactions").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("udhaar_transactions").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "udhaar_transactions",
+            fallbackTime
+        )
         database.udhaarDao().insertAll(docs.mapNotNull { doc ->
-            val id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L
+            val id = localIdForDocument("udhaar_transactions", doc, fallbackTime)
             val type = doc.getString("type") ?: "CREDIT"
             val amount = doc.moneyMinor("amount")
             val eventId = doc.getString("eventId")?.trim()?.ifEmpty { "legacy-$id" } ?: "legacy-$id"
+            val globalId = doc.syncGlobalId("udhaar_transactions", doc.long("id") ?: doc.id.toLongOrNull() ?: id)
             val balanceEffect = doc.long("balanceEffect") ?: when (type) {
                 "CREDIT" -> amount
                 "PAYMENT" -> -amount
@@ -257,20 +439,28 @@ class FirebaseSyncService(
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private suspend fun pullAdjustments(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = Tasks.await(
-            shop.collection("stock_adjustments").whereGreaterThan("updatedAt", since).get(),
-            FIRESTORE_TIMEOUT_SECONDS,
-            TimeUnit.SECONDS
-        ).documents
+        val docs = eligibleDocuments(
+            Tasks.await(
+                shop.collection("stock_adjustments").whereGreaterThan("updatedAt", since).get(),
+                FIRESTORE_TIMEOUT_SECONDS,
+                TimeUnit.SECONDS
+            ).documents,
+            "stock_adjustments",
+            fallbackTime
+        )
         database.stockAdjustmentDao().insertAll(docs.mapNotNull { doc ->
+            val id = localIdForDocument("stock_adjustments", doc, fallbackTime)
             StockAdjustment(
-                id = doc.long("id") ?: doc.id.toLongOrNull() ?: 0L,
+                id = id,
+                globalId = doc.syncGlobalId("stock_adjustments", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 productId = doc.long("productId") ?: return@mapNotNull null,
                 oldStock = doc.number("oldStock"),
                 newStock = doc.number("newStock"),
@@ -279,63 +469,80 @@ class FirebaseSyncService(
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
                 updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false
+                isDeleted = doc.getBoolean("isDeleted") ?: false,
+                mutationVersion = doc.syncMutationVersion(fallbackTime),
+                mutationDeviceId = doc.syncMutationDeviceId()
             )
         })
     }
 
     private fun Product.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "name" to name, "categoryId" to categoryId, "mrp" to mrp,
+        "id" to id, "globalId" to globalId, "name" to name, "categoryId" to categoryId, "mrp" to mrp,
         "sellingPrice" to sellingPrice, "purchasePrice" to purchasePrice,
         "moneyScale" to 2L,
         "currentStock" to currentStock, "unit" to unit, "trackStock" to trackStock,
         "lowStockAlertQty" to lowStockAlertQty, "barcode" to barcode, "isActive" to isActive,
-        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("products", globalId, mutationVersion)
     )
 
     private fun Sale.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "billNumber" to billNumber, "totalAmount" to totalAmount,
+        "id" to id, "globalId" to globalId, "billNumber" to billNumber, "totalAmount" to totalAmount,
         "moneyScale" to 2L,
         "paymentMode" to paymentMode, "customerId" to customerId, "note" to note,
-        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("sales", globalId, mutationVersion)
     )
 
     private fun SaleItem.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "saleId" to saleId, "productId" to productId,
+        "id" to id, "globalId" to globalId, "saleId" to saleId, "productId" to productId,
         "productNameSnapshot" to productNameSnapshot, "quantity" to quantity,
         "unit" to unit, "unitPrice" to unitPrice, "lineTotal" to lineTotal,
         "moneyScale" to 2L,
-        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("sale_items", globalId, mutationVersion)
     )
 
     private fun Customer.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "name" to name, "phone" to phone, "creditLimit" to creditLimit,
+        "id" to id, "globalId" to globalId, "name" to name, "phone" to phone, "creditLimit" to creditLimit,
         "moneyScale" to 2L,
-        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("customers", globalId, mutationVersion)
     )
 
     private fun Category.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "name" to name, "createdAt" to createdAt,
-        "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "id" to id, "globalId" to globalId, "name" to name, "createdAt" to createdAt,
+        "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("categories", globalId, mutationVersion)
     )
 
     private fun UdhaarTransaction.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "eventId" to eventId, "customerId" to customerId, "saleId" to saleId, "type" to type,
+        "id" to id, "globalId" to globalId, "eventId" to eventId, "customerId" to customerId, "saleId" to saleId, "type" to type,
         "amount" to amount, "balanceEffect" to balanceEffect, "moneyScale" to 2L,
         "note" to note, "correctsEventId" to correctsEventId, "correctionReason" to correctionReason,
         "actorUid" to actorUid, "actorName" to actorName, "actorRole" to actorRole,
         "actorDeviceId" to actorDeviceId, "createdAt" to createdAt, "updatedAt" to updatedAt,
-        "isDeleted" to isDeleted
+        "isDeleted" to isDeleted, "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("udhaar_transactions", globalId, mutationVersion)
     )
 
     private fun StockAdjustment.toCloudMap(): Map<String, Any?> = mapOf(
-        "id" to id, "productId" to productId, "oldStock" to oldStock,
+        "id" to id, "globalId" to globalId, "productId" to productId, "oldStock" to oldStock,
         "newStock" to newStock, "difference" to difference, "reason" to reason,
-        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted
+        "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
+        "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("stock_adjustments", globalId, mutationVersion)
     )
 
     companion object {
         private const val MAX_BATCH_WRITES = 450
+        private const val MAX_OUTBOX_BATCH = 50
+        private const val OUTBOX_LEASE_MS = 2 * 60_000L
         private const val FIRESTORE_TIMEOUT_SECONDS = 15L
         private const val DEFAULT_PREFIX = "shreeshyam_sync"
         private val client = OkHttpClient.Builder()
@@ -344,6 +551,9 @@ class FirebaseSyncService(
             .writeTimeout(15, TimeUnit.SECONDS)
             .build()
         private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+        private val cloudMapAdapter = moshi.adapter<Map<String, Any?>>(
+            Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
+        )
 
         private fun normalizedBaseUrl(url: String): String? {
             val value = url.trim()

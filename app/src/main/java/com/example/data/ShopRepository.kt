@@ -4,6 +4,7 @@ import androidx.room.withTransaction
 import com.example.commerce.LedgerActor
 import com.example.commerce.LedgerAuditPolicy
 import com.example.commerce.UdhaarTransactionType
+import com.example.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
 
 class ShopRepository(
@@ -15,16 +16,17 @@ class ShopRepository(
     private val stockAdjustmentDao: StockAdjustmentDao,
     private val userDao: UserDao,
     private val database: AppDatabase? = null,
-    private val shopProfileDao: ShopProfileDao? = null
+    private val shopProfileDao: ShopProfileDao? = null,
+    private val settingsDataStore: SettingsDataStore? = null
 ) {
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
     
     suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
     suspend fun getCategoryByName(name: String): Category? = categoryDao.getCategoryByName(name)
-    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category)
-    suspend fun updateCategory(category: Category) = categoryDao.update(category)
-    suspend fun deleteCategory(category: Category) = categoryDao.delete(category)
+    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category.stamped(mutationDeviceId()))
+    suspend fun updateCategory(category: Category) = categoryDao.update(category.stamped(mutationDeviceId()))
+    suspend fun deleteCategory(category: Category) = categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
 
     // Products
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -33,8 +35,8 @@ class ShopRepository(
     fun getProductByIdFlow(id: Long): Flow<Product?> = productDao.getProductByIdFlow(id)
     fun getProductsByCategory(categoryId: Long): Flow<List<Product>> = productDao.getProductsByCategory(categoryId)
     
-    suspend fun insertProduct(product: Product): Long = productDao.insert(product)
-    suspend fun updateProduct(product: Product) = productDao.update(product)
+    suspend fun insertProduct(product: Product): Long = productDao.insert(product.stamped(mutationDeviceId()))
+    suspend fun updateProduct(product: Product) = productDao.update(product.stamped(mutationDeviceId()))
 
     // Sales
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
@@ -60,7 +62,10 @@ class ShopRepository(
         selectedCustomerId: Long? = null,
         ledgerActor: LedgerActor? = null
     ): Long {
-        return saleDao.completeBillCheckout(sale, items, selectedCustomerId, ledgerActor)
+        val deviceId = mutationDeviceId()
+        val stampedSale = sale.stamped(deviceId)
+        val stampedItems = items.map { it.stamped(deviceId) }
+        return saleDao.completeBillCheckout(stampedSale, stampedItems, selectedCustomerId, ledgerActor)
     }
 
     suspend fun insertSaleWithItems(
@@ -78,7 +83,15 @@ class ShopRepository(
         newCustomer: Customer,
         ledgerActor: LedgerActor? = null
     ): Long {
-        return saleDao.completeBillCheckoutWithNewCustomer(sale, items, newCustomer, ledgerActor)
+        val deviceId = mutationDeviceId()
+        val stampedSale = sale.stamped(deviceId)
+        val stampedItems = items.map { it.stamped(deviceId) }
+        return saleDao.completeBillCheckoutWithNewCustomer(
+            stampedSale,
+            stampedItems,
+            newCustomer.stamped(deviceId),
+            ledgerActor
+        )
     }
 
     // Customers
@@ -86,9 +99,9 @@ class ShopRepository(
     
     suspend fun getCustomerById(id: Long): Customer? = customerDao.getCustomerById(id)
     suspend fun getCustomerByName(name: String): Customer? = customerDao.getCustomerByName(name)
-    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer)
-    suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer)
-    suspend fun deleteCustomer(customer: Customer) = customerDao.deleteCustomer(customer)
+    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer.stamped(mutationDeviceId()))
+    suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer.stamped(mutationDeviceId()))
+    suspend fun deleteCustomer(customer: Customer) = customerDao.updateCustomer(customer.stamped(mutationDeviceId(), isDeleted = true))
 
     // Udhaar
     val allUdhaarTransactions: Flow<List<UdhaarTransaction>> = udhaarDao.getAllTransactions()
@@ -128,6 +141,7 @@ class ShopRepository(
             val now = System.currentTimeMillis()
             val transactionId = udhaarDao.insertTransaction(
                 UdhaarTransaction(
+                    globalId = SyncIdentity.newGlobalId(),
                     customerId = customerId,
                     type = UdhaarTransactionType.PAYMENT.name,
                     amount = amountMinorUnits,
@@ -137,12 +151,14 @@ class ShopRepository(
                     actorName = normalizedActor.actorName,
                     actorRole = normalizedActor.actorRole,
                     actorDeviceId = normalizedActor.actorDeviceId,
+                    mutationVersion = now,
+                    mutationDeviceId = normalizedActor.actorDeviceId,
                     isSynced = false,
                     createdAt = now,
                     updatedAt = now
                 )
             )
-            customerDao.touchCustomer(customerId, now)
+            customerDao.touchCustomer(customerId, now, normalizedActor.actorDeviceId)
             transactionId
         }
     }
@@ -169,6 +185,7 @@ class ShopRepository(
             val now = System.currentTimeMillis()
             val reversalId = udhaarDao.insertTransaction(
                 UdhaarTransaction(
+                    globalId = SyncIdentity.newGlobalId(),
                     customerId = customerId,
                     saleId = target.saleId,
                     type = UdhaarTransactionType.REVERSAL.name,
@@ -181,12 +198,14 @@ class ShopRepository(
                     actorName = normalizedActor.actorName,
                     actorRole = normalizedActor.actorRole,
                     actorDeviceId = normalizedActor.actorDeviceId,
+                    mutationVersion = now,
+                    mutationDeviceId = normalizedActor.actorDeviceId,
                     isSynced = false,
                     createdAt = now,
                     updatedAt = now
                 )
             )
-            customerDao.touchCustomer(customerId, now)
+            customerDao.touchCustomer(customerId, now, normalizedActor.actorDeviceId)
             reversalId
         }
     }
@@ -220,6 +239,7 @@ class ShopRepository(
             val now = System.currentTimeMillis()
             val correctionId = udhaarDao.insertTransaction(
                 UdhaarTransaction(
+                    globalId = SyncIdentity.newGlobalId(),
                     customerId = customerId,
                     saleId = target.saleId,
                     type = UdhaarTransactionType.CORRECTION.name,
@@ -232,18 +252,92 @@ class ShopRepository(
                     actorName = normalizedActor.actorName,
                     actorRole = normalizedActor.actorRole,
                     actorDeviceId = normalizedActor.actorDeviceId,
+                    mutationVersion = now,
+                    mutationDeviceId = normalizedActor.actorDeviceId,
                     isSynced = false,
                     createdAt = now,
                     updatedAt = now
                 )
             )
-            customerDao.touchCustomer(customerId, now)
+            customerDao.touchCustomer(customerId, now, normalizedActor.actorDeviceId)
             correctionId
         }
     }
 
     private suspend fun <T> inLedgerTransaction(operation: suspend () -> T): T =
         database?.withTransaction { operation() } ?: operation()
+
+    private suspend fun mutationDeviceId(): String =
+        settingsDataStore?.getOrCreateAuditDeviceId() ?: SyncIdentity.LEGACY_DEVICE_ID
+
+    private fun Category.stamped(deviceId: String, isDeleted: Boolean = this.isDeleted): Category {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isDeleted = isDeleted,
+            isSynced = false
+        )
+    }
+
+    private fun Product.stamped(deviceId: String, isDeleted: Boolean = this.isDeleted): Product {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isDeleted = isDeleted,
+            isSynced = false
+        )
+    }
+
+    private fun Sale.stamped(deviceId: String): Sale {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isSynced = false
+        )
+    }
+
+    private fun SaleItem.stamped(deviceId: String): SaleItem {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isSynced = false
+        )
+    }
+
+    private fun Customer.stamped(deviceId: String, isDeleted: Boolean = this.isDeleted): Customer {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isDeleted = isDeleted,
+            isSynced = false
+        )
+    }
+
+    private fun StockAdjustment.stamped(deviceId: String): StockAdjustment {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isSynced = false
+        )
+    }
 
     // Stock Adjustments
     val allStockAdjustments: Flow<List<StockAdjustment>> = stockAdjustmentDao.getAllAdjustments()
@@ -252,7 +346,7 @@ class ShopRepository(
         stockAdjustmentDao.getAdjustmentsForProduct(productId)
 
     suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long {
-        return stockAdjustmentDao.insertAdjustment(adjustment)
+        return stockAdjustmentDao.insertAdjustment(adjustment.stamped(mutationDeviceId()))
     }
 
     /** Corrects a product stock level and logs the audit record atomically. */
@@ -262,10 +356,13 @@ class ShopRepository(
             val product = productDao.getProductById(productId) ?: return@operation
             val oldStock = product.currentStock
             val now = System.currentTimeMillis()
+            val deviceId = mutationDeviceId()
             productDao.update(
                 product.copy(
                     currentStock = actualStockCounted,
                     updatedAt = now,
+                    mutationVersion = now,
+                    mutationDeviceId = deviceId,
                     isSynced = false
                 )
             )
@@ -276,6 +373,8 @@ class ShopRepository(
                     newStock = actualStockCounted,
                     difference = actualStockCounted - oldStock,
                     reason = reason.trim().ifEmpty { "Manual stock adjustment" },
+                    mutationVersion = now,
+                    mutationDeviceId = deviceId,
                     isSynced = false,
                     createdAt = now,
                     updatedAt = now
@@ -339,6 +438,13 @@ class ShopRepository(
         udhaarTxsList: List<UdhaarTransaction>,
         adjustmentsList: List<StockAdjustment>
     ) {
+        val normalizedCategories = categoriesList.map { it.normalizeForRestore("categories") }
+        val normalizedProducts = productsList.map { it.normalizeForRestore("products") }
+        val normalizedSales = salesList.map { it.normalizeForRestore("sales") }
+        val normalizedSaleItems = saleItemsList.map { it.normalizeForRestore("sale_items") }
+        val normalizedCustomers = customersList.map { it.normalizeForRestore("customers") }
+        val normalizedUdhaar = udhaarTxsList.map { it.normalizeForRestore("udhaar_transactions") }
+        val normalizedAdjustments = adjustmentsList.map { it.normalizeForRestore("stock_adjustments") }
         val operation: suspend () -> Unit = {
             categoryDao.clearAllCategories()
             productDao.clearAllProducts()
@@ -347,17 +453,70 @@ class ShopRepository(
             customerDao.clearAllCustomers()
             udhaarDao.clearAllTransactions()
             stockAdjustmentDao.clearAllAdjustments()
+            syncOutboxDao().clearAll()
 
-            if (categoriesList.isNotEmpty()) categoryDao.insertAll(categoriesList)
-            if (productsList.isNotEmpty()) productDao.insertAll(productsList)
-            if (salesList.isNotEmpty()) saleDao.insertAllSales(salesList)
-            if (saleItemsList.isNotEmpty()) saleDao.insertAllSaleItems(saleItemsList)
-            if (customersList.isNotEmpty()) customerDao.insertAll(customersList)
-            if (udhaarTxsList.isNotEmpty()) udhaarDao.insertAll(udhaarTxsList)
-            if (adjustmentsList.isNotEmpty()) stockAdjustmentDao.insertAll(adjustmentsList)
+            if (normalizedCategories.isNotEmpty()) categoryDao.insertAll(normalizedCategories)
+            if (normalizedProducts.isNotEmpty()) productDao.insertAll(normalizedProducts)
+            if (normalizedSales.isNotEmpty()) saleDao.insertAllSales(normalizedSales)
+            if (normalizedSaleItems.isNotEmpty()) saleDao.insertAllSaleItems(normalizedSaleItems)
+            if (normalizedCustomers.isNotEmpty()) customerDao.insertAll(normalizedCustomers)
+            if (normalizedUdhaar.isNotEmpty()) udhaarDao.insertAll(normalizedUdhaar)
+            if (normalizedAdjustments.isNotEmpty()) stockAdjustmentDao.insertAll(normalizedAdjustments)
         }
         if (database != null) database.withTransaction { operation() } else operation()
     }
+
+    private suspend fun syncOutboxDao(): SyncOutboxDao =
+        database?.syncOutboxDao() ?: error("Sync outbox requires a database")
+
+    private fun Category.normalizeForRestore(tableName: String): Category = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun Product.normalizeForRestore(tableName: String): Product = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun Sale.normalizeForRestore(tableName: String): Sale = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun SaleItem.normalizeForRestore(tableName: String): SaleItem = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun Customer.normalizeForRestore(tableName: String): Customer = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun UdhaarTransaction.normalizeForRestore(tableName: String): UdhaarTransaction = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun StockAdjustment.normalizeForRestore(tableName: String): StockAdjustment = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
 
     suspend fun getAllSaleItems(): List<SaleItem> = saleDao.getAllSaleItemsList()
 }

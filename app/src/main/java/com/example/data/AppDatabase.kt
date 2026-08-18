@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import java.util.UUID
 
 @Database(
     entities = [
@@ -16,9 +17,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         Customer::class,
         UdhaarTransaction::class,
         StockAdjustment::class,
-        User::class
+        User::class,
+        SyncOutbox::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +36,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun udhaarDao(): UdhaarDao
     abstract fun stockAdjustmentDao(): StockAdjustmentDao
     abstract fun userDao(): UserDao
+    abstract fun syncOutboxDao(): SyncOutboxDao
 
     companion object {
         private const val DATABASE_NAME = "shree_shyam_store_db"
@@ -251,6 +254,47 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                val businessTables = listOf(
+                    "categories", "products", "sales", "sale_items",
+                    "customers", "udhaar_transactions", "stock_adjustments"
+                )
+                businessTables.forEach { table ->
+                    database.execSQL("ALTER TABLE $table ADD COLUMN globalId TEXT NOT NULL DEFAULT ''")
+                    database.execSQL("ALTER TABLE $table ADD COLUMN mutationVersion INTEGER NOT NULL DEFAULT 0")
+                    database.execSQL("ALTER TABLE $table ADD COLUMN mutationDeviceId TEXT NOT NULL DEFAULT 'legacy-device'")
+                    database.execSQL("UPDATE $table SET globalId = 'legacy-' || '$table' || '-' || id WHERE globalId = ''")
+                    database.execSQL("UPDATE $table SET mutationVersion = updatedAt WHERE mutationVersion = 0")
+                    database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_${table}_globalId ON $table (globalId)")
+                }
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS sync_outbox (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        tableName TEXT NOT NULL,
+                        globalId TEXT NOT NULL,
+                        localId INTEGER NOT NULL,
+                        mutationVersion INTEGER NOT NULL,
+                        mutationDeviceId TEXT NOT NULL,
+                        idempotencyKey TEXT NOT NULL,
+                        payloadJson TEXT NOT NULL,
+                        tombstone INTEGER NOT NULL,
+                        state TEXT NOT NULL,
+                        attemptCount INTEGER NOT NULL,
+                        nextAttemptAt INTEGER NOT NULL,
+                        leaseUntil INTEGER,
+                        lastError TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_state_nextAttemptAt ON sync_outbox (state, nextAttemptAt)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_outbox_tableName_globalId_mutationVersion ON sync_outbox (tableName, globalId, mutationVersion)")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -258,7 +302,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .addCallback(seedCategoriesCallback())
                     .build()
                     .also { INSTANCE = it }
@@ -270,14 +314,17 @@ abstract class AppDatabase : RoomDatabase() {
                 super.onCreate(db)
                 val now = System.currentTimeMillis()
                 val statement = db.compileStatement(
-                    "INSERT INTO categories (name, isSynced, createdAt, updatedAt, isDeleted) " +
-                        "VALUES (?, 0, ?, ?, 0)"
+                    "INSERT INTO categories (globalId, name, isSynced, createdAt, updatedAt, isDeleted, mutationVersion, mutationDeviceId) " +
+                        "VALUES (?, ?, 0, ?, ?, 0, ?, ?)"
                 )
                 DEFAULT_CATEGORIES.forEach { name ->
                     statement.clearBindings()
-                    statement.bindString(1, name)
-                    statement.bindLong(2, now)
+                    statement.bindString(1, UUID.randomUUID().toString())
+                    statement.bindString(2, name)
                     statement.bindLong(3, now)
+                    statement.bindLong(4, now)
+                    statement.bindLong(5, now)
+                    statement.bindString(6, "system")
                     statement.executeInsert()
                 }
             }
