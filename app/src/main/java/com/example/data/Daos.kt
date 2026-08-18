@@ -359,6 +359,9 @@ interface CustomerDao {
     @Update
     suspend fun updateCustomer(customer: Customer)
 
+    @Query("UPDATE customers SET updatedAt = :updatedAt, isSynced = 0 WHERE id = :customerId")
+    suspend fun touchCustomer(customerId: Long, updatedAt: Long)
+
     @Delete
     suspend fun deleteCustomer(customer: Customer)
 
