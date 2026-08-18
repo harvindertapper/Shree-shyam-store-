@@ -269,7 +269,8 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                                             } else {
                                                 viewModel.navigateTo(Screen.Home)
                                             }
-                                        }
+                                        },
+                                        onError = { errorMessage = it }
                                     )
                                 }
                             } else {

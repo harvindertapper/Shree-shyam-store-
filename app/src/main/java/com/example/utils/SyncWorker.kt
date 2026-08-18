@@ -5,7 +5,9 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.AppDatabase
+import com.example.data.IdentityProvider
 import com.example.data.SettingsDataStore
+import com.example.data.identitySessionOrNull
 import kotlinx.coroutines.flow.first
 import java.io.IOException
 import java.text.ParsePosition
@@ -24,23 +26,27 @@ class SyncWorker(
 
         return try {
             val settings = settingsStore.settingsFlow.first()
-            val shopUid = settings.loggedInUid.trim()
-                .ifEmpty { settings.loggedInEmail.trim() }
-                .ifEmpty { settings.loggedInUsername.trim() }
+            val session = settings.identitySessionOrNull()
 
-            if (!settings.isUserLoggedIn || shopUid.isEmpty()) {
-                Log.d(TAG, "Skipping sync because there is no authenticated local session")
+            if (session == null) {
+                Log.d(TAG, "Skipping sync because there is no valid identity session")
+                return Result.success()
+            }
+            if (session.provider == IdentityProvider.FIREBASE &&
+                AuthManager.currentUser?.uid != session.uid
+            ) {
+                Log.w(TAG, "Skipping sync because Firebase identity does not match the persisted session")
                 return Result.success()
             }
 
             val database = AppDatabase.getDatabase(applicationContext)
             val service = FirebaseSyncService(database, settingsStore)
-            if (!service.pushUpstream(shopUid)) {
+            if (!service.pushUpstream(session.shopUid)) {
                 return retryOrFailure("upstream push failed")
             }
 
             val previousCursor = parseSyncTimestamp(settings.lastSyncTime)
-            val newCursor = service.pullDownstream(shopUid, previousCursor)
+            val newCursor = service.pullDownstream(session.shopUid, previousCursor)
             if (newCursor <= previousCursor) {
                 // A successful pull always returns a fresh high-water mark. Do
                 // not advance the stored cursor when the service kept it after

@@ -45,3 +45,15 @@
 ## Open decisions
 
 The owner still needs to decide the production application ID/package identity, whether local password auth will be removed in favor of Firebase identity, the payment/UPI provider boundary, stable global ID and conflict strategy, backup provider authorization, release distribution channel, data-retention expectations, and production rollout date. The P0 branch accepts the inventory and UPI defaults above; remaining production blockers include minor-unit money migration, immutable ledger reversals, actor/audit metadata, multi-device identity/conflict semantics, and non-destructive Room migrations. These should be recorded here before implementing the corresponding production migrations.
+
+## ADR-007: Persist one explicit identity authority per active session
+
+**Status:** Accepted for the identity-unification branch
+
+**Decision:** Every active device session persists an explicit `IdentityProvider` (`FIREBASE` or `LOCAL`) together with one stable `uid`, display name, email, and role. Firebase Auth is authoritative for Firebase sessions; the local Room user remains a device-local projection and local credentials remain usable only for explicitly local offline sessions. Startup, ledger actors, background sync, manual backup/restore namespaces, logout, and account switching must consume the resolved `IdentitySession` rather than independently combining Firebase state with DataStore fallbacks.
+
+**Compatibility and security rules:** Existing sessions without a provider are inferred only during one-way compatibility resolution: a non-empty legacy UID is treated as Firebase-backed, while a blank UID with local profile fields is treated as local and receives a deterministic `local:<sha256(email)>` identity. A Firebase session is cleared when the matching Firebase account is unavailable; a local session remains usable offline. No password hash, PIN verifier, Firebase token, session secret, or other credential material is included in sync, backup, logs, or analytics. The identity provider is stored in DataStore, not in cloud business tables.
+
+**Reason:** The application previously treated Firebase Auth, local Room credentials, and a DataStore boolean as interchangeable authentication signals. An explicit authority prevents silent cross-account mixing while retaining offline local usability during the migration period. A stable local namespace also removes the old empty-UID/email/username fallback chain from sync and backup consumers.
+
+**Follow-up:** The next security slice must add rate limiting/lockout and harden local credential/PIN migration. The authorization slice must add repository/domain permission checks for privileged actions and negative tests; this ADR does not by itself grant permissions based on the UI role string.

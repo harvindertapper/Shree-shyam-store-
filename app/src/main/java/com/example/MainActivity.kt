@@ -23,7 +23,6 @@ import com.example.data.SettingsDataStore
 import com.example.data.ShopRepository
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
-import com.example.utils.AuthManager
 import com.example.viewmodel.Screen
 import com.example.viewmodel.ShopViewModel
 import com.example.viewmodel.ShopViewModelFactory
@@ -74,10 +73,15 @@ class MainActivity : FragmentActivity() {
                 val settings by viewModel.storeSettings.collectAsState()
                 val strings = remember(settings.appLanguage) { com.example.utils.LocaleHelper.getStrings(settings.appLanguage) }
 
-                // Initial Startup Router: Direct navigation based on Auth and App Lock state
-                LaunchedEffect(settings.isUserLoggedIn, settings.firstLaunchCompleted, settings.appLockEnabled) {
-                    val firebaseUser = AuthManager.currentUser
-                    val isAuthenticated = firebaseUser != null || settings.isUserLoggedIn
+                // Initial Startup Router: derive navigation from one reconciled identity session.
+                LaunchedEffect(
+                    settings.identityProvider,
+                    settings.isUserLoggedIn,
+                    settings.firstLaunchCompleted,
+                    settings.appLockEnabled
+                ) {
+                    val identitySession = viewModel.reconcileIdentitySession()
+                    val isAuthenticated = identitySession != null
 
                     if (!isAuthenticated) {
                         // User is logged out -> Show Google Sign-In & Welcome screen

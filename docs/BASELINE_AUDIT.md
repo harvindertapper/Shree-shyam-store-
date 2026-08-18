@@ -133,3 +133,8 @@ The audit is grounded in the checked-out repository revision and its GitHub meta
 [8]: ../app/src/main/java/com/example/utils/SecurityUtils.kt "PIN security helper"
 [9]: ../.github/workflows/ci.yml "Android CI workflow"
 [10]: ../docs/ROADMAP_AND_GITHUB_WORKFLOW.md "Existing roadmap and workflow document"
+
+
+## Post-stabilization implementation update — 18 August 2026
+
+The security and data-integrity roadmap has now merged the credential-sync boundary, atomic restore boundary, P0 checkout policies, minor-unit money migration, immutable udhaar audit events, and stable sync identity/outbox through PR #18. The identity-unification slice is being reviewed separately. It persists an explicit Firebase-or-local authority in DataStore, reconciles startup routing and background sync through one `IdentitySession`, prevents silent local-account linking during Google sign-in, and removes ambiguous email/username/default-store namespace fallbacks from manual backup and restore. Local password/PIN hardening, domain-level authorization negatives, package identity, release signing, and authenticated backup-provider enforcement remain open production work.

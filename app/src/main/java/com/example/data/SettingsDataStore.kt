@@ -31,6 +31,7 @@ data class StoreSettings(
     val loggedInUsername: String = "",
     val loggedInEmail: String = "",
     val loggedInRole: String = "OWNER",
+    val identityProvider: IdentityProvider? = null,
     val auditDeviceId: String = "",
     val isUserLoggedIn: Boolean = false,
     val appLockEnabled: Boolean = true,
@@ -55,6 +56,7 @@ class SettingsDataStore(private val context: Context) {
         private val LOGGED_IN_USERNAME = stringPreferencesKey("logged_in_username")
         private val LOGGED_IN_EMAIL = stringPreferencesKey("logged_in_email")
         private val LOGGED_IN_ROLE = stringPreferencesKey("logged_in_role")
+        private val IDENTITY_PROVIDER = stringPreferencesKey("identity_provider")
         private val AUDIT_DEVICE_ID = stringPreferencesKey("audit_device_id")
         private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
         private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
@@ -87,6 +89,16 @@ class SettingsDataStore(private val context: Context) {
                 loggedInUsername = preferences[LOGGED_IN_USERNAME].orEmpty(),
                 loggedInEmail = preferences[LOGGED_IN_EMAIL].orEmpty(),
                 loggedInRole = preferences[LOGGED_IN_ROLE]?.trim()?.ifEmpty { "OWNER" } ?: "OWNER",
+                identityProvider = IdentityProvider.fromStored(preferences[IDENTITY_PROVIDER])
+                    ?: if (preferences[IS_USER_LOGGED_IN] == true) {
+                        if (preferences[LOGGED_IN_UID].orEmpty().isNotBlank()) {
+                            IdentityProvider.FIREBASE
+                        } else {
+                            IdentityProvider.LOCAL
+                        }
+                    } else {
+                        null
+                    },
                 auditDeviceId = preferences[AUDIT_DEVICE_ID].orEmpty(),
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
@@ -168,13 +180,32 @@ class SettingsDataStore(private val context: Context) {
         it[AUTO_SYNC_ENABLED] = enabled
     }
 
-    suspend fun saveSession(uid: String, username: String, email: String, role: String = "OWNER") = context.dataStore.edit {
-        it[LOGGED_IN_UID] = uid.trim()
-        it[LOGGED_IN_USERNAME] = username.trim()
-        it[LOGGED_IN_EMAIL] = email.trim()
-        it[LOGGED_IN_ROLE] = role.trim().ifEmpty { "OWNER" }
+    suspend fun saveSession(session: IdentitySession) = context.dataStore.edit {
+        val normalized = session.normalized()
+        require(normalized.isUsable()) { "Cannot persist an identity without a stable uid" }
+        it[LOGGED_IN_UID] = normalized.uid
+        it[LOGGED_IN_USERNAME] = normalized.username
+        it[LOGGED_IN_EMAIL] = normalized.email
+        it[LOGGED_IN_ROLE] = normalized.role
+        it[IDENTITY_PROVIDER] = normalized.provider.name
         it[IS_USER_LOGGED_IN] = true
     }
+
+    suspend fun saveSession(
+        uid: String,
+        username: String,
+        email: String,
+        role: String = "OWNER",
+        provider: IdentityProvider = IdentityProvider.LOCAL
+    ) = saveSession(
+        IdentitySession(
+            provider = provider,
+            uid = uid,
+            username = username,
+            email = email,
+            role = role
+        )
+    )
 
     suspend fun getOrCreateAuditDeviceId(): String {
         var resolved = ""
@@ -193,6 +224,7 @@ class SettingsDataStore(private val context: Context) {
         it[LOGGED_IN_USERNAME] = ""
         it[LOGGED_IN_EMAIL] = ""
         it[LOGGED_IN_ROLE] = "OWNER"
+        it.remove(IDENTITY_PROVIDER)
         it[IS_USER_LOGGED_IN] = false
     }
 }

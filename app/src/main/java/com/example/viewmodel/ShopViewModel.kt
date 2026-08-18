@@ -50,21 +50,71 @@ class ShopViewModel(
 ) : ViewModel() {
 
     private suspend fun currentLedgerActor(): LedgerActor {
+        val session = reconcileIdentitySession()
+            ?: error("Authenticated actor is required")
         val settings = settingsDataStore.settingsFlow.first()
-        require(settings.isUserLoggedIn) { "Authenticated actor is required" }
-        val uid = settings.loggedInUid.trim()
-            .ifEmpty { settings.loggedInEmail.trim() }
-        val name = settings.loggedInUsername.trim()
-            .ifEmpty { settings.loggedInEmail.trim() }
-            .ifEmpty { uid }
         val deviceId = settings.auditDeviceId.trim()
             .ifEmpty { settingsDataStore.getOrCreateAuditDeviceId() }
         return LedgerActor(
-            actorUid = uid,
-            actorName = name,
-            actorRole = settings.loggedInRole,
+            actorUid = session.uid,
+            actorName = session.username.ifBlank { session.email }.ifBlank { session.uid },
+            actorRole = session.role,
             actorDeviceId = deviceId
         ).normalized()
+    }
+
+    /**
+     * Reconciles one explicit local session authority with Firebase state.
+     * Local sessions remain usable offline; Firebase sessions are accepted only
+     * when Firebase exposes the same authenticated account.
+     */
+    suspend fun reconcileIdentitySession(): IdentitySession? {
+        val settings = settingsDataStore.settingsFlow.first()
+        val persisted = settings.identitySessionOrNull()
+        val firebaseUser = com.example.utils.AuthManager.currentUser
+
+        if (persisted?.provider == IdentityProvider.LOCAL) {
+            return persisted
+        }
+
+        if (firebaseUser != null) {
+            val firebaseSession = IdentitySession(
+                provider = IdentityProvider.FIREBASE,
+                uid = firebaseUser.uid,
+                username = firebaseUser.displayName.orEmpty()
+                    .ifBlank { firebaseUser.email?.substringBefore("@").orEmpty() },
+                email = firebaseUser.email.orEmpty(),
+                role = persisted?.role ?: "OWNER"
+            ).normalized()
+            if (firebaseSession.isUsable() &&
+                (persisted?.provider != IdentityProvider.FIREBASE || persisted.uid != firebaseSession.uid)
+            ) {
+                settingsDataStore.saveSession(firebaseSession)
+            }
+            return firebaseSession.takeIf { it.isUsable() }
+        }
+
+        if (persisted?.provider == IdentityProvider.FIREBASE) {
+            settingsDataStore.clearSession()
+            return null
+        }
+
+        if (settings.isUserLoggedIn && (settings.loggedInEmail.isNotBlank() || settings.loggedInUsername.isNotBlank())) {
+            val localSession = IdentitySession.localForUser(
+                username = settings.loggedInUsername,
+                email = settings.loggedInEmail,
+                existingUid = settings.loggedInUid
+            )
+            if (localSession.isUsable()) {
+                settingsDataStore.saveSession(localSession)
+                return localSession
+            }
+        }
+        return null
+    }
+
+    private suspend fun clearFirebaseAuthorityForLocalSession() {
+        context?.let { com.example.utils.AuthManager.signOut(it) }
     }
 
     fun triggerAutoSync() {
@@ -146,22 +196,43 @@ class ShopViewModel(
         uid: String,
         email: String,
         displayName: String,
-        onSuccess: (isFirstTime: Boolean) -> Unit
+        onSuccess: (isFirstTime: Boolean) -> Unit,
+        onError: (String) -> Unit
     ) {
         viewModelScope.launch {
-            val username = displayName.ifBlank { email.substringBefore("@") }
-            val existingUser = repository.getUserByEmail(email)
+            val normalizedUid = uid.trim()
+            val normalizedEmail = email.trim().lowercase()
+            if (normalizedUid.isEmpty() || normalizedEmail.isEmpty()) {
+                onError("Google account did not provide a stable identity.")
+                return@launch
+            }
+            val username = displayName.ifBlank { normalizedEmail.substringBefore("@") }
+            val existingUser = repository.getUserByEmail(normalizedEmail)
+            if (existingUser != null &&
+                existingUser.passwordHash.isNotBlank() &&
+                existingUser.uid.trim() != normalizedUid
+            ) {
+                onError("This email already belongs to a local account. Sign in locally or complete account linking first.")
+                return@launch
+            }
             if (existingUser == null) {
                 val newUser = User(
-                    uid = uid,
+                    uid = normalizedUid,
                     username = username,
-                    email = email,
+                    email = normalizedEmail,
                     passwordHash = ""
                 )
                 repository.insertUser(newUser)
             }
-            settingsDataStore.saveSession(uid, username, email)
-            val settings = storeSettings.value
+            settingsDataStore.saveSession(
+                IdentitySession(
+                    provider = IdentityProvider.FIREBASE,
+                    uid = normalizedUid,
+                    username = username,
+                    email = normalizedEmail
+                )
+            )
+            val settings = settingsDataStore.settingsFlow.first()
             onSuccess(!settings.firstLaunchCompleted)
         }
     }
@@ -176,18 +247,15 @@ class ShopViewModel(
             settingsDataStore.updateShopName(shopName.trim())
             settingsDataStore.updateOwnerName(ownerName.trim())
             settingsDataStore.updateOwnerPhone(ownerPhone.trim())
-            val sessionSettings = settingsDataStore.settingsFlow.first()
-            val uid = sessionSettings.loggedInUid.ifBlank {
-                sessionSettings.loggedInEmail.ifBlank { sessionSettings.loggedInUsername }
-            }.trim()
-            if (uid.isNotEmpty()) {
+            val session = reconcileIdentitySession()
+            if (session != null) {
                 repository.saveShopProfile(
                     ShopProfile(
-                        uid = uid,
+                        uid = session.shopUid,
                         shopName = shopName.trim(),
                         ownerName = ownerName.trim(),
                         ownerPhone = ownerPhone.trim(),
-                        email = sessionSettings.loggedInEmail.trim(),
+                        email = session.email,
                         isSynced = false,
                         updatedAt = System.currentTimeMillis()
                     )
@@ -267,16 +335,19 @@ class ShopViewModel(
                     return@launch
                 }
 
-                // Insert User
+                val localSession = IdentitySession.localForUser(trimmedUsername, trimmedEmail)
+                // Insert a device-local projection with a stable local identity.
                 val user = User(
+                    uid = localSession.uid,
                     username = trimmedUsername,
                     email = trimmedEmail,
                     passwordHash = sha256(password)
                 )
                 repository.insertUser(user)
 
-                // Save active session
-                settingsDataStore.saveSession(user.uid, trimmedUsername, trimmedEmail)
+                // Local and Firebase authorities must not remain active together.
+                clearFirebaseAuthorityForLocalSession()
+                settingsDataStore.saveSession(localSession)
 
                 onSuccess()
             } catch (e: Exception) {
@@ -317,8 +388,13 @@ class ShopViewModel(
 
                 val hashedPass = sha256(password)
                 if (user.passwordHash == hashedPass) {
-                    // Save active session
-                    settingsDataStore.saveSession(user.uid, user.username, user.email)
+                    val localSession = IdentitySession.localForUser(
+                        username = user.username,
+                        email = user.email,
+                        existingUid = user.uid
+                    )
+                    clearFirebaseAuthorityForLocalSession()
+                    settingsDataStore.saveSession(localSession)
                     onSuccess()
                 } else {
                     onError("Incorrect password! Change and retry.")
@@ -1003,11 +1079,13 @@ class ShopViewModel(
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
             val url = settings.firebaseUrl.ifBlank { com.example.BuildConfig.FIREBASE_URL }
+            val identitySession = reconcileIdentitySession()
+            if (identitySession == null) {
+                onResult(false, "No valid authenticated store session is available for backup.")
+                return@launch
+            }
 
-            val userIdentifier = settings.loggedInUid.ifBlank {
-                settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }
-            }.lowercase().trim()
-            val hashedUser = hashStringSHA256(userIdentifier)
+            val hashedUser = hashStringSHA256(identitySession.shopUid.lowercase().trim())
             val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
             val prefix = "$basePrefix/users/$hashedUser"
 
@@ -1078,11 +1156,13 @@ class ShopViewModel(
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
             val url = settings.firebaseUrl.ifBlank { com.example.BuildConfig.FIREBASE_URL }
+            val identitySession = reconcileIdentitySession()
+            if (identitySession == null) {
+                onResult(false, "No valid authenticated store session is available for restore.")
+                return@launch
+            }
 
-            val userIdentifier = settings.loggedInUid.ifBlank {
-                settings.loggedInUsername.ifBlank { settings.loggedInEmail.ifBlank { "default_store" } }
-            }.lowercase().trim()
-            val hashedUser = hashStringSHA256(userIdentifier)
+            val hashedUser = hashStringSHA256(identitySession.shopUid.lowercase().trim())
             val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
             val prefix = "$basePrefix/users/$hashedUser"
 
