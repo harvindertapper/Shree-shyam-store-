@@ -830,15 +830,18 @@ class ShopViewModel(
         )
     }
 
-    fun exportStockCsv(context: Context) {
+    fun exportStockCsv(
+        context: Context,
+        products: List<Product>,
+        categories: List<Category>
+    ) {
         val settings = storeSettings.value
         val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
-        val prods = products.value
-        val catMap = categories.value.associate { it.id to it.name }
+        val catMap = categories.associate { it.id to it.name }
         com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.exportStockCsv(
             context = context,
-            products = prods,
+            products = products,
             categoryNameMap = catMap,
             shopName = shopDisplayName
         )
@@ -856,11 +859,11 @@ class ShopViewModel(
         )
     }
 
-    fun generateReorderText(lowStockList: List<Product>): String {
+    fun generateReorderText(lowStockList: List<Product>, categories: List<Category>): String {
         val settings = storeSettings.value
         val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
-        val catMap = categories.value.associate { it.id to it.name }
+        val catMap = categories.associate { it.id to it.name }
         return com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.generateReorderListText(
             shopName = shopDisplayName,
             lowStockItems = lowStockList,
@@ -868,8 +871,13 @@ class ShopViewModel(
         )
     }
 
-    fun shareReorderListViaWhatsApp(context: Context, lowStockList: List<Product>, wholesalerPhone: String? = null) {
-        val text = generateReorderText(lowStockList)
+    fun shareReorderListViaWhatsApp(
+        context: Context,
+        lowStockList: List<Product>,
+        categories: List<Category>,
+        wholesalerPhone: String? = null
+    ) {
+        val text = generateReorderText(lowStockList, categories)
         com.aistudio.shreeshyamstore.pqwzkb.utils.ShareUtils.shareText(
             context = context,
             text = text,
@@ -878,8 +886,12 @@ class ShopViewModel(
         )
     }
 
-    fun copyReorderListToClipboard(context: Context, lowStockList: List<Product>) {
-        val text = generateReorderText(lowStockList)
+    fun copyReorderListToClipboard(
+        context: Context,
+        lowStockList: List<Product>,
+        categories: List<Category>
+    ) {
+        val text = generateReorderText(lowStockList, categories)
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
         val clip = android.content.ClipData.newPlainText("Re-order List", text)
         clipboard.setPrimaryClip(clip)

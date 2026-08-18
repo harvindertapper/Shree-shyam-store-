@@ -119,7 +119,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                     }
 
                     IconButton(
-                        onClick = { viewModel.exportStockCsv(context) },
+                        onClick = { viewModel.exportStockCsv(context, products, categories) },
                         modifier = Modifier.testTag("export_stock_csv_button")
                     ) {
                         Icon(Icons.Default.Download, contentDescription = "Export Stock CSV", tint = SaffronPrimary)
@@ -1481,7 +1481,7 @@ fun LowStockReorderDialog(
                     // WhatsApp Share
                     Button(
                         onClick = {
-                            viewModel.shareReorderListViaWhatsApp(context, lowStockProducts)
+                            viewModel.shareReorderListViaWhatsApp(context, lowStockProducts, categories)
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
                         shape = RoundedCornerShape(10.dp),
@@ -1501,7 +1501,7 @@ fun LowStockReorderDialog(
                     // Copy Button
                     OutlinedButton(
                         onClick = {
-                            viewModel.copyReorderListToClipboard(context, lowStockProducts)
+                            viewModel.copyReorderListToClipboard(context, lowStockProducts, categories)
                         },
                         border = BorderStroke(1.2.dp, BorderStrong),
                         shape = RoundedCornerShape(10.dp),
