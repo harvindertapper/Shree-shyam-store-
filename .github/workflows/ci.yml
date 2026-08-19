@@ -95,12 +95,15 @@ jobs:
           schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/8.json"
           test -f "$schema_path"
 
-          base_ref="HEAD^1"
-          if ! git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
-            base_ref="HEAD^"
+          if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            base_ref="origin/$GITHUB_BASE_REF"
+            changed_files="$(git diff --name-only "$base_ref" HEAD)"
+          elif git rev-parse --verify HEAD^ >/dev/null 2>&1; then
+            changed_files="$(git diff --name-only HEAD^ HEAD)"
+          else
+            changed_files=""
           fi
-
-          changed_files="$(git diff --name-only "$base_ref" HEAD)"
           if grep -Eq '^app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/data/(AppDatabase|Entities|Daos).*\\.kt$' <<<"$changed_files"; then
             grep -Eq '^app/schemas/.*\\.json$' <<<"$changed_files"
           fi
