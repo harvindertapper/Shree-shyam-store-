@@ -347,7 +347,7 @@ class RestoreRecoveryCoordinator(
                     allowEmpty = true
                 )
                 replaceSnapshot(verifiedRecovery)
-            }.onFailure(rollbackError -> restoreError.addSuppressed(rollbackError))
+            }.onFailure { rollbackError -> restoreError.addSuppressed(rollbackError) }
             throw restoreError
         }
     }
