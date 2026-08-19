@@ -2,6 +2,9 @@ package com.aistudio.shreeshyamstore.pqwzkb
 
 import android.content.Context
 import androidx.room.Room
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PlatformActor
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
@@ -21,6 +24,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -29,6 +33,20 @@ class CheckoutInvariantsTest {
     private lateinit var repository: ShopRepository
 
     private val testActor = LedgerActor("owner-1", "Test Owner", "OWNER", "test-device")
+    private val testPlatformActor = PlatformActor("owner-1", "Test Owner", "OWNER", "test-device")
+    private val testTenant = TenantScope("org-test", "store-test", "membership-owner-1", "test-device", "install-test")
+
+    private fun command(
+        actor: PlatformActor = testPlatformActor,
+        tenant: TenantScope = testTenant,
+        clientCreatedAt: Long = System.currentTimeMillis()
+    ) = CommandMetadata(
+        idempotencyKey = UUID.randomUUID().toString(),
+        clientEventId = UUID.randomUUID().toString(),
+        tenant = tenant,
+        actor = actor,
+        clientCreatedAt = clientCreatedAt
+    )
 
     @Before
     fun setUp() {
@@ -45,7 +63,8 @@ class CheckoutInvariantsTest {
             stockAdjustmentDao = database.stockAdjustmentDao(),
             userDao = database.userDao(),
             database = database,
-            shopProfileDao = database.shopProfileDao()
+            shopProfileDao = database.shopProfileDao(),
+            authorizationContextProvider = { testTenant to testPlatformActor }
         )
     }
 
@@ -110,7 +129,7 @@ class CheckoutInvariantsTest {
     fun receivedPaymentIsRoundedAndRequiresAnActiveCustomer() = runBlocking {
         val customerId = database.customerDao().insertCustomer(Customer(name = "Payment Customer"))
 
-        repository.recordUdhaarPayment(customerId, 1235L, "cash", testActor)
+        repository.recordUdhaarPayment(customerId, 1235L, "cash", command = command())
         val transaction = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
 
         assertEquals("PAYMENT", transaction.type)
@@ -119,22 +138,22 @@ class CheckoutInvariantsTest {
         assertEquals("owner-1", transaction.actorUid)
 
         expectIllegalArgument {
-            repository.recordUdhaarPayment(99999L, 100L, "cash", testActor)
+            repository.recordUdhaarPayment(99999L, 100L, "cash", command = command())
         }
     }
 
     @Test
     fun ledgerCorrectionIsAppendOnlyAndCannotBeAppliedTwice() = runBlocking {
         val customerId = database.customerDao().insertCustomer(Customer(name = "Correction Customer"))
-        repository.recordUdhaarPayment(customerId, 1000L, "cash", testActor)
+        repository.recordUdhaarPayment(customerId, 1000L, "cash", command = command())
         val original = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
 
         val correctionId = repository.correctUdhaarTransaction(
             customerId = customerId,
             eventId = original.eventId,
             correctedAmountMinorUnits = 700L,
-            reason = "Entered amount was incorrect",
-            actor = testActor
+                reason = "Entered amount was incorrect",
+                command = command()
         )
         val rows = database.udhaarDao().getTransactionsForCustomerList(customerId)
         val correction = rows.single { it.id == correctionId }
@@ -151,7 +170,7 @@ class CheckoutInvariantsTest {
                 eventId = original.eventId,
                 correctedAmountMinorUnits = 600L,
                 reason = "Second correction must fail",
-                actor = testActor
+                command = command()
             )
         }
     }
@@ -159,7 +178,7 @@ class CheckoutInvariantsTest {
     @Test
     fun cashierCannotCorrectLedgerEvents() = runBlocking {
         val customerId = database.customerDao().insertCustomer(Customer(name = "Authorization Customer"))
-        repository.recordUdhaarPayment(customerId, 1000L, "cash", testActor)
+        repository.recordUdhaarPayment(customerId, 1000L, "cash", command = command())
         val original = database.udhaarDao().getTransactionsForCustomerList(customerId).single()
 
         expectIllegalArgument {
@@ -167,7 +186,7 @@ class CheckoutInvariantsTest {
                 customerId = customerId,
                 eventId = original.eventId,
                 reason = "Cashier correction attempt",
-                actor = LedgerActor("cashier-1", "Cashier", "CASHIER", "device-1")
+                command = command(actor = testPlatformActor.copy(role = "CASHIER"))
             )
         }
         assertEquals(1, database.udhaarDao().getTransactionsForCustomerList(customerId).size)
@@ -237,7 +256,7 @@ class CheckoutInvariantsTest {
             saleId = saleId,
             targetState = PaymentState.RECEIVED,
             receivedAmount = 1000L,
-            actor = testActor
+            command = command()
         )
         assertEquals(PaymentState.RECEIVED.wireValue, reconciled.paymentState)
         assertEquals(1000L, reconciled.receivedAmount ?: -1L)
@@ -247,7 +266,7 @@ class CheckoutInvariantsTest {
                 saleId = saleId,
                 targetState = PaymentState.FAILED,
                 receivedAmount = 0L,
-                actor = testActor
+                command = command()
             )
         }
     }
