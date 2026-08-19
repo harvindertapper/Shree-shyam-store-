@@ -53,6 +53,7 @@ class AuthenticatedBackupProviderTest {
         assertThrows(BackupWrongTenantException::class.java) {
             runBlocking { provider.download(com.aistudio.shreeshyamstore.pqwzkb.utils.BackupDownloadRequest("categories")) }
         }
+        Unit
     }
 
     @Test
@@ -68,6 +69,7 @@ class AuthenticatedBackupProviderTest {
         assertThrows(BackupUnavailableException::class.java) {
             runBlocking { timeoutProvider.download(com.aistudio.shreeshyamstore.pqwzkb.utils.BackupDownloadRequest("categories")) }
         }
+        Unit
     }
 
     @Test
@@ -81,6 +83,7 @@ class AuthenticatedBackupProviderTest {
         assertThrows(BackupMalformedException::class.java) {
             runBlocking { client.downloadTable("categories", Category::class.java) }
         }
+        Unit
     }
 
     @Test
@@ -107,6 +110,7 @@ class AuthenticatedBackupProviderTest {
                 )
             }
         }
+        Unit
     }
 
     @Test
@@ -192,6 +196,7 @@ class AuthenticatedBackupProviderTest {
                 )
             }
         }
+        Unit
     }
 
     @Test
