@@ -77,6 +77,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.CredentialMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantDeviceContextTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantDeviceContextMigrationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.TenantAuthorizationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest

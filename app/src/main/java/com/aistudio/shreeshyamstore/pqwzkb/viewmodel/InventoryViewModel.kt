@@ -3,6 +3,7 @@ package com.aistudio.shreeshyamstore.pqwzkb.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
  */
 class InventoryViewModel(
     private val repository: ShopRepository,
+    private val commandProvider: suspend () -> CommandMetadata,
     private val onMutation: () -> Unit,
     private val onError: (String) -> Unit = {}
 ) : ViewModel() {
@@ -45,7 +47,10 @@ class InventoryViewModel(
                 require(repository.getCategoryByName(normalizedName) == null) {
                     "Category name already exists"
                 }
-                repository.insertCategory(Category(name = normalizedName))
+                repository.insertCategory(
+                    category = Category(name = normalizedName),
+                    command = commandProvider()
+                )
                 onMutation()
             } catch (error: IllegalArgumentException) {
                 onError(error.message ?: "Category could not be saved")
@@ -60,10 +65,11 @@ class InventoryViewModel(
             try {
                 val normalizedName = InventoryValidation.validateCategoryName(newName)
                 repository.updateCategory(
-                    category.copy(
+                    category = category.copy(
                         name = normalizedName,
                         updatedAt = System.currentTimeMillis()
-                    )
+                    ),
+                    command = commandProvider()
                 )
                 onMutation()
             } catch (error: IllegalArgumentException) {
@@ -120,7 +126,12 @@ class InventoryViewModel(
                         createdAt = now,
                         updatedAt = now
                     )
-                    repository.insertProductWithOpeningStock(product, normalizedStock, now)
+                    repository.insertProductWithOpeningStock(
+                        product = product,
+                        openingStock = normalizedStock,
+                        createdAt = now,
+                        command = commandProvider()
+                    )
                 } else {
                     val existing = repository.getProductById(id)
                         ?: error("Product was not found")
@@ -144,7 +155,8 @@ class InventoryViewModel(
                         oldStock = existing.currentStock,
                         newStock = finalStock,
                         reason = "Manual correction during edit",
-                        createdAt = now
+                        createdAt = now,
+                        command = commandProvider()
                     )
                 }
                 onMutation()
@@ -161,7 +173,12 @@ class InventoryViewModel(
     fun adjustStock(productId: Long, actualStockCounted: Double, reason: String) {
         viewModelScope.launch {
             try {
-                repository.adjustProductStock(productId, actualStockCounted, reason)
+                repository.adjustProductStock(
+                    productId = productId,
+                    actualStockCounted = actualStockCounted,
+                    reason = reason,
+                    command = commandProvider()
+                )
                 onMutation()
             } catch (error: IllegalArgumentException) {
                 onError(error.message ?: "Stock adjustment could not be saved")
@@ -177,13 +194,14 @@ class InventoryViewModel(
 
 class InventoryViewModelFactory(
     private val repository: ShopRepository,
+    private val commandProvider: suspend () -> CommandMetadata,
     private val onMutation: () -> Unit,
     private val onError: (String) -> Unit = {}
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(InventoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return InventoryViewModel(repository, onMutation, onError) as T
+            return InventoryViewModel(repository, commandProvider, onMutation, onError) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

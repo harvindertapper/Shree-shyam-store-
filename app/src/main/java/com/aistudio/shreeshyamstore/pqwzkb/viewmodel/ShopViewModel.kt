@@ -6,10 +6,11 @@ import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
-import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PlatformActor
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
@@ -49,16 +50,24 @@ class ShopViewModel(
     private val context: Context? = null
 ) : ViewModel() {
 
-    private suspend fun currentLedgerActor(): LedgerActor {
+    suspend fun currentCommandMetadata(): CommandMetadata {
         val session = reconcileIdentitySession()
             ?: error("Authenticated actor is required")
         val tenantContext = settingsDataStore.getOrCreateTenantDeviceContext(session)
-        return LedgerActor(
-            actorUid = session.uid,
-            actorName = session.username.ifBlank { session.email }.ifBlank { session.uid },
-            actorRole = session.role,
-            actorDeviceId = tenantContext.deviceId
-        ).normalized()
+        val actor = PlatformActor(
+            actorId = session.uid,
+            displayName = session.username.ifBlank { session.email }.ifBlank { session.uid },
+            role = session.role,
+            deviceId = tenantContext.deviceId
+        )
+        val now = System.currentTimeMillis()
+        return CommandMetadata(
+            idempotencyKey = UUID.randomUUID().toString(),
+            clientEventId = UUID.randomUUID().toString(),
+            tenant = tenantContext.toTenantScope(),
+            actor = actor,
+            clientCreatedAt = now
+        )
     }
 
     /**
@@ -545,7 +554,12 @@ class ShopViewModel(
                     createdAt = now,
                     updatedAt = now
                 )
-                val newId = repository.insertProductWithOpeningStock(prod, normalizedStock, now)
+                val newId = repository.insertProductWithOpeningStock(
+                    product = prod,
+                    openingStock = normalizedStock,
+                    createdAt = now,
+                    command = currentCommandMetadata()
+                )
 
                 // Add the inserted product directly to our cart.
                 addProductToCart(prod.copy(id = newId), 1.0)
@@ -589,7 +603,7 @@ class ShopViewModel(
                     saleId = saleId,
                     targetState = targetState,
                     receivedAmount = receivedAmount,
-                    actor = currentLedgerActor()
+                    command = currentCommandMetadata()
                 )
                 if (_lastSale.value?.id == updatedSale.id) {
                     _lastSale.value = updatedSale
@@ -627,7 +641,7 @@ class ShopViewModel(
                 val billNo = "BILL-${formatter.format(Date())}-${UUID.randomUUID().toString().take(8).uppercase(Locale.ENGLISH)}"
 
                 val isUdhaar = paymentMode.trim().equals("UDHAAR", ignoreCase = true)
-                val ledgerActor = if (isUdhaar) currentLedgerActor() else null
+                val command = currentCommandMetadata()
                 var newCustomer: Customer? = null
                 val finalCustomerId = if (isUdhaar) {
                     if (customerId != null) {
@@ -678,9 +692,19 @@ class ShopViewModel(
                 )
 
                 val savedSaleId = if (newCustomer != null) {
-                    repository.insertSaleWithNewCustomer(sale, saleItems, newCustomer, ledgerActor)
+                    repository.insertSaleWithNewCustomer(
+                        sale = sale,
+                        items = saleItems,
+                        newCustomer = newCustomer,
+                        command = command
+                    )
                 } else {
-                    repository.insertSaleWithItems(sale, saleItems, finalCustomerId, ledgerActor)
+                    repository.insertSaleWithItems(
+                        sale = sale,
+                        items = saleItems,
+                        selectedCustomerId = finalCustomerId,
+                        command = command
+                    )
                 }
                 val savedSale = repository.getSaleById(savedSaleId)
                 if (savedSale != null) {
@@ -751,7 +775,7 @@ class ShopViewModel(
                     customerId = customerId,
                     amountMinorUnits = amountMinorUnits,
                     note = note,
-                    actor = currentLedgerActor()
+                    command = currentCommandMetadata()
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
@@ -773,7 +797,7 @@ class ShopViewModel(
                     customerId = customerId,
                     eventId = eventId,
                     reason = reason,
-                    actor = currentLedgerActor()
+                    command = currentCommandMetadata()
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
@@ -797,7 +821,7 @@ class ShopViewModel(
                     eventId = eventId,
                     correctedAmountMinorUnits = correctedAmountMinorUnits,
                     reason = reason,
-                    actor = currentLedgerActor()
+                    command = currentCommandMetadata()
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
@@ -815,10 +839,11 @@ class ShopViewModel(
                 val existing = repository.getCustomerByName(trimmedName)
                 if (existing == null) {
                     repository.insertCustomer(
-                        Customer(
+                        customer = Customer(
                             name = trimmedName,
                             phone = phone.trim().ifEmpty { null }
-                        )
+                        ),
+                        command = currentCommandMetadata()
                     )
                     triggerAutoSync()
                 }
@@ -965,7 +990,12 @@ class ShopViewModel(
                     current.currentStock + validatedQuantity,
                     "New stock"
                 )
-                repository.adjustProductStock(product.id, newStock, "Bulk Wholesale Restock")
+                repository.adjustProductStock(
+                    productId = product.id,
+                    actualStockCounted = newStock,
+                    reason = "Bulk Wholesale Restock",
+                    command = currentCommandMetadata()
+                )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
                 Toast.makeText(context, error.message ?: "Restock could not be saved", Toast.LENGTH_LONG).show()

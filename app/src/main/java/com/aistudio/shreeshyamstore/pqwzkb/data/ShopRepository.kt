@@ -1,14 +1,20 @@
 package com.aistudio.shreeshyamstore.pqwzkb.data
 
 import androidx.room.withTransaction
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerAuditPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PlatformActor
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantAuthorizationPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantCapability
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.UdhaarTransactionType
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 
 class ShopRepository(
     private val categoryDao: CategoryDao,
@@ -20,7 +26,8 @@ class ShopRepository(
     private val userDao: UserDao,
     private val database: AppDatabase? = null,
     private val shopProfileDao: ShopProfileDao? = null,
-    private val settingsDataStore: SettingsDataStore? = null
+    private val settingsDataStore: SettingsDataStore? = null,
+    private val authorizationContextProvider: (suspend () -> Pair<TenantScope, PlatformActor>)? = null
 ) {
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
@@ -28,24 +35,32 @@ class ShopRepository(
     suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
     suspend fun getCategoryByName(name: String): Category? = categoryDao.getCategoryByName(name)
 
-    suspend fun insertCategory(category: Category): Long = inCatalogTransaction {
-        val normalized = normalizeCategory(category)
-        require(categoryDao.getCategoryByNameExcludingId(normalized.name, 0L) == null) {
-            "Category name already exists"
+    suspend fun insertCategory(category: Category, command: CommandMetadata): Long {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        return inCatalogTransaction {
+            val normalized = normalizeCategory(category)
+            require(categoryDao.getCategoryByNameExcludingId(normalized.name, 0L) == null) {
+                "Category name already exists"
+            }
+            categoryDao.insert(normalized.stamped(mutationDeviceId()))
         }
-        categoryDao.insert(normalized.stamped(mutationDeviceId()))
     }
 
-    suspend fun updateCategory(category: Category) = inCatalogTransaction {
-        val normalized = normalizeCategory(category)
-        require(categoryDao.getCategoryByNameExcludingId(normalized.name, category.id) == null) {
-            "Category name already exists"
+    suspend fun updateCategory(category: Category, command: CommandMetadata) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        inCatalogTransaction {
+            val normalized = normalizeCategory(category)
+            require(categoryDao.getCategoryByNameExcludingId(normalized.name, category.id) == null) {
+                "Category name already exists"
+            }
+            categoryDao.update(normalized.stamped(mutationDeviceId()))
         }
-        categoryDao.update(normalized.stamped(mutationDeviceId()))
     }
 
-    suspend fun deleteCategory(category: Category) =
+    suspend fun deleteCategory(category: Category, command: CommandMetadata) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
         categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
+    }
 
     // Products
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
@@ -54,17 +69,23 @@ class ShopRepository(
     fun getProductByIdFlow(id: Long): Flow<Product?> = productDao.getProductByIdFlow(id)
     fun getProductsByCategory(categoryId: Long): Flow<List<Product>> = productDao.getProductsByCategory(categoryId)
 
-    suspend fun insertProduct(product: Product): Long = inCatalogTransaction {
-        val normalized = normalizeProduct(product)
-        requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
-        productDao.insert(normalized.stamped(mutationDeviceId()))
+    suspend fun insertProduct(product: Product, command: CommandMetadata): Long {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        return inCatalogTransaction {
+            val normalized = normalizeProduct(product)
+            requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
+            productDao.insert(normalized.stamped(mutationDeviceId()))
+        }
     }
 
     suspend fun insertProductWithOpeningStock(
         product: Product,
         openingStock: Double,
-        createdAt: Long = System.currentTimeMillis()
-    ): Long = inCatalogTransaction {
+        createdAt: Long = System.currentTimeMillis(),
+        command: CommandMetadata
+    ): Long {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        return inCatalogTransaction {
         val normalizedStock = InventoryValidation.validateQuantity(openingStock, "Opening stock")
         val normalized = normalizeProduct(product.copy(currentStock = normalizedStock))
         requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
@@ -83,13 +104,17 @@ class ShopRepository(
                 ).stamped(mutationDeviceId())
             )
         }
-        productId
+            productId
+        }
     }
 
-    suspend fun updateProduct(product: Product) = inCatalogTransaction {
-        val normalized = normalizeProduct(product)
-        requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
-        productDao.update(normalized.stamped(mutationDeviceId()))
+    suspend fun updateProduct(product: Product, command: CommandMetadata) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        inCatalogTransaction {
+            val normalized = normalizeProduct(product)
+            requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
+            productDao.update(normalized.stamped(mutationDeviceId()))
+        }
     }
 
     suspend fun updateProductWithStockAdjustment(
@@ -97,26 +122,30 @@ class ShopRepository(
         oldStock: Double,
         newStock: Double,
         reason: String,
-        createdAt: Long = System.currentTimeMillis()
-    ) = inCatalogTransaction {
-        val normalizedOldStock = InventoryValidation.validateQuantity(oldStock, "Old stock")
-        val normalizedNewStock = InventoryValidation.validateQuantity(newStock, "New stock")
-        val normalized = normalizeProduct(product.copy(currentStock = normalizedNewStock))
-        requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
-        productDao.update(normalized.stamped(mutationDeviceId()))
-        if (normalized.trackStock && normalizedOldStock != normalizedNewStock) {
-            stockAdjustmentDao.insertAdjustment(
-                StockAdjustment(
-                    productId = product.id,
-                    oldStock = normalizedOldStock,
-                    newStock = normalizedNewStock,
-                    difference = normalizedNewStock - normalizedOldStock,
-                    reason = InventoryValidation.validateReason(reason),
-                    createdAt = createdAt,
-                    updatedAt = createdAt,
-                    isSynced = false
-                ).stamped(mutationDeviceId())
-            )
+        createdAt: Long = System.currentTimeMillis(),
+        command: CommandMetadata
+    ) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        inCatalogTransaction {
+            val normalizedOldStock = InventoryValidation.validateQuantity(oldStock, "Old stock")
+            val normalizedNewStock = InventoryValidation.validateQuantity(newStock, "New stock")
+            val normalized = normalizeProduct(product.copy(currentStock = normalizedNewStock))
+            requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
+            productDao.update(normalized.stamped(mutationDeviceId()))
+            if (normalized.trackStock && normalizedOldStock != normalizedNewStock) {
+                stockAdjustmentDao.insertAdjustment(
+                    StockAdjustment(
+                        productId = product.id,
+                        oldStock = normalizedOldStock,
+                        newStock = normalizedNewStock,
+                        difference = normalizedNewStock - normalizedOldStock,
+                        reason = InventoryValidation.validateReason(reason),
+                        createdAt = createdAt,
+                        updatedAt = createdAt,
+                        isSynced = false
+                    ).stamped(mutationDeviceId())
+                )
+            }
         }
     }
 
@@ -164,9 +193,10 @@ class ShopRepository(
         saleId: Long,
         targetState: PaymentState,
         receivedAmount: Long,
-        actor: LedgerActor
+        command: CommandMetadata
     ): Sale {
-        val normalizedActor = LedgerAuditPolicy.requireCanRecord(actor)
+        val authorizedCommand = authorize(command, TenantCapability.PAYMENT_RECONCILIATION)
+        val normalizedActor = LedgerAuditPolicy.requireCanRecord(authorizedCommand.toLedgerActor())
         val sale = saleDao.getSaleById(saleId)
         require(sale != null && !sale.isDeleted) { "Sale was not found" }
         val normalizedReceived = CommerceValidation.validatePaymentStateTransition(
@@ -182,7 +212,7 @@ class ShopRepository(
             paymentState = targetState.wireValue,
             receivedAmount = if (targetState == PaymentState.FAILED) null else normalizedReceived,
             updatedAt = now,
-            mutationDeviceId = normalizedActor.actorDeviceId
+            mutationDeviceId = authorizedCommand.actor.deviceId
         )
         require(updated == 1) { "Payment state update was not applied" }
         return saleDao.getSaleById(saleId) ?: error("Sale disappeared after payment update")
@@ -204,11 +234,13 @@ class ShopRepository(
         sale: Sale,
         items: List<SaleItem>,
         selectedCustomerId: Long? = null,
-        ledgerActor: LedgerActor? = null
+        command: CommandMetadata
     ): Long {
-        val deviceId = mutationDeviceId()
+        val authorizedCommand = authorize(command, TenantCapability.CHECKOUT)
+        val deviceId = authorizedCommand.actor.deviceId
         val stampedSale = sale.stamped(deviceId)
         val stampedItems = items.map { it.stamped(deviceId) }
+        val ledgerActor = authorizedCommand.toLedgerActor()
         return saleDao.completeBillCheckout(stampedSale, stampedItems, selectedCustomerId, ledgerActor)
     }
 
@@ -216,25 +248,26 @@ class ShopRepository(
         sale: Sale,
         items: List<SaleItem>,
         selectedCustomerId: Long? = null,
-        ledgerActor: LedgerActor? = null
+        command: CommandMetadata
     ): Long {
-        return completeBillCheckout(sale, items, selectedCustomerId, ledgerActor)
+        return completeBillCheckout(sale, items, selectedCustomerId, command)
     }
 
     suspend fun insertSaleWithNewCustomer(
         sale: Sale,
         items: List<SaleItem>,
         newCustomer: Customer,
-        ledgerActor: LedgerActor? = null
+        command: CommandMetadata
     ): Long {
-        val deviceId = mutationDeviceId()
+        val authorizedCommand = authorize(command, TenantCapability.CHECKOUT)
+        val deviceId = authorizedCommand.actor.deviceId
         val stampedSale = sale.stamped(deviceId)
         val stampedItems = items.map { it.stamped(deviceId) }
         return saleDao.completeBillCheckoutWithNewCustomer(
             stampedSale,
             stampedItems,
             newCustomer.stamped(deviceId),
-            ledgerActor
+            authorizedCommand.toLedgerActor()
         )
     }
 
@@ -243,9 +276,20 @@ class ShopRepository(
     
     suspend fun getCustomerById(id: Long): Customer? = customerDao.getCustomerById(id)
     suspend fun getCustomerByName(name: String): Customer? = customerDao.getCustomerByName(name)
-    suspend fun insertCustomer(customer: Customer): Long = customerDao.insertCustomer(customer.stamped(mutationDeviceId()))
-    suspend fun updateCustomer(customer: Customer) = customerDao.updateCustomer(customer.stamped(mutationDeviceId()))
-    suspend fun deleteCustomer(customer: Customer) = customerDao.updateCustomer(customer.stamped(mutationDeviceId(), isDeleted = true))
+    suspend fun insertCustomer(customer: Customer, command: CommandMetadata): Long {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        return customerDao.insertCustomer(customer.stamped(command.actor.deviceId))
+    }
+
+    suspend fun updateCustomer(customer: Customer, command: CommandMetadata) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        customerDao.updateCustomer(customer.stamped(command.actor.deviceId))
+    }
+
+    suspend fun deleteCustomer(customer: Customer, command: CommandMetadata) {
+        authorize(command, TenantCapability.CATALOG_WRITE)
+        customerDao.updateCustomer(customer.stamped(command.actor.deviceId, isDeleted = true))
+    }
 
     // Udhaar
     val allUdhaarTransactions: Flow<List<UdhaarTransaction>> = udhaarDao.getAllTransactions()
@@ -272,9 +316,10 @@ class ShopRepository(
         customerId: Long,
         amountMinorUnits: Long,
         note: String?,
-        actor: LedgerActor
+        command: CommandMetadata
     ): Long {
-        val normalizedActor = LedgerAuditPolicy.requireCanRecord(actor)
+        val authorizedCommand = authorize(command, TenantCapability.LEDGER_RECORD)
+        val normalizedActor = LedgerAuditPolicy.requireCanRecord(authorizedCommand.toLedgerActor())
         return inLedgerTransaction {
             require(amountMinorUnits > 0L) {
                 "Payment amount must be positive"
@@ -311,9 +356,10 @@ class ShopRepository(
         customerId: Long,
         eventId: String,
         reason: String,
-        actor: LedgerActor
+        command: CommandMetadata
     ): Long {
-        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(actor)
+        val authorizedCommand = authorize(command, TenantCapability.LEDGER_CORRECTION)
+        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(authorizedCommand.toLedgerActor())
         val normalizedReason = LedgerAuditPolicy.requireReason(reason)
         return inLedgerTransaction {
             val target = udhaarDao.getActiveEventById(eventId)
@@ -359,9 +405,10 @@ class ShopRepository(
         eventId: String,
         correctedAmountMinorUnits: Long,
         reason: String,
-        actor: LedgerActor
+        command: CommandMetadata
     ): Long {
-        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(actor)
+        val authorizedCommand = authorize(command, TenantCapability.LEDGER_CORRECTION)
+        val normalizedActor = LedgerAuditPolicy.requireCanCorrect(authorizedCommand.toLedgerActor())
         val normalizedReason = LedgerAuditPolicy.requireReason(reason)
         require(correctedAmountMinorUnits > 0L) { "Corrected amount must be positive" }
         return inLedgerTransaction {
@@ -410,6 +457,40 @@ class ShopRepository(
 
     private suspend fun <T> inLedgerTransaction(operation: suspend () -> T): T =
         database?.withTransaction { operation() } ?: operation()
+
+    private suspend fun authorize(
+        command: CommandMetadata,
+        capability: TenantCapability,
+        nowEpochMs: Long = System.currentTimeMillis()
+    ): CommandMetadata {
+        val (expectedTenant, expectedActor) = authorizationContextProvider?.invoke()
+            ?: run {
+                val settings = settingsDataStore ?: error("Tenant authorization requires local settings")
+                val session = settings.settingsFlow.first().identitySessionOrNull()
+                    ?: error("Authenticated session is required")
+                val context = settings.getOrCreateTenantDeviceContext(session)
+                context.toTenantScope() to PlatformActor(
+                    actorId = session.uid,
+                    displayName = session.username.ifBlank { session.email }.ifBlank { session.uid },
+                    role = session.role,
+                    deviceId = context.deviceId
+                )
+            }
+        return TenantAuthorizationPolicy.requireAuthorized(
+            command = command,
+            expectedTenant = expectedTenant,
+            expectedActor = expectedActor,
+            capability = capability,
+            nowEpochMs = nowEpochMs
+        )
+    }
+
+    private fun CommandMetadata.toLedgerActor(): LedgerActor = LedgerActor(
+        actorUid = actor.actorId,
+        actorName = actor.displayName,
+        actorRole = actor.role,
+        actorDeviceId = actor.deviceId
+    ).normalized()
 
     private suspend fun mutationDeviceId(): String =
         settingsDataStore?.getOrCreateAuditDeviceId() ?: SyncIdentity.LEGACY_DEVICE_ID
@@ -489,18 +570,25 @@ class ShopRepository(
     fun getAdjustmentsForProduct(productId: Long): Flow<List<StockAdjustment>> = 
         stockAdjustmentDao.getAdjustmentsForProduct(productId)
 
-    suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long {
+    suspend fun insertStockAdjustment(adjustment: StockAdjustment, command: CommandMetadata): Long {
+        authorize(command, TenantCapability.INVENTORY_ADJUSTMENT)
         val normalized = adjustment.copy(
             oldStock = InventoryValidation.validateQuantity(adjustment.oldStock, "Old stock"),
             newStock = InventoryValidation.validateQuantity(adjustment.newStock, "New stock"),
             difference = requireFiniteStockDelta(adjustment.difference),
             reason = InventoryValidation.validateReason(adjustment.reason)
         )
-        return stockAdjustmentDao.insertAdjustment(normalized.stamped(mutationDeviceId()))
+        return stockAdjustmentDao.insertAdjustment(normalized.stamped(command.actor.deviceId))
     }
 
     /** Corrects a product stock level and logs the audit record atomically. */
-    suspend fun adjustProductStock(productId: Long, actualStockCounted: Double, reason: String) {
+    suspend fun adjustProductStock(
+        productId: Long,
+        actualStockCounted: Double,
+        reason: String,
+        command: CommandMetadata
+    ) {
+        val authorizedCommand = authorize(command, TenantCapability.INVENTORY_ADJUSTMENT)
         val validatedStock = InventoryValidation.validateQuantity(actualStockCounted, "Stock")
         val validatedReason = InventoryValidation.validateReason(reason)
         val operation: suspend () -> Unit = {
@@ -510,7 +598,7 @@ class ShopRepository(
             }
             val oldStock = product.currentStock
             val now = System.currentTimeMillis()
-            val deviceId = mutationDeviceId()
+            val deviceId = authorizedCommand.actor.deviceId
             productDao.update(
                 product.copy(
                     currentStock = validatedStock,
