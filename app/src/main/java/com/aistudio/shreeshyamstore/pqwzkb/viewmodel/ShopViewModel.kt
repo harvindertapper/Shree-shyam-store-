@@ -448,7 +448,11 @@ class ShopViewModel(
     // --- Billing State (Cart) ---
     private val billingCart = BillingCartState()
     val cartState: StateFlow<Map<Product, Double>> = billingCart.items
-    val cartTotal: Flow<Long> = billingCart.total
+    val cartTotal: StateFlow<Long> = billingCart.total.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0L
+    )
 
     /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
