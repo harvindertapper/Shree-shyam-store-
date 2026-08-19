@@ -83,6 +83,15 @@ interface SyncOutboxDao {
     @Query("SELECT COUNT(*) FROM sync_outbox WHERE state = :state")
     suspend fun countByState(state: String): Int
 
+    @Query("SELECT MIN(nextAttemptAt) FROM sync_outbox WHERE state = 'RETRYABLE' AND nextAttemptAt > 0")
+    suspend fun getNextRetryAt(): Long?
+
+    @Query("SELECT COUNT(*) FROM sync_outbox WHERE state = 'DEAD_LETTER' AND LOWER(COALESCE(lastError, '')) LIKE '%conflict%'")
+    suspend fun countConflictDeadLetters(): Int
+
+    @Query("UPDATE sync_outbox SET state = 'PENDING', attemptCount = 0, nextAttemptAt = 0, leaseUntil = NULL, lastError = NULL, updatedAt = :now WHERE state = 'DEAD_LETTER'")
+    suspend fun requeueDeadLetters(now: Long): Int
+
     @Query("DELETE FROM sync_outbox WHERE state = 'ACKED' AND updatedAt < :before")
     suspend fun deleteAcknowledgedBefore(before: Long): Int
 

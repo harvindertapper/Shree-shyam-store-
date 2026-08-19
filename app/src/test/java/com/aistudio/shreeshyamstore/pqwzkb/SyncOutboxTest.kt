@@ -9,6 +9,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -59,6 +60,35 @@ class SyncOutboxTest {
         val candidate = database.syncOutboxDao().getEligible(now, 10).single()
         assertEquals(1, database.syncOutboxDao().claim(candidate.id, now, now + 60_000L))
         assertEquals(0, database.syncOutboxDao().claim(candidate.id, now, now + 60_000L))
+    }
+
+    @Test
+    fun deadLettersCanBeRequeuedForOperatorRecovery() = runBlocking {
+        val now = 3_000L
+        val entry = SyncOutbox(
+            tableName = "products",
+            globalId = "global-recovery",
+            localId = 3L,
+            mutationVersion = 12L,
+            mutationDeviceId = "device-a",
+            idempotencyKey = SyncIdentity.idempotencyKey("products", "global-recovery", 12L),
+            payloadJson = "{\"name\":\"redacted\"}",
+            tombstone = false,
+            nextAttemptAt = now
+        )
+        database.syncOutboxDao().insert(entry)
+        val candidate = database.syncOutboxDao().getEligible(now, 10).single()
+        database.syncOutboxDao().claim(candidate.id, now, now + 60_000L)
+        database.syncOutboxDao().markDeadLetter(candidate.id, SyncIdentity.MAX_OUTBOX_ATTEMPTS, "CONFLICT", now)
+
+        assertEquals(1, database.syncOutboxDao().requeueDeadLetters(now + 1L))
+        val requeued = database.syncOutboxDao().getById(candidate.id)!!
+        assertEquals(SyncOutboxState.PENDING, requeued.state)
+        assertEquals(0, requeued.attemptCount)
+        assertEquals(0L, requeued.nextAttemptAt)
+        assertNull(requeued.leaseUntil)
+        assertNull(requeued.lastError)
+        assertEquals(now + 1L, requeued.updatedAt)
     }
 
     @Test
