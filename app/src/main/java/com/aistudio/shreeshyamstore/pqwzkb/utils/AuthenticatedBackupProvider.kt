@@ -71,6 +71,8 @@ data class BackupDownloadRequest(
 
 data class BackupUploadResult(val revision: String?)
 data class BackupDownloadResult(val jsonBody: String, val revision: String?)
+data class BackupSnapshotUploadRequest(val jsonBody: String, val revision: String? = null)
+data class BackupSnapshotDownloadRequest(val expectedRevision: String? = null)
 
 data class BackupHttpResponse(
     val statusCode: Int,
@@ -90,6 +92,13 @@ fun interface BackupTransport {
 interface AuthenticatedBackupProvider {
     suspend fun upload(request: BackupUploadRequest): BackupUploadResult
     suspend fun download(request: BackupDownloadRequest): BackupDownloadResult
+
+    /** Snapshot operations use a dedicated envelope path, not a business table name. */
+    suspend fun uploadSnapshot(request: BackupSnapshotUploadRequest): BackupUploadResult =
+        throw BackupIncompatibleException("Provider does not support snapshot envelopes")
+
+    suspend fun downloadSnapshot(request: BackupSnapshotDownloadRequest): BackupDownloadResult =
+        throw BackupIncompatibleException("Provider does not support snapshot envelopes")
 }
 
 class AuthenticatedBackupTableClient(
@@ -112,6 +121,18 @@ class AuthenticatedBackupTableClient(
             BackupDownloadRequest(tableName = tableName, expectedRevision = expectedRevision)
         )
         return BackupPayloadCodec.decode(result.jsonBody, clazz)
+    }
+
+    suspend fun uploadSnapshot(envelope: SnapshotEnvelope): BackupUploadResult =
+        provider.uploadSnapshot(
+            BackupSnapshotUploadRequest(jsonBody = RestoreSnapshotCodec.encode(envelope))
+        )
+
+    suspend fun downloadSnapshot(expectedRevision: String? = null): SnapshotEnvelope {
+        val result = provider.downloadSnapshot(
+            BackupSnapshotDownloadRequest(expectedRevision = expectedRevision)
+        )
+        return RestoreSnapshotCodec.decode(result.jsonBody)
     }
 }
 
@@ -158,7 +179,7 @@ class AuthenticatedRestBackupProvider(
         require(request.jsonBody.isNotBlank()) { "Backup payload cannot be empty" }
         val response = execute(
             method = "PUT",
-            tableName = request.tableName,
+            pathSegment = request.tableName,
             body = request.jsonBody,
             revision = request.revision
         )
@@ -168,7 +189,7 @@ class AuthenticatedRestBackupProvider(
 
     override suspend fun download(request: BackupDownloadRequest): BackupDownloadResult {
         validateTable(request.tableName)
-        val response = execute(method = "GET", tableName = request.tableName, body = null, revision = null)
+        val response = execute(method = "GET", pathSegment = request.tableName, body = null, revision = null)
         val revision = response.headers.headerValue("x-backup-revision")
         if (request.expectedRevision != null && request.expectedRevision == revision) {
             throw BackupReplayException()
@@ -179,13 +200,36 @@ class AuthenticatedRestBackupProvider(
         return BackupDownloadResult(response.body, revision)
     }
 
+    override suspend fun uploadSnapshot(request: BackupSnapshotUploadRequest): BackupUploadResult {
+        require(request.jsonBody.isNotBlank()) { "Backup snapshot cannot be empty" }
+        val response = execute(
+            method = "PUT",
+            pathSegment = "snapshot",
+            body = request.jsonBody,
+            revision = request.revision
+        )
+        return BackupUploadResult(response.headers.headerValue("x-backup-revision"))
+    }
+
+    override suspend fun downloadSnapshot(request: BackupSnapshotDownloadRequest): BackupDownloadResult {
+        val response = execute(method = "GET", pathSegment = "snapshot", body = null, revision = null)
+        val revision = response.headers.headerValue("x-backup-revision")
+        if (request.expectedRevision != null && request.expectedRevision == revision) {
+            throw BackupReplayException()
+        }
+        if (response.body.isBlank() || response.body.trim() == "null") {
+            throw BackupMalformedException("Backup snapshot envelope is empty")
+        }
+        return BackupDownloadResult(response.body, revision)
+    }
+
     private suspend fun execute(
         method: String,
-        tableName: String,
+        pathSegment: String,
         body: String?,
         revision: String?
     ): BackupHttpResponse {
-        val url = "$normalizedBaseUrl/$scopedPrefix/${tableName.trim()}.json"
+        val url = "$normalizedBaseUrl/$scopedPrefix/${pathSegment.trim()}.json"
         val headers = linkedMapOf(
             "Authorization" to "Bearer ${auth.bearerToken.trim()}",
             "Accept" to "application/json",

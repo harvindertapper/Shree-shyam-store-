@@ -23,18 +23,14 @@ import com.squareup.moshi.Types
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
 /**
  * Bidirectional cloud synchronization for the local Room database.
  *
- * Firestore is used by the background worker. The REST helpers are retained for
- * the manual JSON backup/restore screen and intentionally return safe values on
- * network or decoding failures so offline use never crashes the app.
+ * Firestore is used by the background worker. Manual backup and restore are
+ * handled by the authenticated provider boundary, while this service remains
+ * responsible for background outbox synchronization only.
  */
 class FirebaseSyncService(
     private val database: AppDatabase,
@@ -558,82 +554,10 @@ class FirebaseSyncService(
         private const val MAX_OUTBOX_BATCH = 50
         private const val OUTBOX_LEASE_MS = 2 * 60_000L
         private const val FIRESTORE_TIMEOUT_SECONDS = 15L
-        private const val DEFAULT_PREFIX = "shreeshyam_sync"
-        private val client = OkHttpClient.Builder()
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
-            .build()
         private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
         private val cloudMapAdapter = moshi.adapter<Map<String, Any?>>(
             Types.newParameterizedType(Map::class.java, String::class.java, Any::class.java)
         )
-
-        private fun normalizedBaseUrl(url: String): String? {
-            val value = url.trim()
-            if (value.isEmpty()) return null
-            val withScheme = if (value.startsWith("http://") || value.startsWith("https://")) {
-                value
-            } else {
-                "https://$value"
-            }
-            return withScheme.trimEnd('/').removeSuffix(".json")
-        }
-
-        private fun getJsonUrl(url: String, prefix: String, table: String): String? {
-            val base = normalizedBaseUrl(url) ?: return null
-            val cleanPrefix = prefix.trim().trim('/').ifEmpty { DEFAULT_PREFIX }
-            val cleanTable = table.trim().trim('/')
-            if (!CloudSyncPolicy.isCloudBusinessTable(cleanTable)) return null
-            return "$base/$cleanPrefix/$cleanTable.json"
-        }
-
-        suspend fun testFirebaseConnection(url: String): Boolean = withContext(Dispatchers.IO) {
-            val base = normalizedBaseUrl(url) ?: return@withContext false
-            val request = runCatching { Request.Builder().url("$base/.json?shallow=true").get().build() }
-                .getOrNull() ?: return@withContext false
-            runCatching { client.newCall(request).execute().use { it.isSuccessful } }.getOrDefault(false)
-        }
-
-        suspend fun <T> uploadTable(
-            url: String,
-            prefix: String,
-            tableName: String,
-            list: List<T>,
-            clazz: Class<T>
-        ): Boolean = withContext(Dispatchers.IO) {
-            val targetUrl = getJsonUrl(url, prefix, tableName) ?: return@withContext false
-            runCatching {
-                val type = Types.newParameterizedType(List::class.java, clazz)
-                val json = moshi.adapter<List<T>>(type).serializeNulls().toJson(list)
-                val request = Request.Builder()
-                    .url(targetUrl)
-                    .put(json.toRequestBody(JSON_MEDIA_TYPE))
-                    .build()
-                client.newCall(request).execute().use { it.isSuccessful }
-            }.getOrDefault(false)
-        }
-
-        suspend fun <T> downloadTable(
-            url: String,
-            prefix: String,
-            tableName: String,
-            clazz: Class<T>
-        ): List<T> = withContext(Dispatchers.IO) {
-            val targetUrl = getJsonUrl(url, prefix, tableName) ?: return@withContext emptyList()
-            runCatching {
-                val request = Request.Builder().url(targetUrl).get().build()
-                client.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) return@use emptyList()
-                    val body = response.body?.string().orEmpty()
-                    if (body.isBlank() || body == "null") return@use emptyList()
-                    val type = Types.newParameterizedType(List::class.java, clazz)
-                    moshi.adapter<List<T>>(type).fromJson(body).orEmpty()
-                }
-            }.getOrDefault(emptyList())
-        }
-
-        private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 }
 

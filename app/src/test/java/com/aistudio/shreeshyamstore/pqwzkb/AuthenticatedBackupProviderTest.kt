@@ -1,6 +1,8 @@
 package com.aistudio.shreeshyamstore.pqwzkb
 
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
+import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotCodec
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.IdentitySession
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AuthenticatedBackupTableClient
@@ -14,6 +16,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnauthorizedException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnavailableException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupWrongTenantException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudSyncPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
 import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupIncompatibleException
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -153,6 +156,34 @@ class AuthenticatedBackupProviderTest {
     }
 
     @Test
+    fun authenticatedSnapshotEnvelopeUsesDedicatedScopedPath() = runBlocking {
+        var capturedMethod = ""
+        var capturedUrl = ""
+        var capturedHeaders: Map<String, String> = emptyMap()
+        val envelope = SnapshotEnvelope.create(emptySnapshot(), tenantScope())
+        val transport = BackupTransport { method, url, headers, _ ->
+            capturedMethod = method
+            capturedUrl = url
+            capturedHeaders = headers
+            BackupHttpResponse(
+                statusCode = 200,
+                body = if (method == "GET") RestoreSnapshotCodec.encode(envelope) else "{}",
+                headers = mapOf("x-backup-revision" to "snapshot-revision", "x-backup-tenant" to "store-1")
+            )
+        }
+        val client = AuthenticatedBackupTableClient(provider(transport))
+
+        client.uploadSnapshot(envelope)
+        val downloaded = client.downloadSnapshot()
+
+        assertEquals("GET", capturedMethod)
+        assertTrue(capturedUrl.endsWith("/snapshot.json"))
+        assertTrue(capturedUrl.contains("/scopes/"))
+        assertEquals("Bearer short-lived-token", capturedHeaders["Authorization"])
+        assertEquals(envelope, downloaded)
+    }
+
+    @Test
     fun untrustedHostIsRejectedAtConstruction() {
         assertThrows(BackupIncompatibleException::class.java) {
             AuthenticatedRestBackupProvider(
@@ -222,6 +253,16 @@ class AuthenticatedBackupProviderTest {
             allowedHosts = setOf("backup.example.com"),
             transport = transport
         )
+
+    private fun emptySnapshot() = CloudRestorableSnapshot(
+        categories = emptyList(),
+        products = emptyList(),
+        sales = emptyList(),
+        saleItems = emptyList(),
+        customers = emptyList(),
+        udhaarTransactions = emptyList(),
+        stockAdjustments = emptyList()
+    )
 
     private fun authContext() = BackupAuthContext(
         identityUid = "firebase-user",

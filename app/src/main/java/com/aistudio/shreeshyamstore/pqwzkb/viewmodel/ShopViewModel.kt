@@ -23,10 +23,18 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
+import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalRecoveryPointStore
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreRecoveryCoordinator
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotValidator
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotUnavailableException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import java.io.File
 import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -1062,8 +1070,57 @@ class ShopViewModel(
             is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupIncompatibleException -> "Backup format or provider configuration is incompatible."
             is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupReplayException -> "This backup snapshot was already seen and was rejected."
         }
+        is RestoreSnapshotException -> "Backup snapshot validation failed. Local data was not changed."
         is IllegalArgumentException -> error.message ?: "Backup configuration is invalid."
         else -> "Backup operation failed. Local data was not changed."
+    }
+
+    private suspend fun currentCloudRestorableSnapshot(): CloudRestorableSnapshot = CloudRestorableSnapshot(
+        categories = repository.allCategories.first(),
+        products = repository.allProducts.first(),
+        sales = repository.allSales.first(),
+        saleItems = repository.getAllSaleItems(),
+        customers = repository.allCustomers.first(),
+        udhaarTransactions = repository.allUdhaarTransactions.first(),
+        stockAdjustments = repository.getAllStockAdjustmentsList()
+    )
+
+    private fun recoveryPointStore(): LocalRecoveryPointStore? =
+        context?.let { LocalRecoveryPointStore(File(it.filesDir, "restore-recovery")) }
+
+    private fun restoreFailureMessage(error: Throwable): String = when (error) {
+        is RestoreSnapshotException -> error.message ?: "Restore snapshot validation failed."
+        is IllegalArgumentException -> error.message ?: "Restore configuration is invalid."
+        else -> "Restore failed. Local data was not changed."
+    }
+
+    private suspend fun saveVerifiedRecoveryPoint(
+        snapshot: CloudRestorableSnapshot,
+        tenant: com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
+    ): SnapshotEnvelope {
+        val recoveryEnvelope = SnapshotEnvelope.create(snapshot, tenant)
+        RestoreSnapshotValidator.validate(recoveryEnvelope, tenant, allowEmpty = true)
+        recoveryPointStore()?.save(recoveryEnvelope)
+            ?: throw IllegalStateException("Local recovery storage is unavailable")
+        return recoveryEnvelope
+    }
+
+    private suspend fun replaceCloudSnapshotWithRollback(
+        snapshot: CloudRestorableSnapshot,
+        tenant: com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope,
+        recoveryEnvelope: SnapshotEnvelope
+    ) {
+        RestoreRecoveryCoordinator { restored: CloudRestorableSnapshot ->
+            repository.replaceCloudRestorableTables(
+                categoriesList = restored.categories,
+                productsList = restored.products,
+                salesList = restored.sales,
+                saleItemsList = restored.saleItems,
+                customersList = restored.customers,
+                udhaarTxsList = restored.udhaarTransactions,
+                adjustmentsList = restored.stockAdjustments
+            )
+        }.replaceWithRollback(snapshot, tenant, recoveryEnvelope)
     }
 
     fun updateFirebaseSettings(url: String, prefix: String, autoSync: Boolean) {
@@ -1084,6 +1141,7 @@ class ShopViewModel(
                 onResult(false, "No valid authenticated store session is available for backup.")
                 return@launch
             }
+            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
             val backupClient = try {
                 authenticatedBackupClient(settings, identitySession)
             } catch (error: Exception) {
@@ -1093,46 +1151,19 @@ class ShopViewModel(
 
             _syncInProgress.value = true
             _syncMessage.value = "Starting Backup..."
-
             try {
-                // Gather snapshot data and require every table to upload successfully.
-                _syncMessage.value = "Backing up Categories..."
-                val catList = repository.allCategories.first()
-                backupClient.uploadTable("categories", catList, Category::class.java)
-
-                _syncMessage.value = "Backing up Products..."
-                val prodList = repository.allProducts.first()
-                backupClient.uploadTable("products", prodList, Product::class.java)
-
-                _syncMessage.value = "Backing up Bills..."
-                val salesList = repository.allSales.first()
-                backupClient.uploadTable("sales", salesList, Sale::class.java)
-
-                _syncMessage.value = "Backing up Sale Items..."
-                val saleItemsList = repository.getAllSaleItems()
-                backupClient.uploadTable("sale_items", saleItemsList, SaleItem::class.java)
-
-                _syncMessage.value = "Backing up Customers..."
-                val customersList = repository.allCustomers.first()
-                backupClient.uploadTable("customers", customersList, Customer::class.java)
-
-                _syncMessage.value = "Backing up Ledger..."
-                val udhaarList = repository.allUdhaarTransactions.first()
-                backupClient.uploadTable("udhaar_transactions", udhaarList, UdhaarTransaction::class.java)
-
-                _syncMessage.value = "Backing up Stock Adjustments..."
-                val adjList = repository.getAllStockAdjustmentsList()
-                backupClient.uploadTable("stock_adjustments", adjList, StockAdjustment::class.java)
-
-                // Update sync time
-                val currentDF = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", java.util.Locale.ENGLISH)
-                val timeStr = currentDF.format(java.util.Date())
-                settingsDataStore.updateLastSyncTime(timeStr)
-
+                _syncMessage.value = "Creating verified snapshot..."
+                val envelope = SnapshotEnvelope.create(currentCloudRestorableSnapshot(), tenant)
+                RestoreSnapshotValidator.validate(envelope, tenant)
+                _syncMessage.value = "Uploading authenticated snapshot..."
+                backupClient.uploadSnapshot(envelope)
+                settingsDataStore.updateLastSyncTime(
+                    SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", Locale.ENGLISH).format(Date())
+                )
                 _syncMessage.value = "Backup Completed!"
                 onResult(true, "Cloud Backup successful!")
-            } catch (e: Exception) {
-                onResult(false, backupFailureMessage(e))
+            } catch (error: Exception) {
+                onResult(false, backupFailureMessage(error))
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null
@@ -1148,6 +1179,7 @@ class ShopViewModel(
                 onResult(false, "No valid authenticated store session is available for restore.")
                 return@launch
             }
+            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
             val backupClient = try {
                 authenticatedBackupClient(settings, identitySession)
             } catch (error: Exception) {
@@ -1156,54 +1188,23 @@ class ShopViewModel(
             }
 
             _syncInProgress.value = true
-            _syncMessage.value = "Testing connection..."
-
+            _syncMessage.value = "Downloading complete snapshot..."
             try {
-                _syncMessage.value = "Downloading Categories..."
-                val catList = backupClient.downloadTable("categories", Category::class.java)
+                _syncMessage.value = "Downloading authenticated snapshot..."
+                val remoteEnvelope = backupClient.downloadSnapshot()
+                _syncMessage.value = "Validating snapshot integrity..."
+                val remoteSnapshot = RestoreSnapshotValidator.validate(remoteEnvelope, tenant)
 
-                _syncMessage.value = "Downloading Products..."
-                val prodList = backupClient.downloadTable("products", Product::class.java)
+                _syncMessage.value = "Creating local recovery point..."
+                val recoveryEnvelope = saveVerifiedRecoveryPoint(currentCloudRestorableSnapshot(), tenant)
 
-                _syncMessage.value = "Downloading Bills..."
-                val salesList = backupClient.downloadTable("sales", Sale::class.java)
-
-                _syncMessage.value = "Downloading Sale Items..."
-                val saleItemsList = backupClient.downloadTable("sale_items", SaleItem::class.java)
-
-                _syncMessage.value = "Downloading Customers..."
-                val customersList = backupClient.downloadTable("customers", Customer::class.java)
-
-                _syncMessage.value = "Downloading Ledger..."
-                val udhaarList = backupClient.downloadTable("udhaar_transactions", UdhaarTransaction::class.java)
-
-                _syncMessage.value = "Downloading Adjustments..."
-                val adjList = backupClient.downloadTable("stock_adjustments", StockAdjustment::class.java)
-
-                if (catList.isEmpty() && prodList.isEmpty() && salesList.isEmpty() && saleItemsList.isEmpty() &&
-                    customersList.isEmpty() && udhaarList.isEmpty() && adjList.isEmpty()) {
-                    _syncInProgress.value = false
-                    _syncMessage.value = null
-                    onResult(false, "No backup data found for the authenticated store.")
-                    return@launch
-                }
-
-                // Clear & Insert
-                _syncMessage.value = "Restoring Database..."
-                repository.replaceCloudRestorableTables(
-                    categoriesList = catList,
-                    productsList = prodList,
-                    salesList = salesList,
-                    saleItemsList = saleItemsList,
-                    customersList = customersList,
-                    udhaarTxsList = udhaarList,
-                    adjustmentsList = adjList
-                )
+                _syncMessage.value = "Restoring validated database..."
+                replaceCloudSnapshotWithRollback(remoteSnapshot, tenant, recoveryEnvelope)
 
                 _syncMessage.value = "Database Restored!"
                 onResult(true, "All data successfully synchronized from Cloud!")
-            } catch (e: Exception) {
-                onResult(false, backupFailureMessage(e))
+            } catch (error: Exception) {
+                onResult(false, backupFailureMessage(error))
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null
