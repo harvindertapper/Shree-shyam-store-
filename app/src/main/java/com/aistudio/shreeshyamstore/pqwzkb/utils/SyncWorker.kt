@@ -21,6 +21,10 @@ class SyncWorker(
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
+        if (!com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.CLOUD_SYNC_ENABLED) {
+            Log.d(TAG, "Background sync skipped because this build disables cloud sync")
+            return Result.success()
+        }
         Log.d(TAG, "Background sync started (attempt $runAttemptCount)")
         val settingsStore = SettingsDataStore(applicationContext)
 
