@@ -38,6 +38,11 @@ data class StoreSettings(
     val loggedInRole: String = "OWNER",
     val identityProvider: IdentityProvider? = null,
     val auditDeviceId: String = "",
+    val organizationId: String = "",
+    val storeId: String = "",
+    val membershipId: String = "",
+    val deviceId: String = "",
+    val appInstallationId: String = "",
     val isUserLoggedIn: Boolean = false,
     val appLockEnabled: Boolean = true,
     val biometricEnabled: Boolean = false,
@@ -66,6 +71,11 @@ class SettingsDataStore(private val context: Context) {
         private val LOGGED_IN_ROLE = stringPreferencesKey("logged_in_role")
         private val IDENTITY_PROVIDER = stringPreferencesKey("identity_provider")
         private val AUDIT_DEVICE_ID = stringPreferencesKey("audit_device_id")
+        private val ORGANIZATION_ID = stringPreferencesKey("organization_id")
+        private val STORE_ID = stringPreferencesKey("store_id")
+        private val MEMBERSHIP_ID = stringPreferencesKey("membership_id")
+        private val DEVICE_ID = stringPreferencesKey("device_id")
+        private val APP_INSTALLATION_ID = stringPreferencesKey("app_installation_id")
         private val IS_USER_LOGGED_IN = booleanPreferencesKey("is_user_logged_in")
         private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
@@ -111,6 +121,11 @@ class SettingsDataStore(private val context: Context) {
                         null
                     },
                 auditDeviceId = preferences[AUDIT_DEVICE_ID].orEmpty(),
+                organizationId = preferences[ORGANIZATION_ID].orEmpty(),
+                storeId = preferences[STORE_ID].orEmpty(),
+                membershipId = preferences[MEMBERSHIP_ID].orEmpty(),
+                deviceId = preferences[DEVICE_ID].orEmpty(),
+                appInstallationId = preferences[APP_INSTALLATION_ID].orEmpty(),
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
                 biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
@@ -225,15 +240,18 @@ class SettingsDataStore(private val context: Context) {
         it[AUTO_SYNC_ENABLED] = enabled
     }
 
-    suspend fun saveSession(session: IdentitySession) = context.dataStore.edit {
+    suspend fun saveSession(session: IdentitySession) {
         val normalized = session.normalized()
         require(normalized.isUsable()) { "Cannot persist an identity without a stable uid" }
-        it[LOGGED_IN_UID] = normalized.uid
-        it[LOGGED_IN_USERNAME] = normalized.username
-        it[LOGGED_IN_EMAIL] = normalized.email
-        it[LOGGED_IN_ROLE] = normalized.role
-        it[IDENTITY_PROVIDER] = normalized.provider.name
-        it[IS_USER_LOGGED_IN] = true
+        getOrCreateTenantDeviceContext(normalized)
+        context.dataStore.edit {
+            it[LOGGED_IN_UID] = normalized.uid
+            it[LOGGED_IN_USERNAME] = normalized.username
+            it[LOGGED_IN_EMAIL] = normalized.email
+            it[LOGGED_IN_ROLE] = normalized.role
+            it[IDENTITY_PROVIDER] = normalized.provider.name
+            it[IS_USER_LOGGED_IN] = true
+        }
     }
 
     suspend fun saveSession(
@@ -262,6 +280,66 @@ class SettingsDataStore(private val context: Context) {
             }
         }
         return resolved
+    }
+
+    suspend fun getOrCreateTenantDeviceContext(session: IdentitySession): TenantDeviceContext {
+        val normalizedSession = session.normalized()
+        require(normalizedSession.isUsable()) { "A usable identity is required for tenant mapping" }
+        var resolved: TenantDeviceContext? = null
+        context.dataStore.edit { preferences ->
+            val storedValues = listOf(
+                preferences[ORGANIZATION_ID].orEmpty().trim(),
+                preferences[STORE_ID].orEmpty().trim(),
+                preferences[MEMBERSHIP_ID].orEmpty().trim(),
+                preferences[DEVICE_ID].orEmpty().trim(),
+                preferences[APP_INSTALLATION_ID].orEmpty().trim()
+            )
+            val hasAnyStoredContext = storedValues.any(String::isNotBlank)
+            val hasCompleteStoredContext = storedValues.all(String::isNotBlank)
+            require(!hasAnyStoredContext || hasCompleteStoredContext) {
+                "Tenant context is incomplete and must be repaired before use"
+            }
+
+            if (hasCompleteStoredContext) {
+                val stored = TenantDeviceContext(
+                    organizationId = storedValues[0],
+                    storeId = storedValues[1],
+                    membershipId = storedValues[2],
+                    deviceId = storedValues[3],
+                    appInstallationId = storedValues[4]
+                )
+                val expectedLegacy = TenantDeviceContext.fromLegacySession(
+                    session = normalizedSession,
+                    deviceId = stored.deviceId,
+                    appInstallationId = stored.appInstallationId
+                )
+                require(
+                    !stored.organizationId.startsWith(TenantDeviceContext.LEGACY_ORGANIZATION_PREFIX) ||
+                        stored.storeId == expectedLegacy.storeId
+                ) { "Tenant/store scope mismatch" }
+                resolved = stored
+            } else {
+                val deviceId = preferences[AUDIT_DEVICE_ID].orEmpty().trim().ifEmpty {
+                    UUID.randomUUID().toString()
+                }
+                val appInstallationId = preferences[APP_INSTALLATION_ID].orEmpty().trim().ifEmpty {
+                    TenantDeviceContext.newAppInstallationId()
+                }
+                val mapped = TenantDeviceContext.fromLegacySession(
+                    session = normalizedSession,
+                    deviceId = deviceId,
+                    appInstallationId = appInstallationId
+                )
+                preferences[AUDIT_DEVICE_ID] = deviceId
+                preferences[ORGANIZATION_ID] = mapped.organizationId
+                preferences[STORE_ID] = mapped.storeId
+                preferences[MEMBERSHIP_ID] = mapped.membershipId
+                preferences[DEVICE_ID] = mapped.deviceId
+                preferences[APP_INSTALLATION_ID] = mapped.appInstallationId
+                resolved = mapped
+            }
+        }
+        return resolved ?: error("Tenant context persistence did not produce a result")
     }
 
     suspend fun clearSession() = context.dataStore.edit {

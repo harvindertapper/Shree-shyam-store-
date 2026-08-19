@@ -18,7 +18,12 @@ data class ShopProfile(
     val address: String = "",
     val isSynced: Boolean = false,
     val updatedAt: Long = System.currentTimeMillis(),
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "''") val organizationId: String = "",
+    @ColumnInfo(defaultValue = "''") val storeId: String = "",
+    @ColumnInfo(defaultValue = "''") val membershipId: String = "",
+    @ColumnInfo(defaultValue = "'legacy-device'") val deviceId: String = "legacy-device",
+    @ColumnInfo(defaultValue = "''") val appInstallationId: String = ""
 )
 
 @Entity(tableName = "categories", indices = [Index(value = ["globalId"], unique = true)])

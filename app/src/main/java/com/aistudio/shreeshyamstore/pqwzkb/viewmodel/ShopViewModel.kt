@@ -57,14 +57,12 @@ class ShopViewModel(
     private suspend fun currentLedgerActor(): LedgerActor {
         val session = reconcileIdentitySession()
             ?: error("Authenticated actor is required")
-        val settings = settingsDataStore.settingsFlow.first()
-        val deviceId = settings.auditDeviceId.trim()
-            .ifEmpty { settingsDataStore.getOrCreateAuditDeviceId() }
+        val tenantContext = settingsDataStore.getOrCreateTenantDeviceContext(session)
         return LedgerActor(
             actorUid = session.uid,
             actorName = session.username.ifBlank { session.email }.ifBlank { session.uid },
             actorRole = session.role,
-            actorDeviceId = deviceId
+            actorDeviceId = tenantContext.deviceId
         ).normalized()
     }
 
@@ -278,9 +276,15 @@ class ShopViewModel(
             settingsDataStore.updateOwnerPhone(ownerPhone.trim())
             val session = reconcileIdentitySession()
             if (session != null) {
+                val tenantContext = settingsDataStore.getOrCreateTenantDeviceContext(session)
                 repository.saveShopProfile(
                     ShopProfile(
                         uid = session.shopUid,
+                        organizationId = tenantContext.organizationId,
+                        storeId = tenantContext.storeId,
+                        membershipId = tenantContext.membershipId,
+                        deviceId = tenantContext.deviceId,
+                        appInstallationId = tenantContext.appInstallationId,
                         shopName = shopName.trim(),
                         ownerName = ownerName.trim(),
                         ownerPhone = ownerPhone.trim(),
