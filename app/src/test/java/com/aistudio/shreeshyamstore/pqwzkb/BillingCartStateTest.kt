@@ -2,11 +2,7 @@ package com.aistudio.shreeshyamstore.pqwzkb
 
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.BillingCartState
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -15,7 +11,7 @@ import org.junit.Test
 class BillingCartStateTest {
     @Test
     fun trackedProductCannotExceedAvailableStock() {
-        val cart = BillingCartState(thisScope())
+        val cart = BillingCartState()
         val product = product(stock = 2.0)
 
         cart.add(product, quantity = 3.0)
@@ -25,7 +21,7 @@ class BillingCartStateTest {
 
     @Test
     fun addingAndRemovingQuantityPreservesExpectedCartState() {
-        val cart = BillingCartState(thisScope())
+        val cart = BillingCartState()
         val product = product(stock = 5.0)
 
         cart.add(product, quantity = 2.0)
@@ -40,7 +36,7 @@ class BillingCartStateTest {
 
     @Test
     fun invalidQuantitiesDoNotMutateCart() {
-        val cart = BillingCartState(thisScope())
+        val cart = BillingCartState()
         val product = product(stock = 5.0)
 
         cart.add(product, quantity = Double.NaN)
@@ -51,22 +47,17 @@ class BillingCartStateTest {
 
     @Test
     fun totalUsesIntegerPaiseAndCommerceRounding() = runBlocking {
-        val scope = CoroutineScope(Dispatchers.Unconfined)
-        try {
-            val cart = BillingCartState(scope)
-            val product = product(stock = 5.0, sellingPrice = 1235L)
+        val cart = BillingCartState()
+        val product = product(stock = 5.0, sellingPrice = 1235L)
 
-            cart.add(product, quantity = 2.0)
+        cart.add(product, quantity = 2.0)
 
-            assertEquals(2470L, cart.total.drop(1).first())
-        } finally {
-            scope.cancel()
-        }
+        assertEquals(2470L, cart.total.first())
     }
 
     @Test
     fun untrackedProductDoesNotUseStockAsCartLimit() {
-        val cart = BillingCartState(thisScope())
+        val cart = BillingCartState()
         val product = product(stock = 0.0, trackStock = false)
 
         cart.add(product, quantity = 10.0)
@@ -87,5 +78,4 @@ class BillingCartStateTest {
         trackStock = trackStock
     )
 
-    private fun thisScope() = CoroutineScope(Dispatchers.Unconfined)
 }

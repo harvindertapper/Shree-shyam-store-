@@ -2,13 +2,11 @@ package com.aistudio.shreeshyamstore.pqwzkb.viewmodel
 
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.CoroutineScope
 
 /**
  * Local billing cart boundary.
@@ -18,24 +16,16 @@ import kotlinx.coroutines.CoroutineScope
  * the repository/Room transaction boundary. ShopViewModel temporarily exposes
  * compatibility delegates while billing screens migrate to this boundary.
  */
-class BillingCartState(
-    scope: CoroutineScope
-) {
+class BillingCartState {
     private val _items = MutableStateFlow<Map<Product, Double>>(emptyMap())
 
     val items: StateFlow<Map<Product, Double>> = _items.asStateFlow()
 
-    val total: StateFlow<Long> = _items
-        .map { cart ->
-            cart.entries.sumOf { (product, quantity) ->
-                CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
-            }
+    val total: Flow<Long> = _items.map { cart ->
+        cart.entries.sumOf { (product, quantity) ->
+            CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
         }
-        .stateIn(
-            scope = scope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = 0L
-        )
+    }
 
     fun add(product: Product, quantity: Double = 1.0) {
         if (!quantity.isFinite()) return
