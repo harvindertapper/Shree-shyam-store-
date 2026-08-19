@@ -9,6 +9,12 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
+ksp {
+  arg("room.schemaLocation", "$projectDir/schemas")
+  arg("room.generateKotlin", "true")
+  arg("room.incremental", "true")
+}
+
 android {
   namespace = "com.aistudio.shreeshyamstore.pqwzkb"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
