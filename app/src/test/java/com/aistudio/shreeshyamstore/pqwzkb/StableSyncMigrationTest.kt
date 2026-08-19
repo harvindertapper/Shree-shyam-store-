@@ -42,7 +42,7 @@ class StableSyncMigrationTest {
         raw.close()
 
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_5_6)
+            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
             .allowMainThreadQueries()
             .build()
 
@@ -56,15 +56,56 @@ class StableSyncMigrationTest {
         migrated.close()
     }
 
-    private fun createV5Schema(database: SQLiteDatabase) {
-        database.execSQL("CREATE TABLE categories (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE products (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, categoryId INTEGER NOT NULL, mrp INTEGER NOT NULL, sellingPrice INTEGER, purchasePrice INTEGER, currentStock REAL NOT NULL, unit TEXT NOT NULL, trackStock INTEGER NOT NULL, lowStockAlertQty REAL NOT NULL, barcode TEXT NOT NULL, isActive INTEGER NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE sales (id INTEGER NOT NULL PRIMARY KEY, billNumber TEXT NOT NULL, totalAmount INTEGER NOT NULL, paymentMode TEXT NOT NULL, customerId INTEGER, note TEXT, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE sale_items (id INTEGER NOT NULL PRIMARY KEY, saleId INTEGER NOT NULL, productId INTEGER NOT NULL, productNameSnapshot TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unitPrice INTEGER NOT NULL, lineTotal INTEGER NOT NULL, isSynced INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE customers (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, phone TEXT, creditLimit INTEGER NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE udhaar_transactions (id INTEGER NOT NULL PRIMARY KEY, customerId INTEGER NOT NULL, saleId INTEGER, type TEXT NOT NULL, amount INTEGER NOT NULL, balanceEffect INTEGER NOT NULL DEFAULT 0, note TEXT, correctsEventId TEXT, correctionReason TEXT, actorUid TEXT NOT NULL DEFAULT 'legacy-local', actorName TEXT NOT NULL DEFAULT 'Legacy local record', actorRole TEXT NOT NULL DEFAULT 'OWNER', actorDeviceId TEXT NOT NULL DEFAULT 'legacy-device', isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL, eventId TEXT NOT NULL DEFAULT '')")
-        database.execSQL("CREATE TABLE stock_adjustments (id INTEGER NOT NULL PRIMARY KEY, productId INTEGER NOT NULL, oldStock REAL NOT NULL, newStock REAL NOT NULL, difference REAL NOT NULL, reason TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE shop_profiles (uid TEXT NOT NULL PRIMARY KEY, shopName TEXT NOT NULL, ownerName TEXT NOT NULL, ownerPhone TEXT NOT NULL, upiId TEXT NOT NULL, email TEXT NOT NULL, address TEXT NOT NULL, isSynced INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
-        database.execSQL("CREATE TABLE users (id INTEGER NOT NULL PRIMARY KEY, uid TEXT NOT NULL, username TEXT NOT NULL, email TEXT NOT NULL, passwordHash TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+
+}
+
+internal fun createV5Schema(database: SQLiteDatabase) {
+    database.execSQL("CREATE TABLE categories (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE products (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, categoryId INTEGER NOT NULL, mrp INTEGER NOT NULL, sellingPrice INTEGER, purchasePrice INTEGER, currentStock REAL NOT NULL, unit TEXT NOT NULL, trackStock INTEGER NOT NULL, lowStockAlertQty REAL NOT NULL, barcode TEXT NOT NULL, isActive INTEGER NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE sales (id INTEGER NOT NULL PRIMARY KEY, billNumber TEXT NOT NULL, totalAmount INTEGER NOT NULL, paymentMode TEXT NOT NULL, customerId INTEGER, note TEXT, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE sale_items (id INTEGER NOT NULL PRIMARY KEY, saleId INTEGER NOT NULL, productId INTEGER NOT NULL, productNameSnapshot TEXT NOT NULL, quantity REAL NOT NULL, unit TEXT NOT NULL, unitPrice INTEGER NOT NULL, lineTotal INTEGER NOT NULL, isSynced INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE customers (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, phone TEXT, creditLimit INTEGER NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE udhaar_transactions (id INTEGER NOT NULL PRIMARY KEY, customerId INTEGER NOT NULL, saleId INTEGER, type TEXT NOT NULL, amount INTEGER NOT NULL, balanceEffect INTEGER NOT NULL DEFAULT 0, note TEXT, correctsEventId TEXT, correctionReason TEXT, actorUid TEXT NOT NULL DEFAULT 'legacy-local', actorName TEXT NOT NULL DEFAULT 'Legacy local record', actorRole TEXT NOT NULL DEFAULT 'OWNER', actorDeviceId TEXT NOT NULL DEFAULT 'legacy-device', isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL, eventId TEXT NOT NULL DEFAULT '')")
+    database.execSQL("CREATE TABLE stock_adjustments (id INTEGER NOT NULL PRIMARY KEY, productId INTEGER NOT NULL, oldStock REAL NOT NULL, newStock REAL NOT NULL, difference REAL NOT NULL, reason TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE shop_profiles (uid TEXT NOT NULL PRIMARY KEY, shopName TEXT NOT NULL, ownerName TEXT NOT NULL, ownerPhone TEXT NOT NULL, upiId TEXT NOT NULL, email TEXT NOT NULL, address TEXT NOT NULL, isSynced INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+    database.execSQL("CREATE TABLE users (id INTEGER NOT NULL PRIMARY KEY, uid TEXT NOT NULL, username TEXT NOT NULL, email TEXT NOT NULL, passwordHash TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
+}
+
+internal fun upgradeV5SchemaToV6(database: SQLiteDatabase) {
+    val businessTables = listOf(
+        "categories", "products", "sales", "sale_items",
+        "customers", "udhaar_transactions", "stock_adjustments"
+    )
+    businessTables.forEach { table ->
+        database.execSQL("ALTER TABLE $table ADD COLUMN globalId TEXT NOT NULL DEFAULT ''")
+        database.execSQL("ALTER TABLE $table ADD COLUMN mutationVersion INTEGER NOT NULL DEFAULT 0")
+        database.execSQL("ALTER TABLE $table ADD COLUMN mutationDeviceId TEXT NOT NULL DEFAULT 'legacy-device'")
+        database.execSQL("UPDATE $table SET globalId = 'legacy-' || '$table' || '-' || id WHERE globalId = ''")
+        database.execSQL("UPDATE $table SET mutationVersion = updatedAt WHERE mutationVersion = 0")
+        database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_${table}_globalId ON $table (globalId)")
     }
+    database.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS sync_outbox (
+            id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            tableName TEXT NOT NULL,
+            globalId TEXT NOT NULL,
+            localId INTEGER NOT NULL,
+            mutationVersion INTEGER NOT NULL,
+            mutationDeviceId TEXT NOT NULL,
+            idempotencyKey TEXT NOT NULL,
+            payloadJson TEXT NOT NULL,
+            tombstone INTEGER NOT NULL,
+            state TEXT NOT NULL,
+            attemptCount INTEGER NOT NULL,
+            nextAttemptAt INTEGER NOT NULL,
+            leaseUntil INTEGER,
+            lastError TEXT,
+            createdAt INTEGER NOT NULL,
+            updatedAt INTEGER NOT NULL
+        )
+        """.trimIndent()
+    )
+    database.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_state_nextAttemptAt ON sync_outbox (state, nextAttemptAt)")
+    database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_outbox_tableName_globalId_mutationVersion ON sync_outbox (tableName, globalId, mutationVersion)")
 }

@@ -3,6 +3,7 @@ package com.aistudio.shreeshyamstore.pqwzkb.utils
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
@@ -297,6 +298,8 @@ class FirebaseSyncService(
                 trackStock = doc.getBoolean("trackStock") ?: true,
                 lowStockAlertQty = doc.number("lowStockAlertQty", 5.0),
                 barcode = doc.getString("barcode").orEmpty(),
+                barcodeKey = doc.getString("barcodeKey")?.takeIf { it.isNotBlank() }
+                    ?: InventoryValidation.normalizeBarcode(doc.getString("barcode").orEmpty()),
                 isActive = doc.getBoolean("isActive") ?: true,
                 isSynced = true,
                 createdAt = doc.long("createdAt") ?: fallbackTime,
@@ -481,7 +484,8 @@ class FirebaseSyncService(
         "sellingPrice" to sellingPrice, "purchasePrice" to purchasePrice,
         "moneyScale" to 2L,
         "currentStock" to currentStock, "unit" to unit, "trackStock" to trackStock,
-        "lowStockAlertQty" to lowStockAlertQty, "barcode" to barcode, "isActive" to isActive,
+        "lowStockAlertQty" to lowStockAlertQty, "barcode" to barcode, "barcodeKey" to barcodeKey,
+        "isActive" to isActive,
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
         "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
         "idempotencyKey" to SyncIdentity.idempotencyKey("products", globalId, mutationVersion)

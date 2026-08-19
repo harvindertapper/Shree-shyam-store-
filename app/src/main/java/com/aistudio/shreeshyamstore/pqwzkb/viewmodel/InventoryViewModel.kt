@@ -3,6 +3,7 @@ package com.aistudio.shreeshyamstore.pqwzkb.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
@@ -22,7 +23,8 @@ import kotlinx.coroutines.launch
  */
 class InventoryViewModel(
     private val repository: ShopRepository,
-    private val onMutation: () -> Unit
+    private val onMutation: () -> Unit,
+    private val onError: (String) -> Unit = {}
 ) : ViewModel() {
     val categories: StateFlow<List<Category>> = repository.allCategories.stateIn(
         scope = viewModelScope,
@@ -38,18 +40,25 @@ class InventoryViewModel(
 
     fun addCategory(name: String) {
         viewModelScope.launch {
-            val normalizedName = name.trim()
-            if (normalizedName.isNotEmpty() && repository.getCategoryByName(normalizedName) == null) {
+            try {
+                val normalizedName = InventoryValidation.validateCategoryName(name)
+                require(repository.getCategoryByName(normalizedName) == null) {
+                    "Category name already exists"
+                }
                 repository.insertCategory(Category(name = normalizedName))
                 onMutation()
+            } catch (error: IllegalArgumentException) {
+                onError(error.message ?: "Category could not be saved")
+            } catch (_: Exception) {
+                onError("Category could not be saved")
             }
         }
     }
 
     fun renameCategory(category: Category, newName: String) {
         viewModelScope.launch {
-            val normalizedName = newName.trim()
-            if (normalizedName.isNotEmpty()) {
+            try {
+                val normalizedName = InventoryValidation.validateCategoryName(newName)
                 repository.updateCategory(
                     category.copy(
                         name = normalizedName,
@@ -57,6 +66,10 @@ class InventoryViewModel(
                     )
                 )
                 onMutation()
+            } catch (error: IllegalArgumentException) {
+                onError(error.message ?: "Category could not be renamed")
+            } catch (_: Exception) {
+                onError("Category could not be renamed")
             }
         }
     }
@@ -76,73 +89,70 @@ class InventoryViewModel(
         barcode: String = ""
     ) {
         viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            if (id == 0L) {
-                val product = Product(
-                    name = name.trim(),
-                    categoryId = categoryId,
-                    mrp = mrp,
-                    sellingPrice = sellingPrice,
-                    purchasePrice = purchasePrice,
-                    currentStock = currentStock,
-                    unit = unit.trim().ifEmpty { "pcs" },
-                    trackStock = trackStock,
-                    lowStockAlertQty = lowStockAlertQty,
-                    barcode = barcode.trim(),
-                    isActive = isActive,
-                    createdAt = now,
-                    updatedAt = now
-                )
-                val newProductId = repository.insertProduct(product)
-                if (trackStock && currentStock > 0.0) {
-                    repository.insertStockAdjustment(
-                        StockAdjustment(
-                            productId = newProductId,
-                            oldStock = 0.0,
-                            newStock = currentStock,
-                            difference = currentStock,
-                            reason = "Opening stock entry",
-                            createdAt = now,
-                            updatedAt = now
-                        )
-                    )
+            try {
+                val normalizedName = InventoryValidation.validateProductName(name)
+                val normalizedMrp = InventoryValidation.validateProductMoney(mrp, "MRP")
+                val normalizedSellingPrice = InventoryValidation.validateOptionalMoney(sellingPrice, "Selling price")
+                val normalizedPurchasePrice = InventoryValidation.validateOptionalMoney(purchasePrice, "Purchase price")
+                val normalizedStock = InventoryValidation.validateQuantity(currentStock, "Current stock")
+                val normalizedAlertQty = InventoryValidation.validateQuantity(lowStockAlertQty, "Low-stock alert quantity")
+                val normalizedUnit = InventoryValidation.validateUnit(unit)
+                val normalizedBarcode = InventoryValidation.normalizeBarcode(barcode)
+                require(repository.isBarcodeAvailable(normalizedBarcode.orEmpty(), id)) {
+                    "Barcode already belongs to another active product"
                 }
-            } else {
-                val existing = repository.getProductById(id)
-                if (existing != null) {
-                    val finalStock = if (trackStock) currentStock else existing.currentStock
-                    repository.updateProduct(
-                        existing.copy(
-                            name = name.trim(),
+
+                val now = System.currentTimeMillis()
+                if (id == 0L) {
+                    val product = Product(
+                        name = normalizedName,
+                        categoryId = categoryId,
+                        mrp = normalizedMrp,
+                        sellingPrice = normalizedSellingPrice,
+                        purchasePrice = normalizedPurchasePrice,
+                        currentStock = normalizedStock,
+                        unit = normalizedUnit,
+                        trackStock = trackStock,
+                        lowStockAlertQty = normalizedAlertQty,
+                        barcode = barcode.trim(),
+                        barcodeKey = normalizedBarcode,
+                        isActive = isActive,
+                        createdAt = now,
+                        updatedAt = now
+                    )
+                    repository.insertProductWithOpeningStock(product, normalizedStock, now)
+                } else {
+                    val existing = repository.getProductById(id)
+                        ?: error("Product was not found")
+                    val finalStock = if (trackStock) normalizedStock else existing.currentStock
+                    repository.updateProductWithStockAdjustment(
+                        product = existing.copy(
+                            name = normalizedName,
                             categoryId = categoryId,
-                            mrp = mrp,
-                            sellingPrice = sellingPrice,
-                            purchasePrice = purchasePrice,
+                            mrp = normalizedMrp,
+                            sellingPrice = normalizedSellingPrice,
+                            purchasePrice = normalizedPurchasePrice,
                             currentStock = finalStock,
-                            unit = unit.trim().ifEmpty { existing.unit },
+                            unit = normalizedUnit,
                             trackStock = trackStock,
-                            lowStockAlertQty = lowStockAlertQty,
+                            lowStockAlertQty = normalizedAlertQty,
                             barcode = barcode.trim(),
+                            barcodeKey = normalizedBarcode,
                             isActive = isActive,
                             updatedAt = now
-                        )
+                        ),
+                        oldStock = existing.currentStock,
+                        newStock = finalStock,
+                        reason = "Manual correction during edit",
+                        createdAt = now
                     )
-                    if (trackStock && currentStock != existing.currentStock) {
-                        repository.insertStockAdjustment(
-                            StockAdjustment(
-                                productId = id,
-                                oldStock = existing.currentStock,
-                                newStock = currentStock,
-                                difference = currentStock - existing.currentStock,
-                                reason = "Manual correction during edit",
-                                createdAt = now,
-                                updatedAt = now
-                            )
-                        )
-                    }
                 }
+                onMutation()
+            } catch (error: IllegalArgumentException) {
+                onError(error.message ?: "Product could not be saved")
+            } catch (_: Exception) {
+                onError("Product could not be saved")
             }
-            onMutation()
         }
     }
 
@@ -150,8 +160,14 @@ class InventoryViewModel(
 
     fun adjustStock(productId: Long, actualStockCounted: Double, reason: String) {
         viewModelScope.launch {
-            repository.adjustProductStock(productId, actualStockCounted, reason)
-            onMutation()
+            try {
+                repository.adjustProductStock(productId, actualStockCounted, reason)
+                onMutation()
+            } catch (error: IllegalArgumentException) {
+                onError(error.message ?: "Stock adjustment could not be saved")
+            } catch (_: Exception) {
+                onError("Stock adjustment could not be saved")
+            }
         }
     }
 
@@ -161,12 +177,13 @@ class InventoryViewModel(
 
 class InventoryViewModelFactory(
     private val repository: ShopRepository,
-    private val onMutation: () -> Unit
+    private val onMutation: () -> Unit,
+    private val onError: (String) -> Unit = {}
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(InventoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return InventoryViewModel(repository, onMutation) as T
+            return InventoryViewModel(repository, onMutation, onError) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

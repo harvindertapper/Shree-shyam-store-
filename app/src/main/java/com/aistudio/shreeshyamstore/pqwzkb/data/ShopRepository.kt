@@ -1,6 +1,7 @@
 package com.aistudio.shreeshyamstore.pqwzkb.data
 
 import androidx.room.withTransaction
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerAuditPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.UdhaarTransactionType
@@ -24,19 +25,132 @@ class ShopRepository(
     
     suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
     suspend fun getCategoryByName(name: String): Category? = categoryDao.getCategoryByName(name)
-    suspend fun insertCategory(category: Category): Long = categoryDao.insert(category.stamped(mutationDeviceId()))
-    suspend fun updateCategory(category: Category) = categoryDao.update(category.stamped(mutationDeviceId()))
-    suspend fun deleteCategory(category: Category) = categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
+
+    suspend fun insertCategory(category: Category): Long = inCatalogTransaction {
+        val normalized = normalizeCategory(category)
+        require(categoryDao.getCategoryByNameExcludingId(normalized.name, 0L) == null) {
+            "Category name already exists"
+        }
+        categoryDao.insert(normalized.stamped(mutationDeviceId()))
+    }
+
+    suspend fun updateCategory(category: Category) = inCatalogTransaction {
+        val normalized = normalizeCategory(category)
+        require(categoryDao.getCategoryByNameExcludingId(normalized.name, category.id) == null) {
+            "Category name already exists"
+        }
+        categoryDao.update(normalized.stamped(mutationDeviceId()))
+    }
+
+    suspend fun deleteCategory(category: Category) =
+        categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
 
     // Products
     val allProducts: Flow<List<Product>> = productDao.getAllProducts()
-    
+
     suspend fun getProductById(id: Long): Product? = productDao.getProductById(id)
     fun getProductByIdFlow(id: Long): Flow<Product?> = productDao.getProductByIdFlow(id)
     fun getProductsByCategory(categoryId: Long): Flow<List<Product>> = productDao.getProductsByCategory(categoryId)
-    
-    suspend fun insertProduct(product: Product): Long = productDao.insert(product.stamped(mutationDeviceId()))
-    suspend fun updateProduct(product: Product) = productDao.update(product.stamped(mutationDeviceId()))
+
+    suspend fun insertProduct(product: Product): Long = inCatalogTransaction {
+        val normalized = normalizeProduct(product)
+        requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
+        productDao.insert(normalized.stamped(mutationDeviceId()))
+    }
+
+    suspend fun insertProductWithOpeningStock(
+        product: Product,
+        openingStock: Double,
+        createdAt: Long = System.currentTimeMillis()
+    ): Long = inCatalogTransaction {
+        val normalizedStock = InventoryValidation.validateQuantity(openingStock, "Opening stock")
+        val normalized = normalizeProduct(product.copy(currentStock = normalizedStock))
+        requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
+        val productId = productDao.insert(normalized.stamped(mutationDeviceId()))
+        if (normalized.trackStock && normalizedStock > 0.0) {
+            stockAdjustmentDao.insertAdjustment(
+                StockAdjustment(
+                    productId = productId,
+                    oldStock = 0.0,
+                    newStock = normalizedStock,
+                    difference = normalizedStock,
+                    reason = "Opening stock entry",
+                    createdAt = createdAt,
+                    updatedAt = createdAt,
+                    isSynced = false
+                ).stamped(mutationDeviceId())
+            )
+        }
+        productId
+    }
+
+    suspend fun updateProduct(product: Product) = inCatalogTransaction {
+        val normalized = normalizeProduct(product)
+        requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
+        productDao.update(normalized.stamped(mutationDeviceId()))
+    }
+
+    suspend fun updateProductWithStockAdjustment(
+        product: Product,
+        oldStock: Double,
+        newStock: Double,
+        reason: String,
+        createdAt: Long = System.currentTimeMillis()
+    ) = inCatalogTransaction {
+        val normalizedOldStock = InventoryValidation.validateQuantity(oldStock, "Old stock")
+        val normalizedNewStock = InventoryValidation.validateQuantity(newStock, "New stock")
+        val normalized = normalizeProduct(product.copy(currentStock = normalizedNewStock))
+        requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
+        productDao.update(normalized.stamped(mutationDeviceId()))
+        if (normalized.trackStock && normalizedOldStock != normalizedNewStock) {
+            stockAdjustmentDao.insertAdjustment(
+                StockAdjustment(
+                    productId = product.id,
+                    oldStock = normalizedOldStock,
+                    newStock = normalizedNewStock,
+                    difference = normalizedNewStock - normalizedOldStock,
+                    reason = InventoryValidation.validateReason(reason),
+                    createdAt = createdAt,
+                    updatedAt = createdAt,
+                    isSynced = false
+                ).stamped(mutationDeviceId())
+            )
+        }
+    }
+
+    suspend fun isBarcodeAvailable(barcode: String, excludeId: Long = 0L): Boolean {
+        val barcodeKey = InventoryValidation.normalizeBarcode(barcode) ?: return true
+        return productDao.getActiveProductByBarcodeKey(barcodeKey, excludeId) == null &&
+            productDao.getActiveProductByLegacyBarcode(barcodeKey, excludeId) == null
+    }
+
+    private suspend fun requireNoDuplicateBarcode(barcodeKey: String?, excludeId: Long) {
+        require(barcodeKey == null || isBarcodeAvailable(barcodeKey, excludeId)) {
+            "Barcode already belongs to another active product"
+        }
+    }
+
+    private fun normalizeCategory(category: Category): Category = category.copy(
+        name = InventoryValidation.validateCategoryName(category.name)
+    )
+
+    private fun normalizeProduct(product: Product): Product {
+        val normalizedBarcode = InventoryValidation.normalizeBarcode(product.barcode)
+        return product.copy(
+            name = InventoryValidation.validateProductName(product.name),
+            mrp = InventoryValidation.validateProductMoney(product.mrp, "MRP"),
+            sellingPrice = InventoryValidation.validateOptionalMoney(product.sellingPrice, "Selling price"),
+            purchasePrice = InventoryValidation.validateOptionalMoney(product.purchasePrice, "Purchase price"),
+            currentStock = InventoryValidation.validateQuantity(product.currentStock, "Current stock"),
+            lowStockAlertQty = InventoryValidation.validateQuantity(product.lowStockAlertQty, "Low-stock alert quantity"),
+            unit = InventoryValidation.validateUnit(product.unit),
+            barcode = product.barcode.trim(),
+            barcodeKey = normalizedBarcode
+        )
+    }
+
+    private suspend fun <T> inCatalogTransaction(block: suspend () -> T): T =
+        if (database != null) database.withTransaction { block() } else block()
 
     // Sales
     val allSales: Flow<List<Sale>> = saleDao.getAllSales()
@@ -346,20 +460,30 @@ class ShopRepository(
         stockAdjustmentDao.getAdjustmentsForProduct(productId)
 
     suspend fun insertStockAdjustment(adjustment: StockAdjustment): Long {
-        return stockAdjustmentDao.insertAdjustment(adjustment.stamped(mutationDeviceId()))
+        val normalized = adjustment.copy(
+            oldStock = InventoryValidation.validateQuantity(adjustment.oldStock, "Old stock"),
+            newStock = InventoryValidation.validateQuantity(adjustment.newStock, "New stock"),
+            difference = requireFiniteStockDelta(adjustment.difference),
+            reason = InventoryValidation.validateReason(adjustment.reason)
+        )
+        return stockAdjustmentDao.insertAdjustment(normalized.stamped(mutationDeviceId()))
     }
 
     /** Corrects a product stock level and logs the audit record atomically. */
     suspend fun adjustProductStock(productId: Long, actualStockCounted: Double, reason: String) {
-        require(actualStockCounted >= 0.0) { "Stock cannot be negative" }
-        val operation: suspend () -> Unit = operation@{
-            val product = productDao.getProductById(productId) ?: return@operation
+        val validatedStock = InventoryValidation.validateQuantity(actualStockCounted, "Stock")
+        val validatedReason = InventoryValidation.validateReason(reason)
+        val operation: suspend () -> Unit = {
+            val product = productDao.getProductById(productId)
+            require(product != null && product.isActive && !product.isDeleted) {
+                "Stock adjustment requires an active product"
+            }
             val oldStock = product.currentStock
             val now = System.currentTimeMillis()
             val deviceId = mutationDeviceId()
             productDao.update(
                 product.copy(
-                    currentStock = actualStockCounted,
+                    currentStock = validatedStock,
                     updatedAt = now,
                     mutationVersion = now,
                     mutationDeviceId = deviceId,
@@ -370,9 +494,9 @@ class ShopRepository(
                 StockAdjustment(
                     productId = productId,
                     oldStock = oldStock,
-                    newStock = actualStockCounted,
-                    difference = actualStockCounted - oldStock,
-                    reason = reason.trim().ifEmpty { "Manual stock adjustment" },
+                    newStock = validatedStock,
+                    difference = validatedStock - oldStock,
+                    reason = validatedReason,
                     mutationVersion = now,
                     mutationDeviceId = deviceId,
                     isSynced = false,
@@ -383,6 +507,12 @@ class ShopRepository(
         }
         if (database != null) database.withTransaction { operation() } else operation()
     }
+
+    private fun requireFiniteStockDelta(value: Double): Double {
+        require(value.isFinite()) { "Stock difference must be finite" }
+        return value
+    }
+
 
     suspend fun getShopProfile(uid: String): ShopProfile? =
         shopProfileDao?.getByUid(uid) ?: database?.shopProfileDao()?.getByUid(uid)

@@ -33,7 +33,13 @@ data class Category(
     @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "products", indices = [Index(value = ["globalId"], unique = true)])
+@Entity(
+    tableName = "products",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["barcodeKey"], unique = true)
+    ]
+)
 data class Product(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(defaultValue = "''") val globalId: String = "",
@@ -50,6 +56,8 @@ data class Product(
     val trackStock: Boolean = true,
     val lowStockAlertQty: Double = 5.0,
     val barcode: String = "",
+    /** Canonical non-empty barcode identity; null means no validated barcode. */
+    val barcodeKey: String? = null,
     val isActive: Boolean = true,
     val isSynced: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
