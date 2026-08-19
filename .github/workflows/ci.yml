@@ -90,6 +90,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
 
