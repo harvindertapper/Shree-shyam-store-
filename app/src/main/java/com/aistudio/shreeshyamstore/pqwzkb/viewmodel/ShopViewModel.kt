@@ -446,54 +446,28 @@ class ShopViewModel(
     }
 
     // --- Billing State (Cart) ---
-    private val _cartState = MutableStateFlow<Map<Product, Double>>(emptyMap())
-    val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
+    private val billingCart = BillingCartState(viewModelScope)
+    val cartState: StateFlow<Map<Product, Double>> = billingCart.items
+    val cartTotal: StateFlow<Long> = billingCart.total
 
-    val cartTotal: StateFlow<Long> = _cartState.map { cart ->
-        cart.entries.sumOf { (product, quantity) ->
-            CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
-        }
-    }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0L
-    )
-
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
-        if (!quantity.isFinite()) return
-        val current = _cartState.value.toMutableMap()
-        val currentQty = current[product] ?: 0.0
-        val finalQty = currentQty + quantity
-        if (!finalQty.isFinite()) return
-        if (finalQty > 0.0) {
-            if (product.trackStock && finalQty > product.currentStock) return
-            current[product] = finalQty
-        } else {
-            current.remove(product)
-        }
-        _cartState.value = current
+        billingCart.add(product, quantity)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun setProductQuantityInCart(product: Product, qty: Double) {
-        if (!qty.isFinite()) return
-        val current = _cartState.value.toMutableMap()
-        if (qty > 0.0) {
-            if (product.trackStock && qty > product.currentStock) return
-            current[product] = qty
-        } else {
-            current.remove(product)
-        }
-        _cartState.value = current
+        billingCart.setQuantity(product, qty)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun removeProductFromCart(product: Product) {
-        val current = _cartState.value.toMutableMap()
-        current.remove(product)
-        _cartState.value = current
+        billingCart.remove(product)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun clearCart() {
-        _cartState.value = emptyMap()
+        billingCart.clear()
     }
 
     /**
@@ -595,7 +569,7 @@ class ShopViewModel(
         receivedAmount: Long? = null
     ) {
         if (_checkoutInFlight.value) return
-        val cartItems = _cartState.value
+        val cartItems = billingCart.items.value
         if (cartItems.isEmpty()) return
 
         _checkoutInFlight.value = true
