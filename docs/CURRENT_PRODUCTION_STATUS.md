@@ -9,7 +9,7 @@
 
 The repository is now a **hardened internal/staging candidate**, not yet a production-distributable release. The original prototype risks around credential payload privacy, checkout money representation, stock policy, stable sync identity, tenant/device persistence, repository authorization, authenticated backup, snapshot integrity, and restore recovery have been addressed through the merged hardening sequence through PR #35.
 
-The remaining production blockers are concentrated in five areas: billing architecture decomposition, residual local credential KDF and compatibility cleanup, operational sync/conflict support, reproducible release engineering, and staging/recovery evidence. Server-authoritative tenant operations belong to the future private Control Plane repository and must not be implemented by making the Android client its own authority.
+The remaining production blockers are concentrated in five areas: billing architecture decomposition, temporary credential-compatibility cleanup, operational sync/conflict support, reproducible release engineering, and staging/recovery evidence. The core local credential KDF migration and login throttling are already implemented and covered by the current security tests. Server-authoritative tenant operations belong to the future private Control Plane repository and must not be implemented by making the Android client its own authority.
 
 > **Current source-of-truth rule:** The checked-out source, current `main`, the CI workflow, and this document describe the present state. Older audit statements are historical findings and must not be treated as evidence that already-merged controls are still absent.
 
@@ -30,7 +30,7 @@ The remaining production blockers are concentrated in five areas: billing archit
 | ID | Priority | Blocker | Planned PR or evidence | Current state |
 |---|---:|---|---|---|
 | APP-29 | P1 | Billing and checkout orchestration remains concentrated in `ShopViewModel`, limiting isolated testing and maintainability. | `refactor/billing-viewmodel`, followed by billing UI migration. | Next implementation slice. |
-| SEC-30 | P0 | New local credentials need a versioned, salted, slow verifier; legacy SHA-256 and weak PIN compatibility paths need a controlled sunset. | `security/credential-kdf-migration`. | PR #30 is a foundation; completion remains pending. |
+| SEC-30 | P1 | The core versioned salted PBKDF2 verifier and local-login throttling are implemented; the remaining work is a separately approved sunset of the legacy app-lock blank/default-PIN compatibility window and stale documentation. | `security/credential-compatibility-cleanup` or a release migration decision. | Core migration complete in PR #30; compatibility cleanup remains intentionally gated by recovery evidence. |
 | SYNC-36 | P1 | Dead-letter, conflict, cursor, retry, and operator recovery outcomes are not yet exposed through structured redacted status. | `feat/sync-observability-conflicts`. | Planned. |
 | SYNC-37 | P0 | Merchant-to-server synchronization contract needs versioned tenant authorization, replay, cursor, tombstone, and conflict semantics. | `feat/sync-contract-compatibility`; server implementation belongs to Control Plane. | Planned. |
 | REL-38 | P0 | Release signing, versioning, R8/minification, production configuration separation, and artifact provenance are not yet demonstrated. | `release/build-signing-r8`. | Planned. |
@@ -65,7 +65,7 @@ The following invariants are non-negotiable for future PRs:
 
 ## Recommended execution sequence
 
-The next code PR is `APP-29`, the billing/cart ViewModel boundary. A documentation-only status update can merge independently. `SEC-30` can proceed in a separate branch because it does not require a billing schema change. After the billing and credential boundaries are stable, implement `SYNC-36`, then `SYNC-37`, then the release build/signing slice `REL-38`, staging/recovery rehearsal `REL-39`, and operations readiness `OPS-40`. Only after those gates are evidenced should the separate private Control Plane repository begin.
+The next code PR is `APP-29`, the billing/cart ViewModel boundary. A documentation-only status update can merge independently. The core `SEC-30` KDF migration is already complete; only a later compatibility-cleanup decision should be made after app-lock recovery evidence is available. After the billing and credential boundaries are stable, implement `SYNC-36`, then `SYNC-37`, then the release build/signing slice `REL-38`, staging/recovery rehearsal `REL-39`, and operations readiness `OPS-40`. Only after those gates are evidenced should the separate private Control Plane repository begin.
 
 ## References
 
