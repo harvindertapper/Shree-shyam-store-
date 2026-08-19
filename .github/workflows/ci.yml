@@ -88,6 +88,33 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
 
+      - name: Verify Room schema artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.AppDatabase/8.json"
+          test -f "$schema_path"
+
+          if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
+            git fetch --no-tags origin "$GITHUB_BASE_REF"
+            base_ref="origin/$GITHUB_BASE_REF"
+          else
+            base_ref="HEAD^"
+          fi
+
+          changed_files="$(git diff --name-only "$base_ref...HEAD")"
+          if grep -Eq '^app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/data/(AppDatabase|Entities|Daos).*\\.kt$' <<<"$changed_files"; then
+            grep -Eq '^app/schemas/.*\\.json$' <<<"$changed_files"
+          fi
+
+      - name: Upload Room schema artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shree-shyam-store-room-schemas
+          path: app/schemas
+          if-no-files-found: warn
+
       - name: Upload debug APK
         if: always()
         uses: actions/upload-artifact@v4
