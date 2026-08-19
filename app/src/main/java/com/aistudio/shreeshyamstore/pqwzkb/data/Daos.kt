@@ -537,6 +537,9 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertUser(user: User): Long
 
+    @Query("UPDATE users SET passwordHash = :credentialVerifier WHERE id = :userId")
+    suspend fun updateLocalCredential(userId: Long, credentialVerifier: String): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(users: List<User>)
 

@@ -44,12 +44,20 @@ object AppLockPolicy {
         enteredPin: String,
         storedHash: String,
         state: AppLockState,
-        nowEpochMs: Long
+        nowEpochMs: Long,
+        allowDefaultPinFallback: Boolean = true,
+        credentialMatched: Boolean? = null
     ): Pair<PinUnlockResult, AppLockState> {
         if (isLocked(state, nowEpochMs)) {
             return PinUnlockResult.Locked(state.lockedUntilEpochMs) to state
         }
-        if (SecurityUtils.verifyPin(enteredPin, storedHash)) {
+        if (credentialMatched ?: SecurityUtils.verifyCredential(
+                secret = enteredPin,
+                storedCredential = storedHash,
+                scope = SecurityUtils.CredentialScope.APP_LOCK,
+                allowDefaultPinFallback = allowDefaultPinFallback
+            ).matched
+        ) {
             return PinUnlockResult.Success to recordSuccess(nowEpochMs)
         }
 
@@ -66,4 +74,47 @@ object AppLockPolicy {
         nowEpochMs: Long,
         timeoutMs: Long = SESSION_TIMEOUT_MS
     ): Boolean = lastUnlockAtEpochMs <= 0L || nowEpochMs - lastUnlockAtEpochMs >= timeoutMs
+}
+
+sealed interface LocalLoginResult {
+    data object Success : LocalLoginResult
+    data class Invalid(val remainingAttempts: Int) : LocalLoginResult
+    data class Locked(val untilEpochMs: Long) : LocalLoginResult
+}
+
+/** Independent throttle for local account password guesses. */
+object LocalLoginPolicy {
+    const val MAX_FAILED_ATTEMPTS = 5
+    const val LOCKOUT_DURATION_MS = 60_000L
+
+    fun isLocked(failedAttempts: Int, lockedUntilEpochMs: Long, nowEpochMs: Long): Boolean =
+        lockedUntilEpochMs > nowEpochMs && failedAttempts >= MAX_FAILED_ATTEMPTS
+
+    fun evaluate(
+        credentialMatched: Boolean,
+        failedAttempts: Int,
+        lockedUntilEpochMs: Long,
+        nowEpochMs: Long
+    ): Pair<LocalLoginResult, Pair<Int, Long>> {
+        val safeAttempts = failedAttempts.coerceAtLeast(0)
+        if (isLocked(safeAttempts, lockedUntilEpochMs, nowEpochMs)) {
+            return LocalLoginResult.Locked(lockedUntilEpochMs) to (safeAttempts to lockedUntilEpochMs)
+        }
+        if (credentialMatched) {
+            return LocalLoginResult.Success to (0 to 0L)
+        }
+
+        val nextAttempts = (safeAttempts + 1).coerceAtMost(MAX_FAILED_ATTEMPTS)
+        val nextLockedUntil = if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+            nowEpochMs + LOCKOUT_DURATION_MS
+        } else {
+            0L
+        }
+        val result = if (nextAttempts >= MAX_FAILED_ATTEMPTS) {
+            LocalLoginResult.Locked(nextLockedUntil)
+        } else {
+            LocalLoginResult.Invalid(MAX_FAILED_ATTEMPTS - nextAttempts)
+        }
+        return result to (nextAttempts to nextLockedUntil)
+    }
 }
