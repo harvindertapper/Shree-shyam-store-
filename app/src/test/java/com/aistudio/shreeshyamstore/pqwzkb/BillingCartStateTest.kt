@@ -4,7 +4,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.BillingCartState
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -47,8 +47,8 @@ class BillingCartStateTest {
     }
 
     @Test
-    fun totalUsesIntegerPaiseAndCommerceRounding() = runTest {
-        val cart = BillingCartState(this)
+    fun totalUsesIntegerPaiseAndCommerceRounding() = runBlocking {
+        val cart = BillingCartState(thisScope())
         val product = product(stock = 5.0, sellingPrice = 1235L)
 
         cart.add(product, quantity = 2.0)
