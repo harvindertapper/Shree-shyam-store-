@@ -4,6 +4,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
@@ -353,12 +354,20 @@ class FirebaseSyncService(
         database.saleDao().insertAllSales(docs.mapNotNull { doc ->
             val id = localIdForDocument("sales", doc, fallbackTime)
             val number = doc.getString("billNumber") ?: return@mapNotNull null
+            val totalAmount = doc.moneyMinor("totalAmount")
+            val paymentMode = doc.getString("paymentMode") ?: "CASH"
+            val paymentState = doc.getString("paymentState")
+                ?.let { runCatching { PaymentState.fromWireValue(it).wireValue }.getOrNull() }
+                ?: legacyPaymentState(paymentMode)
             Sale(
                 id = id,
                 globalId = doc.syncGlobalId("sales", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
                 billNumber = number,
-                totalAmount = doc.moneyMinor("totalAmount"),
-                paymentMode = doc.getString("paymentMode") ?: "CASH",
+                totalAmount = totalAmount,
+                paymentMode = paymentMode,
+                paymentState = paymentState,
+                receivedAmount = doc.long("receivedAmount")
+                    ?: if (paymentState == PaymentState.RECEIVED.wireValue) totalAmount else null,
                 customerId = doc.long("customerId"),
                 note = doc.getString("note"),
                 isSynced = true,
@@ -494,7 +503,8 @@ class FirebaseSyncService(
     private fun Sale.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "globalId" to globalId, "billNumber" to billNumber, "totalAmount" to totalAmount,
         "moneyScale" to 2L,
-        "paymentMode" to paymentMode, "customerId" to customerId, "note" to note,
+        "paymentMode" to paymentMode, "paymentState" to paymentState,
+        "receivedAmount" to receivedAmount, "customerId" to customerId, "note" to note,
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
         "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
         "idempotencyKey" to SyncIdentity.idempotencyKey("sales", globalId, mutationVersion)
@@ -635,6 +645,13 @@ private fun com.google.firebase.firestore.DocumentSnapshot.number(field: String,
 
 private fun com.google.firebase.firestore.DocumentSnapshot.optionalNumber(field: String): Double? =
     getDouble(field) ?: getLong(field)?.toDouble()
+
+private fun legacyPaymentState(paymentMode: String): String =
+    if (paymentMode.trim().equals("UDHAAR", ignoreCase = true)) {
+        PaymentState.NOT_REQUIRED.wireValue
+    } else {
+        PaymentState.RECEIVED.wireValue
+    }
 
 private fun com.google.firebase.firestore.DocumentSnapshot.moneyMinor(
     field: String,

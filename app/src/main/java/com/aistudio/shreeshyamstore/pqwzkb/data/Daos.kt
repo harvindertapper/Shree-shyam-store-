@@ -131,6 +131,15 @@ abstract class SaleDao {
     @Query("UPDATE sales SET isSynced = 1 WHERE id = :id AND mutationVersion = :mutationVersion AND mutationDeviceId = :mutationDeviceId")
     abstract suspend fun markSaleSyncedIfVersion(id: Long, mutationVersion: Long, mutationDeviceId: String): Int
 
+    @Query("UPDATE sales SET paymentState = :paymentState, receivedAmount = :receivedAmount, updatedAt = :updatedAt, mutationVersion = :updatedAt, mutationDeviceId = :mutationDeviceId, isSynced = 0 WHERE id = :saleId AND isDeleted = 0")
+    abstract suspend fun updatePaymentStateIfActive(
+        saleId: Long,
+        paymentState: String,
+        receivedAmount: Long?,
+        updatedAt: Long,
+        mutationDeviceId: String
+    ): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertSale(sale: Sale): Long
 
@@ -264,6 +273,11 @@ abstract class SaleDao {
         require(CommerceValidation.amountsMatch(calculatedTotal, sale.totalAmount)) {
             "Sale total does not match its line items"
         }
+        val (validatedPaymentState, validatedReceivedAmount) = CommerceValidation.validateCheckoutPayment(
+            paymentModeRaw = paymentMode.name,
+            totalAmount = calculatedTotal,
+            receivedAmount = sale.receivedAmount
+        )
 
         val now = System.currentTimeMillis()
         val validatedLedgerActor = if (paymentMode == PaymentMode.UDHAAR) {
@@ -296,6 +310,8 @@ abstract class SaleDao {
             customerId = finalCustomerId,
             totalAmount = calculatedTotal,
             paymentMode = paymentMode.name,
+            paymentState = validatedPaymentState.wireValue,
+            receivedAmount = validatedReceivedAmount,
             createdAt = if (sale.createdAt > 0) sale.createdAt else now,
             updatedAt = now,
             mutationVersion = now,

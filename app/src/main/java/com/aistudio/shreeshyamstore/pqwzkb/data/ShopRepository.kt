@@ -1,9 +1,11 @@
 package com.aistudio.shreeshyamstore.pqwzkb.data
 
 import androidx.room.withTransaction
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerAuditPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.UdhaarTransactionType
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
@@ -157,6 +159,34 @@ class ShopRepository(
     
     suspend fun getSaleById(id: Long): Sale? = saleDao.getSaleById(id)
     fun getSaleItemsForSale(saleId: Long): Flow<List<SaleItem>> = saleDao.getSaleItemsForSale(saleId)
+
+    suspend fun reconcilePaymentState(
+        saleId: Long,
+        targetState: PaymentState,
+        receivedAmount: Long,
+        actor: LedgerActor
+    ): Sale {
+        val normalizedActor = LedgerAuditPolicy.requireCanRecord(actor)
+        val sale = saleDao.getSaleById(saleId)
+        require(sale != null && !sale.isDeleted) { "Sale was not found" }
+        val normalizedReceived = CommerceValidation.validatePaymentStateTransition(
+            paymentModeRaw = sale.paymentMode,
+            currentStateRaw = sale.paymentState,
+            targetState = targetState,
+            totalAmount = sale.totalAmount,
+            receivedAmount = receivedAmount
+        )
+        val now = System.currentTimeMillis()
+        val updated = saleDao.updatePaymentStateIfActive(
+            saleId = saleId,
+            paymentState = targetState.wireValue,
+            receivedAmount = if (targetState == PaymentState.FAILED) null else normalizedReceived,
+            updatedAt = now,
+            mutationDeviceId = normalizedActor.actorDeviceId
+        )
+        require(updated == 1) { "Payment state update was not applied" }
+        return saleDao.getSaleById(saleId) ?: error("Sale disappeared after payment update")
+    }
     suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem> = saleDao.getSaleItemsForSaleList(saleId)
     fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>> = saleDao.getSalesForDateRange(start, end)
 

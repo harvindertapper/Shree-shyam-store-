@@ -8,6 +8,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -200,7 +201,55 @@ class CheckoutInvariantsTest {
         assertEquals(2470L, savedSale.totalAmount)
         assertEquals(1235L, savedItem.unitPrice)
         assertEquals(2470L, savedItem.lineTotal)
+        assertEquals(PaymentState.RECEIVED.wireValue, savedSale.paymentState)
+        assertEquals(2470L, savedSale.receivedAmount ?: -1L)
         assertEquals(1.0, database.productDao().getProductById(productId)!!.currentStock, 0.0)
+    }
+
+    @Test
+    fun cashChangeIsPersistedAndUpiMismatchRollsBackAtomically() = runBlocking {
+        val cashProductId = insertProduct(price = 1000L, stock = 2.0)
+        val cashSale = sale(total = 1000L).copy(receivedAmount = 1500L)
+        val cashItem = item(productId = cashProductId, unitPrice = 1000L, quantity = 1.0, lineTotal = 1000L)
+        val cashSaleId = database.saleDao().completeBillCheckout(cashSale, listOf(cashItem))
+        val savedCash = database.saleDao().getSaleById(cashSaleId)!!
+        assertEquals(1500L, savedCash.receivedAmount ?: -1L)
+
+        val upiProductId = insertProduct(price = 1000L, stock = 2.0)
+        val upiSale = sale(total = 1000L, paymentMode = "UPI").copy(receivedAmount = 999L)
+        val upiItem = item(productId = upiProductId, unitPrice = 1000L, quantity = 1.0, lineTotal = 1000L)
+        expectIllegalArgument {
+            database.saleDao().completeBillCheckout(upiSale, listOf(upiItem))
+        }
+        assertEquals(1, database.saleDao().countAllSales())
+        assertEquals(2.0, database.productDao().getProductById(upiProductId)!!.currentStock, 0.0)
+    }
+
+    @Test
+    fun paymentStateReconciliationIsAuditedAndCannotRegress() = runBlocking {
+        val saleId = database.saleDao().insertSale(
+            sale(total = 1000L, paymentMode = "UPI").copy(
+                paymentState = PaymentState.PENDING.wireValue,
+                receivedAmount = null
+            )
+        )
+        val reconciled = repository.reconcilePaymentState(
+            saleId = saleId,
+            targetState = PaymentState.RECEIVED,
+            receivedAmount = 1000L,
+            actor = testActor
+        )
+        assertEquals(PaymentState.RECEIVED.wireValue, reconciled.paymentState)
+        assertEquals(1000L, reconciled.receivedAmount ?: -1L)
+
+        expectIllegalArgument {
+            repository.reconcilePaymentState(
+                saleId = saleId,
+                targetState = PaymentState.FAILED,
+                receivedAmount = 0L,
+                actor = testActor
+            )
+        }
     }
 
     private suspend fun insertProduct(price: Long, stock: Double): Long {

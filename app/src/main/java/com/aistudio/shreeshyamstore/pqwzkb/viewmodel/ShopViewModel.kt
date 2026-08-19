@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
@@ -556,12 +557,42 @@ class ShopViewModel(
         _checkoutError.value = null
     }
 
+    fun reconcilePaymentState(
+        saleId: Long,
+        targetState: PaymentState,
+        receivedAmount: Long,
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val updatedSale = repository.reconcilePaymentState(
+                    saleId = saleId,
+                    targetState = targetState,
+                    receivedAmount = receivedAmount,
+                    actor = currentLedgerActor()
+                )
+                if (_lastSale.value?.id == updatedSale.id) {
+                    _lastSale.value = updatedSale
+                }
+                triggerAutoSync()
+                onResult(true)
+            } catch (error: IllegalArgumentException) {
+                _checkoutError.value = error.message ?: "Payment state could not be updated"
+                onResult(false)
+            } catch (_: Exception) {
+                _checkoutError.value = "Payment state could not be updated"
+                onResult(false)
+            }
+        }
+    }
+
     fun completeBill(
         paymentMode: String, // "CASH", "UPI", "UDHAAR"
         customerId: Long? = null,
         customerName: String = "",
         customerPhone: String = "",
-        note: String? = null
+        note: String? = null,
+        receivedAmount: Long? = null
     ) {
         if (_checkoutInFlight.value) return
         val cartItems = _cartState.value
@@ -619,6 +650,7 @@ class ShopViewModel(
                     billNumber = billNo,
                     totalAmount = CommerceValidation.calculateBillTotal(saleItems),
                     paymentMode = paymentMode,
+                    receivedAmount = receivedAmount,
                     customerId = finalCustomerId,
                     note = note,
                     createdAt = now,
@@ -791,7 +823,9 @@ class ShopViewModel(
             totalAmount = sale.totalAmount,
             paymentMode = sale.paymentMode,
             ownerPhone = settings.ownerPhone.ifEmpty { null },
-            ownerName = settings.ownerName.ifEmpty { null }
+            ownerName = settings.ownerName.ifEmpty { null },
+            paymentState = sale.paymentState,
+            receivedAmount = sale.receivedAmount
         )
     }
 

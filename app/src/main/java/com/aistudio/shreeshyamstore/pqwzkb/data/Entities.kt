@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import java.util.UUID
 
 @Entity(tableName = "shop_profiles")
@@ -87,6 +88,10 @@ data class Sale(
     /** Bill total in integer paise. */
     val totalAmount: Long,
     val paymentMode: String, // "CASH", "UPI", "UDHAAR"
+    /** Persisted lifecycle state shared with the future Control Plane. */
+    val paymentState: String = PaymentState.PENDING.wireValue,
+    /** Amount actually received in integer paise; null means not yet captured. */
+    val receivedAmount: Long? = null,
     val customerId: Long? = null,
     val note: String? = null,
     val isSynced: Boolean = false,
