@@ -20,7 +20,7 @@ import java.util.UUID
         User::class,
         SyncOutbox::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -275,6 +275,41 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE shop_profiles ADD COLUMN organizationId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE shop_profiles ADD COLUMN storeId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE shop_profiles ADD COLUMN membershipId TEXT NOT NULL DEFAULT ''")
+                database.execSQL("ALTER TABLE shop_profiles ADD COLUMN deviceId TEXT NOT NULL DEFAULT 'legacy-device'")
+                database.execSQL("ALTER TABLE shop_profiles ADD COLUMN appInstallationId TEXT NOT NULL DEFAULT ''")
+                database.execSQL(
+                    """
+                    UPDATE shop_profiles
+                    SET organizationId = CASE
+                            WHEN TRIM(uid) = '' THEN 'legacy-org:unknown-store'
+                            ELSE 'legacy-org:' || TRIM(uid)
+                        END,
+                        storeId = CASE
+                            WHEN TRIM(uid) = '' THEN 'legacy-store:unknown-store'
+                            ELSE 'legacy-store:' || TRIM(uid)
+                        END,
+                        membershipId = CASE
+                            WHEN TRIM(uid) = '' THEN 'legacy-membership:unknown-store'
+                            ELSE 'legacy-membership:' || TRIM(uid)
+                        END,
+                        deviceId = CASE
+                            WHEN TRIM(deviceId) = '' THEN 'legacy-device'
+                            ELSE TRIM(deviceId)
+                        END,
+                        appInstallationId = CASE
+                            WHEN TRIM(uid) = '' THEN 'legacy-installation:unknown-store'
+                            ELSE 'legacy-installation:' || TRIM(uid)
+                        END
+                    """.trimIndent()
+                )
+            }
+        }
+
         internal val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE products ADD COLUMN barcodeKey TEXT")
@@ -347,7 +382,15 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
+                    .addMigrations(
+                        MIGRATION_2_3,
+                        MIGRATION_3_4,
+                        MIGRATION_4_5,
+                        MIGRATION_5_6,
+                        MIGRATION_6_7,
+                        MIGRATION_7_8,
+                        MIGRATION_8_9
+                    )
                     .addCallback(seedCategoriesCallback())
                     .build()
                     .also { INSTANCE = it }
