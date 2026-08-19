@@ -136,20 +136,22 @@ object SecurityUtils {
                 CredentialScope.LOCAL_ACCOUNT -> legacyPasswordHash(secret)
                 CredentialScope.APP_LOCK -> hashPin(secret)
             }.toByteArray(Charsets.US_ASCII)
+            val matched = MessageDigest.isEqual(legacy, expected)
             return VerificationResult(
-                matched = MessageDigest.isEqual(legacy, expected),
-                needsRehash = true
+                matched = matched,
+                needsRehash = matched
             )
         }
 
         // Legacy app-lock installations stored a four-digit PIN in Preferences.
         if (scope == CredentialScope.APP_LOCK && stored.length == 4 && stored.all { it.isDigit() }) {
+            val matched = MessageDigest.isEqual(
+                normalized.toByteArray(Charsets.UTF_8),
+                stored.toByteArray(Charsets.UTF_8)
+            )
             return VerificationResult(
-                matched = MessageDigest.isEqual(
-                    normalized.toByteArray(Charsets.UTF_8),
-                    stored.toByteArray(Charsets.UTF_8)
-                ),
-                needsRehash = true
+                matched = matched,
+                needsRehash = matched
             )
         }
 
