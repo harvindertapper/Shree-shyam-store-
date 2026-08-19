@@ -556,6 +556,8 @@ class ShopRepository(
     suspend fun getUserByEmail(email: String): User? = userDao.getUserByEmail(email)
     suspend fun getUserByUsername(username: String): User? = userDao.getUserByUsername(username)
     suspend fun insertUser(user: User): Long = userDao.insertUser(user)
+    suspend fun updateLocalCredential(userId: Long, credentialVerifier: String): Int =
+        userDao.updateLocalCredential(userId, credentialVerifier)
     suspend fun getUserById(userId: Long): User? = userDao.getUserById(userId)
     suspend fun getAllUsers(): List<User> = userDao.getAllUsersList()
     suspend fun getAllStockAdjustmentsList(): List<StockAdjustment> = stockAdjustmentDao.getAllAdjustmentsList()
