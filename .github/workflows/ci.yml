@@ -92,7 +92,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.AppDatabase/8.json"
+          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/8.json"
           test -f "$schema_path"
 
           if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
