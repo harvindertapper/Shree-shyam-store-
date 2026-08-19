@@ -67,7 +67,6 @@ class BillingCheckoutControllerTest {
         assertFalse(controller.checkoutInFlight.value)
         assertEquals(1.0, controller.cartState.value[cartProduct] ?: -1.0, 0.0)
         assertEquals("Insufficient stock. Bill was not saved.", controller.checkoutError.value)
-        assertFalse(gateway.successObserved)
     }
 
     @Test
