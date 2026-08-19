@@ -99,7 +99,7 @@ class BillingCheckoutController(
     val cartState: StateFlow<Map<Product, Double>> = billingCart.items
     val cartTotal: StateFlow<Long> = billingCart.total.stateIn(
         scope = scope,
-        started = SharingStarted.Eagerly,
+        started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0L
     )
 
