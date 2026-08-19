@@ -4,6 +4,9 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.BillingCartState
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -48,12 +51,17 @@ class BillingCartStateTest {
 
     @Test
     fun totalUsesIntegerPaiseAndCommerceRounding() = runBlocking {
-        val cart = BillingCartState(thisScope())
-        val product = product(stock = 5.0, sellingPrice = 1235L)
+        val scope = CoroutineScope(Dispatchers.Unconfined)
+        try {
+            val cart = BillingCartState(scope)
+            val product = product(stock = 5.0, sellingPrice = 1235L)
 
-        cart.add(product, quantity = 2.0)
+            cart.add(product, quantity = 2.0)
 
-        assertEquals(2470L, cart.total.drop(1).first())
+            assertEquals(2470L, cart.total.drop(1).first())
+        } finally {
+            scope.cancel()
+        }
     }
 
     @Test
@@ -79,5 +87,5 @@ class BillingCartStateTest {
         trackStock = trackStock
     )
 
-    private fun thisScope() = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)
+    private fun thisScope() = CoroutineScope(Dispatchers.Unconfined)
 }
