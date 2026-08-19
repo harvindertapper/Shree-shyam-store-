@@ -78,6 +78,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.BillingCartStateTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
