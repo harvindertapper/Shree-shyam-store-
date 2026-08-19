@@ -588,6 +588,48 @@ class FirebaseSyncService(
             return "$base/$cleanPrefix/$cleanTable.json"
         }
 
+        private fun getSnapshotJsonUrl(url: String, prefix: String): String? {
+            val base = normalizedBaseUrl(url) ?: return null
+            val cleanPrefix = prefix.trim().trim('/').ifEmpty { DEFAULT_PREFIX }
+            return "$base/$cleanPrefix/snapshot.json"
+        }
+
+        suspend fun uploadSnapshot(url: String, prefix: String, envelope: SnapshotEnvelope): Boolean =
+            withContext(Dispatchers.IO) {
+                val targetUrl = getSnapshotJsonUrl(url, prefix) ?: return@withContext false
+                runCatching {
+                    val json = RestoreSnapshotCodec.encode(envelope)
+                    val request = Request.Builder()
+                        .url(targetUrl)
+                        .put(json.toRequestBody(JSON_MEDIA_TYPE))
+                        .build()
+                    client.newCall(request).execute().use { it.isSuccessful }
+                }.getOrDefault(false)
+            }
+
+        suspend fun downloadSnapshot(url: String, prefix: String): SnapshotEnvelope =
+            withContext(Dispatchers.IO) {
+                val targetUrl = getSnapshotJsonUrl(url, prefix)
+                    ?: throw SnapshotMalformedException("Snapshot URL is invalid")
+                try {
+                    val request = Request.Builder().url(targetUrl).get().build()
+                    client.newCall(request).execute().use { response ->
+                        if (!response.isSuccessful) {
+                            throw SnapshotUnavailableException("Snapshot provider returned HTTP ${response.code}")
+                        }
+                        val body = response.body?.string().orEmpty()
+                        if (body.isBlank() || body == "null") {
+                            throw SnapshotIncompleteException("Snapshot envelope is missing")
+                        }
+                        RestoreSnapshotCodec.decode(body)
+                    }
+                } catch (error: RestoreSnapshotException) {
+                    throw error
+                } catch (error: Exception) {
+                    throw SnapshotUnavailableException("Snapshot provider is unavailable", error)
+                }
+            }
+
         suspend fun testFirebaseConnection(url: String): Boolean = withContext(Dispatchers.IO) {
             val base = normalizedBaseUrl(url) ?: return@withContext false
             val request = runCatching { Request.Builder().url("$base/.json?shallow=true").get().build() }

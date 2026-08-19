@@ -20,6 +20,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1028,6 +1029,54 @@ class ShopViewModel(
         }
     }
 
+    private suspend fun currentCloudRestorableSnapshot(): CloudRestorableSnapshot = CloudRestorableSnapshot(
+        categories = repository.allCategories.first(),
+        products = repository.allProducts.first(),
+        sales = repository.allSales.first(),
+        saleItems = repository.getAllSaleItems(),
+        customers = repository.allCustomers.first(),
+        udhaarTransactions = repository.allUdhaarTransactions.first(),
+        stockAdjustments = repository.getAllStockAdjustmentsList()
+    )
+
+    private fun recoveryPointStore(): LocalRecoveryPointStore? =
+        context?.let { LocalRecoveryPointStore(File(it.filesDir, "restore-recovery")) }
+
+    private fun restoreFailureMessage(error: Throwable): String = when (error) {
+        is RestoreSnapshotException -> error.message ?: "Restore snapshot validation failed."
+        is IllegalArgumentException -> error.message ?: "Restore configuration is invalid."
+        else -> "Restore failed. Local data was not changed."
+    }
+
+    private suspend fun saveVerifiedRecoveryPoint(
+        snapshot: CloudRestorableSnapshot,
+        tenant: com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
+    ): SnapshotEnvelope {
+        val recoveryEnvelope = SnapshotEnvelope.create(snapshot, tenant)
+        RestoreSnapshotValidator.validate(recoveryEnvelope, tenant, allowEmpty = true)
+        recoveryPointStore()?.save(recoveryEnvelope)
+            ?: throw IllegalStateException("Local recovery storage is unavailable")
+        return recoveryEnvelope
+    }
+
+    private suspend fun replaceCloudSnapshotWithRollback(
+        snapshot: CloudRestorableSnapshot,
+        tenant: com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope,
+        recoveryEnvelope: SnapshotEnvelope
+    ) {
+        RestoreRecoveryCoordinator { restored ->
+            repository.replaceCloudRestorableTables(
+                categoriesList = restored.categories,
+                productsList = restored.products,
+                salesList = restored.sales,
+                saleItemsList = restored.saleItems,
+                customersList = restored.customers,
+                udhaarTxsList = restored.udhaarTransactions,
+                adjustmentsList = restored.stockAdjustments
+            )
+        }.replaceWithRollback(snapshot, tenant, recoveryEnvelope)
+    }
+
     fun updateFirebaseSettings(url: String, prefix: String, autoSync: Boolean) {
         viewModelScope.launch {
             val current = settingsDataStore.settingsFlow.first()
@@ -1041,73 +1090,34 @@ class ShopViewModel(
     fun syncAllToCloud(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
-            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
             val identitySession = reconcileIdentitySession()
             if (identitySession == null) {
                 onResult(false, "No valid authenticated store session is available for backup.")
                 return@launch
             }
-
-            val hashedUser = hashStringSHA256(identitySession.shopUid.lowercase().trim())
-            val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
-            val prefix = "$basePrefix/users/$hashedUser"
+            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
+            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
+            val prefix = "${settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }}/users/${hashStringSHA256(identitySession.shopUid.lowercase().trim())}"
 
             _syncInProgress.value = true
             _syncMessage.value = "Starting Backup..."
-
             try {
-                // Test Connection
-                val isConnected = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)
-                if (!isConnected) {
-                    _syncInProgress.value = false
-                    _syncMessage.value = null
-                    onResult(false, "Could not connect to Firebase database URL. Verify URL!")
-                    return@launch
+                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)) {
+                    throw SnapshotUnavailableException("Could not connect to backup database")
                 }
-
-                // Gather snapshot data and require every table to upload successfully.
-                val uploadResults = mutableListOf<Boolean>()
-                _syncMessage.value = "Backing up Categories..."
-                val catList = repository.allCategories.first()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "categories", catList, Category::class.java)
-
-                _syncMessage.value = "Backing up Products..."
-                val prodList = repository.allProducts.first()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "products", prodList, Product::class.java)
-
-                _syncMessage.value = "Backing up Bills..."
-                val salesList = repository.allSales.first()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "sales", salesList, Sale::class.java)
-
-                _syncMessage.value = "Backing up Sale Items..."
-                val saleItemsList = repository.getAllSaleItems()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "sale_items", saleItemsList, SaleItem::class.java)
-
-                _syncMessage.value = "Backing up Customers..."
-                val customersList = repository.allCustomers.first()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "customers", customersList, Customer::class.java)
-
-                _syncMessage.value = "Backing up Ledger..."
-                val udhaarList = repository.allUdhaarTransactions.first()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "udhaar_transactions", udhaarList, UdhaarTransaction::class.java)
-
-                _syncMessage.value = "Backing up Stock Adjustments..."
-                val adjList = repository.getAllStockAdjustmentsList()
-                uploadResults += com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadTable(url, prefix, "stock_adjustments", adjList, StockAdjustment::class.java)
-
-                if (uploadResults.any { !it }) {
-                    throw IllegalStateException("One or more backup tables failed to upload")
+                _syncMessage.value = "Creating verified snapshot..."
+                val envelope = SnapshotEnvelope.create(currentCloudRestorableSnapshot(), tenant)
+                RestoreSnapshotValidator.validate(envelope, tenant)
+                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadSnapshot(url, prefix, envelope)) {
+                    throw SnapshotUnavailableException("Complete backup snapshot upload failed")
                 }
-
-                // Update sync time
-                val currentDF = java.text.SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", java.util.Locale.ENGLISH)
-                val timeStr = currentDF.format(java.util.Date())
-                settingsDataStore.updateLastSyncTime(timeStr)
-
+                settingsDataStore.updateLastSyncTime(
+                    SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", Locale.ENGLISH).format(Date())
+                )
                 _syncMessage.value = "Backup Completed!"
                 onResult(true, "Cloud Backup successful!")
-            } catch (e: Exception) {
-                onResult(false, "Backup failed: ${e.message}")
+            } catch (error: Exception) {
+                onResult(false, "Backup failed: ${error.message ?: "snapshot validation failed"}")
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null
@@ -1118,75 +1128,35 @@ class ShopViewModel(
     fun restoreAllFromCloud(onResult: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
-            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
             val identitySession = reconcileIdentitySession()
             if (identitySession == null) {
                 onResult(false, "No valid authenticated store session is available for restore.")
                 return@launch
             }
-
-            val hashedUser = hashStringSHA256(identitySession.shopUid.lowercase().trim())
-            val basePrefix = settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }.trim('/')
-            val prefix = "$basePrefix/users/$hashedUser"
+            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
+            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
+            val prefix = "${settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }}/users/${hashStringSHA256(identitySession.shopUid.lowercase().trim())}"
 
             _syncInProgress.value = true
-            _syncMessage.value = "Testing connection..."
-
+            _syncMessage.value = "Downloading complete snapshot..."
             try {
-                // Test Connection
-                val isConnected = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)
-                if (!isConnected) {
-                    _syncInProgress.value = false
-                    _syncMessage.value = null
-                    onResult(false, "Invalid Firebase URL or network unavailable.")
-                    return@launch
+                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)) {
+                    throw SnapshotUnavailableException("Backup provider is unavailable")
                 }
+                val remoteEnvelope = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadSnapshot(url, prefix)
+                _syncMessage.value = "Validating snapshot integrity..."
+                val remoteSnapshot = RestoreSnapshotValidator.validate(remoteEnvelope, tenant)
 
-                _syncMessage.value = "Downloading Categories..."
-                val catList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "categories", Category::class.java)
+                _syncMessage.value = "Creating local recovery point..."
+                val recoveryEnvelope = saveVerifiedRecoveryPoint(currentCloudRestorableSnapshot(), tenant)
 
-                _syncMessage.value = "Downloading Products..."
-                val prodList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "products", Product::class.java)
-
-                _syncMessage.value = "Downloading Bills..."
-                val salesList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "sales", Sale::class.java)
-
-                _syncMessage.value = "Downloading Sale Items..."
-                val saleItemsList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "sale_items", SaleItem::class.java)
-
-                _syncMessage.value = "Downloading Customers..."
-                val customersList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "customers", Customer::class.java)
-
-                _syncMessage.value = "Downloading Ledger..."
-                val udhaarList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "udhaar_transactions", UdhaarTransaction::class.java)
-
-                _syncMessage.value = "Downloading Adjustments..."
-                val adjList = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadTable(url, prefix, "stock_adjustments", StockAdjustment::class.java)
-
-                if (catList.isEmpty() && prodList.isEmpty() && salesList.isEmpty() && saleItemsList.isEmpty() &&
-                    customersList.isEmpty() && udhaarList.isEmpty() && adjList.isEmpty()) {
-                    _syncInProgress.value = false
-                    _syncMessage.value = null
-                    onResult(false, "No backup data found under prefix '$prefix' at this database URL.")
-                    return@launch
-                }
-
-                // Clear & Insert
-                _syncMessage.value = "Restoring Database..."
-                repository.replaceCloudRestorableTables(
-                    categoriesList = catList,
-                    productsList = prodList,
-                    salesList = salesList,
-                    saleItemsList = saleItemsList,
-                    customersList = customersList,
-                    udhaarTxsList = udhaarList,
-                    adjustmentsList = adjList
-                )
+                _syncMessage.value = "Restoring validated database..."
+                replaceCloudSnapshotWithRollback(remoteSnapshot, tenant, recoveryEnvelope)
 
                 _syncMessage.value = "Database Restored!"
                 onResult(true, "All data successfully synchronized from Cloud!")
-            } catch (e: Exception) {
-                onResult(false, "Restore failed: ${e.message}")
+            } catch (error: Exception) {
+                onResult(false, restoreFailureMessage(error))
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null
