@@ -13,11 +13,12 @@ import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -40,12 +41,6 @@ sealed class Screen {
     data class CustomerDetail(val customerId: Long) : Screen()
     object Reports : Screen()
     object Settings : Screen()
-}
-
-fun sha256(input: String): String {
-    val md = MessageDigest.getInstance("SHA-256")
-    val digest = md.digest(input.toByteArray(Charsets.UTF_8))
-    return digest.fold("") { str, it -> str + "%02x".format(it) }
 }
 
 class ShopViewModel(
@@ -156,7 +151,7 @@ class ShopViewModel(
                 isUserLoggedIn = false,
                 appLockEnabled = true,
                 biometricEnabled = false,
-                securityPin = SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+                securityPin = "",
                 firebaseUrl = "",
                 firebasePrefix = "shreeshyam_sync",
                 lastSyncTime = "Never Synced",
@@ -171,7 +166,7 @@ class ShopViewModel(
         }
     }
 
-    fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String, securityPin: String = "1234") {
+    fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String, securityPin: String = "") {
         viewModelScope.launch {
             settingsDataStore.updateShopName(shopName)
             settingsDataStore.updateOwnerPhone(ownerPhone)
@@ -375,7 +370,10 @@ class ShopViewModel(
                     uid = localSession.uid,
                     username = trimmedUsername,
                     email = trimmedEmail,
-                    passwordHash = sha256(password)
+                    passwordHash = SecurityUtils.createCredential(
+                        password,
+                        SecurityUtils.CredentialScope.LOCAL_ACCOUNT
+                    )
                 )
                 repository.insertUser(user)
 
@@ -408,33 +406,73 @@ class ShopViewModel(
             }
 
             try {
-                // Check username or email matching
+                val nowEpochMs = System.currentTimeMillis()
+                val throttleState = settingsDataStore.settingsFlow.first()
+                if (LocalLoginPolicy.isLocked(
+                        failedAttempts = throttleState.localLoginFailedAttempts,
+                        lockedUntilEpochMs = throttleState.localLoginLockedUntilEpochMs,
+                        nowEpochMs = nowEpochMs
+                    )
+                ) {
+                    onError("Too many failed login attempts. Try again later.")
+                    return@launch
+                }
+
+                // Resolve the local account without revealing whether the
+                // username/email exists in the error response.
                 val user = if (key.contains("@")) {
                     repository.getUserByEmail(key)
                 } else {
                     repository.getUserByUsername(key)
                 }
-
-                if (user == null) {
-                    onError("User not found!")
-                    return@launch
-                }
-
-                val hashedPass = sha256(password)
-                if (user.passwordHash == hashedPass) {
-                    val localSession = IdentitySession.localForUser(
-                        username = user.username,
-                        email = user.email,
-                        existingUid = user.uid
+                val verification = user?.let {
+                    SecurityUtils.verifyCredential(
+                        secret = password,
+                        storedCredential = it.passwordHash,
+                        scope = SecurityUtils.CredentialScope.LOCAL_ACCOUNT
                     )
-                    clearFirebaseAuthorityForLocalSession()
-                    settingsDataStore.saveSession(localSession)
-                    onSuccess()
-                } else {
-                    onError("Incorrect password! Change and retry.")
+                } ?: SecurityUtils.VerificationResult(matched = false, needsRehash = false)
+
+                when (val loginResult = settingsDataStore.evaluateLocalLogin(verification.matched, nowEpochMs)) {
+                    LocalLoginResult.Success -> {
+                        if (user == null || !verification.matched) {
+                            onError("Incorrect username or password. Please retry.")
+                            return@launch
+                        }
+
+                        if (verification.needsRehash) {
+                            // Migration failure must not strand an offline user;
+                            // the legacy verifier remains usable for the next
+                            // attempt and can be retried without network access.
+                            runCatching {
+                                repository.updateLocalCredential(
+                                    userId = user.id,
+                                    credentialVerifier = SecurityUtils.createCredential(
+                                        password,
+                                        SecurityUtils.CredentialScope.LOCAL_ACCOUNT
+                                    )
+                                )
+                            }
+                        }
+
+                        val localSession = IdentitySession.localForUser(
+                            username = user.username,
+                            email = user.email,
+                            existingUid = user.uid
+                        )
+                        clearFirebaseAuthorityForLocalSession()
+                        settingsDataStore.saveSession(localSession)
+                        onSuccess()
+                    }
+                    is LocalLoginResult.Locked -> {
+                        onError("Too many failed login attempts. Try again later.")
+                    }
+                    is LocalLoginResult.Invalid -> {
+                        onError("Incorrect username or password. Please retry.")
+                    }
                 }
             } catch (e: Exception) {
-                onError("Login failed: ${e.message}")
+                onError("Login failed. Please retry.")
             }
         }
     }
@@ -450,54 +488,32 @@ class ShopViewModel(
     }
 
     // --- Billing State (Cart) ---
-    private val _cartState = MutableStateFlow<Map<Product, Double>>(emptyMap())
-    val cartState: StateFlow<Map<Product, Double>> = _cartState.asStateFlow()
-
-    val cartTotal: StateFlow<Long> = _cartState.map { cart ->
-        cart.entries.sumOf { (product, quantity) ->
-            CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
-        }
-    }.stateIn(
+    private val billingCart = BillingCartState()
+    val cartState: StateFlow<Map<Product, Double>> = billingCart.items
+    val cartTotal: StateFlow<Long> = billingCart.total.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = 0L
     )
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
-        if (!quantity.isFinite()) return
-        val current = _cartState.value.toMutableMap()
-        val currentQty = current[product] ?: 0.0
-        val finalQty = currentQty + quantity
-        if (!finalQty.isFinite()) return
-        if (finalQty > 0.0) {
-            if (product.trackStock && finalQty > product.currentStock) return
-            current[product] = finalQty
-        } else {
-            current.remove(product)
-        }
-        _cartState.value = current
+        billingCart.add(product, quantity)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun setProductQuantityInCart(product: Product, qty: Double) {
-        if (!qty.isFinite()) return
-        val current = _cartState.value.toMutableMap()
-        if (qty > 0.0) {
-            if (product.trackStock && qty > product.currentStock) return
-            current[product] = qty
-        } else {
-            current.remove(product)
-        }
-        _cartState.value = current
+        billingCart.setQuantity(product, qty)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun removeProductFromCart(product: Product) {
-        val current = _cartState.value.toMutableMap()
-        current.remove(product)
-        _cartState.value = current
+        billingCart.remove(product)
     }
 
+    /** Compatibility facade while billing screens migrate to BillingCartState. */
     fun clearCart() {
-        _cartState.value = emptyMap()
+        billingCart.clear()
     }
 
     /**
@@ -599,7 +615,7 @@ class ShopViewModel(
         receivedAmount: Long? = null
     ) {
         if (_checkoutInFlight.value) return
-        val cartItems = _cartState.value
+        val cartItems = billingCart.items.value
         if (cartItems.isEmpty()) return
 
         _checkoutInFlight.value = true

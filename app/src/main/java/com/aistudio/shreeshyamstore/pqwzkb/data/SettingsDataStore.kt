@@ -13,6 +13,8 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockState
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import kotlinx.coroutines.flow.Flow
@@ -46,10 +48,14 @@ data class StoreSettings(
     val isUserLoggedIn: Boolean = false,
     val appLockEnabled: Boolean = true,
     val biometricEnabled: Boolean = false,
-    val securityPin: String = SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+    /** Device-local verifier; blank means the legacy default-PIN migration window is active. */
+    val securityPin: String = "",
+    val securityPinFormatVersion: Int = SecurityUtils.LEGACY_CREDENTIAL_VERSION,
     val failedPinAttempts: Int = 0,
     val pinLockedUntilEpochMs: Long = 0L,
     val lastUnlockAtEpochMs: Long = 0L,
+    val localLoginFailedAttempts: Int = 0,
+    val localLoginLockedUntilEpochMs: Long = 0L,
     val firebaseUrl: String = "",
     val firebasePrefix: String = DEFAULT_FIREBASE_PREFIX,
     val lastSyncTime: String = "Never Synced",
@@ -80,9 +86,12 @@ class SettingsDataStore(private val context: Context) {
         private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
         private val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         private val SECURITY_PIN = stringPreferencesKey("security_pin")
+        private val SECURITY_PIN_FORMAT_VERSION = intPreferencesKey("security_pin_format_version")
         private val FAILED_PIN_ATTEMPTS = intPreferencesKey("failed_pin_attempts")
         private val PIN_LOCKED_UNTIL_EPOCH_MS = longPreferencesKey("pin_locked_until_epoch_ms")
         private val LAST_UNLOCK_AT_EPOCH_MS = longPreferencesKey("last_unlock_at_epoch_ms")
+        private val LOCAL_LOGIN_FAILED_ATTEMPTS = intPreferencesKey("local_login_failed_attempts")
+        private val LOCAL_LOGIN_LOCKED_UNTIL_EPOCH_MS = longPreferencesKey("local_login_locked_until_epoch_ms")
         private val FIREBASE_URL = stringPreferencesKey("firebase_url")
         private val FIREBASE_PREFIX = stringPreferencesKey("firebase_prefix")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
@@ -129,10 +138,14 @@ class SettingsDataStore(private val context: Context) {
                 isUserLoggedIn = preferences[IS_USER_LOGGED_IN] ?: false,
                 appLockEnabled = preferences[APP_LOCK_ENABLED] ?: true,
                 biometricEnabled = preferences[BIOMETRIC_ENABLED] ?: false,
-                securityPin = preferences[SECURITY_PIN] ?: SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+                securityPin = preferences[SECURITY_PIN].orEmpty(),
+                securityPinFormatVersion = (preferences[SECURITY_PIN_FORMAT_VERSION]
+                    ?: SecurityUtils.LEGACY_CREDENTIAL_VERSION).coerceAtLeast(SecurityUtils.LEGACY_CREDENTIAL_VERSION),
                 failedPinAttempts = (preferences[FAILED_PIN_ATTEMPTS] ?: 0).coerceAtLeast(0),
                 pinLockedUntilEpochMs = (preferences[PIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
                 lastUnlockAtEpochMs = (preferences[LAST_UNLOCK_AT_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
+                localLoginFailedAttempts = (preferences[LOCAL_LOGIN_FAILED_ATTEMPTS] ?: 0).coerceAtLeast(0),
+                localLoginLockedUntilEpochMs = (preferences[LOCAL_LOGIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
                 firebaseUrl = preferences[FIREBASE_URL].orEmpty(),
                 firebasePrefix = preferences[FIREBASE_PREFIX]
                     ?.trim()
@@ -153,13 +166,35 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun updateSecurityPin(pin: String) = context.dataStore.edit {
         val normalized = pin.trim()
-        if (normalized.isEmpty()) {
-            it.remove(SECURITY_PIN)
-        } else {
-            it[SECURITY_PIN] = if (SecurityUtils.isSha256Hash(normalized)) {
-                normalized.lowercase()
-            } else {
-                SecurityUtils.hashPin(normalized)
+        when {
+            normalized.isEmpty() -> {
+                // Keep the legacy marker explicitly so a future release can
+                // remove the default-PIN fallback without ambiguity.
+                it.remove(SECURITY_PIN)
+                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
+            }
+            SecurityUtils.isVersionedCredential(
+                normalized,
+                SecurityUtils.CredentialScope.APP_LOCK
+            ) -> {
+                it[SECURITY_PIN] = normalized
+                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
+            }
+            SecurityUtils.isSha256Hash(normalized) -> {
+                // Compatibility only: existing SHA-256 values migrate on the
+                // next successful unlock, never on a new PIN entry.
+                it[SECURITY_PIN] = normalized.lowercase()
+                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
+            }
+            else -> {
+                require(SecurityUtils.isAcceptableNewPin(normalized)) {
+                    "App-lock PIN does not satisfy the local security policy"
+                }
+                it[SECURITY_PIN] = SecurityUtils.createCredential(
+                    normalized,
+                    SecurityUtils.CredentialScope.APP_LOCK
+                )
+                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
             }
         }
         it[FAILED_PIN_ATTEMPTS] = 0
@@ -181,18 +216,56 @@ class SettingsDataStore(private val context: Context) {
                 lockedUntilEpochMs = (preferences[PIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
                 lastUnlockAtEpochMs = (preferences[LAST_UNLOCK_AT_EPOCH_MS] ?: 0L).coerceAtLeast(0L)
             )
+            val storedCredential = preferences[SECURITY_PIN].orEmpty()
+            val formatVersion = (preferences[SECURITY_PIN_FORMAT_VERSION]
+                ?: SecurityUtils.LEGACY_CREDENTIAL_VERSION).coerceAtLeast(SecurityUtils.LEGACY_CREDENTIAL_VERSION)
+            val verification = SecurityUtils.verifyCredential(
+                secret = enteredPin,
+                storedCredential = storedCredential,
+                scope = SecurityUtils.CredentialScope.APP_LOCK,
+                allowDefaultPinFallback = formatVersion < SecurityUtils.CURRENT_CREDENTIAL_VERSION
+            )
             val (nextResult, nextState) = AppLockPolicy.verifyPin(
                 enteredPin = enteredPin,
-                storedHash = preferences[SECURITY_PIN] ?: SecurityUtils.hashPin(SecurityUtils.DEFAULT_PIN),
+                storedHash = storedCredential,
                 state = currentState,
-                nowEpochMs = nowEpochMs
+                nowEpochMs = nowEpochMs,
+                allowDefaultPinFallback = formatVersion < SecurityUtils.CURRENT_CREDENTIAL_VERSION,
+                credentialMatched = verification.matched
             )
             result = nextResult
             preferences[FAILED_PIN_ATTEMPTS] = nextState.failedAttempts
             preferences[PIN_LOCKED_UNTIL_EPOCH_MS] = nextState.lockedUntilEpochMs
             preferences[LAST_UNLOCK_AT_EPOCH_MS] = nextState.lastUnlockAtEpochMs
+
+            if (nextResult == PinUnlockResult.Success && verification.needsRehash) {
+                preferences[SECURITY_PIN] = SecurityUtils.createCredential(
+                    enteredPin,
+                    SecurityUtils.CredentialScope.APP_LOCK
+                )
+                preferences[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
+            }
         }
         return result ?: error("App-lock evaluation did not produce a result")
+    }
+
+    suspend fun evaluateLocalLogin(
+        credentialMatched: Boolean,
+        nowEpochMs: Long
+    ): LocalLoginResult {
+        var result: LocalLoginResult? = null
+        context.dataStore.edit { preferences ->
+            val (nextResult, nextState) = LocalLoginPolicy.evaluate(
+                credentialMatched = credentialMatched,
+                failedAttempts = (preferences[LOCAL_LOGIN_FAILED_ATTEMPTS] ?: 0).coerceAtLeast(0),
+                lockedUntilEpochMs = (preferences[LOCAL_LOGIN_LOCKED_UNTIL_EPOCH_MS] ?: 0L).coerceAtLeast(0L),
+                nowEpochMs = nowEpochMs
+            )
+            result = nextResult
+            preferences[LOCAL_LOGIN_FAILED_ATTEMPTS] = nextState.first
+            preferences[LOCAL_LOGIN_LOCKED_UNTIL_EPOCH_MS] = nextState.second
+        }
+        return result ?: error("Local-login evaluation did not produce a result")
     }
 
     suspend fun updateAppLockEnabled(enabled: Boolean) = context.dataStore.edit {
