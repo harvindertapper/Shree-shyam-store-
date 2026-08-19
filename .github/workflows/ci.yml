@@ -80,6 +80,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest

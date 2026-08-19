@@ -42,7 +42,7 @@ class StableSyncMigrationTest {
         raw.close()
 
         val migrated = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
+            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
 
@@ -108,4 +108,24 @@ internal fun upgradeV5SchemaToV6(database: SQLiteDatabase) {
     )
     database.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_state_nextAttemptAt ON sync_outbox (state, nextAttemptAt)")
     database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_sync_outbox_tableName_globalId_mutationVersion ON sync_outbox (tableName, globalId, mutationVersion)")
+}
+
+internal fun upgradeV6SchemaToV7(database: SQLiteDatabase) {
+    database.execSQL("ALTER TABLE products ADD COLUMN barcodeKey TEXT")
+    database.execSQL(
+        """
+        UPDATE products
+        SET barcodeKey = UPPER(TRIM(barcode))
+        WHERE isDeleted = 0
+          AND TRIM(barcode) <> ''
+          AND id IN (
+              SELECT MIN(id)
+              FROM products
+              WHERE isDeleted = 0 AND TRIM(barcode) <> ''
+              GROUP BY UPPER(TRIM(barcode))
+              HAVING COUNT(*) = 1
+          )
+        """.trimIndent()
+    )
+    database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_products_barcodeKey ON products (barcodeKey)")
 }

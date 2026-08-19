@@ -761,6 +761,22 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
     var showCreditLimitWarningDialog by remember { mutableStateOf(false) }
     var pendingCreditLimitCustomer by remember { mutableStateOf<Customer?>(null) }
     var pendingProjectedBalance by remember { mutableLongStateOf(0L) }
+    var receivedAmountText by remember(invoiceTotal) {
+        mutableStateOf(MoneyUtils.toInputString(invoiceTotal))
+    }
+    val submitImmediatePayment: (String) -> Unit = { mode ->
+        val receivedAmount = MoneyUtils.parseMajorUnits(receivedAmountText)
+        if (receivedAmount == null) {
+            val message = if (settings.appLanguage == AppLanguage.HINDI) {
+                "प्राप्त राशि सही दर्ज करें"
+            } else {
+                "Enter a valid received amount"
+            }
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.completeBill(paymentMode = mode, receivedAmount = receivedAmount)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -819,6 +835,36 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                         fontSize = 38.sp,
                         fontWeight = FontWeight.ExtraBold,
                         color = SuccessGreen
+                    )
+                }
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                border = BorderStroke(1.2.dp, BorderStrong),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val receivedLabel = if (settings.appLanguage == AppLanguage.HINDI) {
+                        "प्राप्त राशि (Cash / UPI)"
+                    } else {
+                        "Received amount (Cash / UPI)"
+                    }
+                    Text(receivedLabel, fontWeight = FontWeight.Bold, color = TextNearBlack)
+                    OutlinedTextField(
+                        value = receivedAmountText,
+                        onValueChange = { receivedAmountText = it },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        leadingIcon = { Text("₹", fontWeight = FontWeight.Bold) },
+                        modifier = Modifier.fillMaxWidth().testTag("received_amount_field"),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = SaffronPrimary,
+                            unfocusedBorderColor = BorderStrong,
+                            focusedTextColor = TextNearBlack,
+                            unfocusedTextColor = TextNearBlack
+                        )
                     )
                 }
             }
@@ -919,9 +965,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                 ) {
                     // Cash
                     Button(
-                        onClick = {
-                            viewModel.completeBill(paymentMode = "CASH")
-                        },
+                        onClick = { submitImmediatePayment("CASH") },
                         enabled = !checkoutInFlight,
                         colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
@@ -938,9 +982,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
 
                     // UPI
                     Button(
-                        onClick = {
-                            viewModel.completeBill(paymentMode = "UPI")
-                        },
+                        onClick = { submitImmediatePayment("UPI") },
                         enabled = !checkoutInFlight,
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0E5A94), contentColor = Color.White),
                         shape = RoundedCornerShape(12.dp),
@@ -1204,6 +1246,28 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                         else -> SuccessGreen
                     }
                 )
+                val paymentStatusLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान स्थिति:" else "Payment Status:"
+                Text(
+                    text = "$paymentStatusLabel ${sale.paymentState}",
+                    fontWeight = FontWeight.Bold,
+                    color = TextMediumGray
+                )
+                sale.receivedAmount?.let { received ->
+                    val receivedLabel = if (settings.appLanguage == AppLanguage.HINDI) "प्राप्त राशि:" else "Received:"
+                    Text(
+                        text = "$receivedLabel ${CurrencyUtils.formatRupees(received)}",
+                        fontWeight = FontWeight.Bold,
+                        color = TextNearBlack
+                    )
+                    if (sale.paymentMode.equals("CASH", ignoreCase = true) && received > sale.totalAmount) {
+                        val changeLabel = if (settings.appLanguage == AppLanguage.HINDI) "वापसी:" else "Change:"
+                        Text(
+                            text = "$changeLabel ${CurrencyUtils.formatRupees(received - sale.totalAmount)}",
+                            fontWeight = FontWeight.Bold,
+                            color = SuccessGreen
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))

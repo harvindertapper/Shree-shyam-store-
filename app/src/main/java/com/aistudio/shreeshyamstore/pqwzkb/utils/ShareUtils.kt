@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
 import java.io.File
 import java.io.FileWriter
@@ -137,7 +138,9 @@ object ShareUtils {
         totalAmount: Long,
         paymentMode: String,
         ownerPhone: String? = null,
-        ownerName: String? = null
+        ownerName: String? = null,
+        paymentState: String = PaymentState.RECEIVED.wireValue,
+        receivedAmount: Long? = null
     ): String {
         val sb = StringBuilder()
         sb.append("🧾 *$shopName*\n")
@@ -162,6 +165,15 @@ object ShareUtils {
             else -> "नकद / Cash"
         }
         sb.append("भुगतान माध्यम / Mode: $modeText\n")
+        val stateText = runCatching { PaymentState.fromWireValue(paymentState).wireValue }
+            .getOrDefault(PaymentState.RECEIVED.wireValue)
+        sb.append("भुगतान स्थिति / Payment Status: $stateText\n")
+        if (receivedAmount != null) {
+            sb.append("प्राप्त राशि / Received: ${CurrencyUtils.formatRupees(receivedAmount)}\n")
+            if (paymentMode.equals("CASH", ignoreCase = true) && receivedAmount > totalAmount) {
+                sb.append("वापसी / Change: ${CurrencyUtils.formatRupees(receivedAmount - totalAmount)}\n")
+            }
+        }
         sb.append("----------------------------\n")
         sb.append("धन्यवाद! फिर पधारें 🙏\n")
         sb.append("— $shopName")
@@ -216,13 +228,19 @@ object ShareUtils {
             val file = File(context.cacheDir, fileName)
             val writer = FileWriter(file)
 
-            writer.append("Bill Number,Date,Payment Mode,Total Amount (INR),Customer ID,Created At\n")
+            writer.append("Bill Number,Date,Payment Mode,Payment State,Total Amount (INR),Received Amount (INR),Change (INR),Customer ID,Created At\n")
             val df = SimpleDateFormat("dd-MM-yyyy HH:mm", Locale.ENGLISH)
             for (s in sales) {
                 writer.append(csvField(s.billNumber)).append(",")
                 writer.append(csvField(df.format(Date(s.createdAt)))).append(",")
                 writer.append(csvField(s.paymentMode)).append(",")
+                writer.append(csvField(s.paymentState)).append(",")
                 writer.append(MoneyUtils.toInputString(s.totalAmount)).append(",")
+                writer.append(s.receivedAmount?.let { MoneyUtils.toInputString(it) }.orEmpty()).append(",")
+                val change = if (s.paymentMode.equals("CASH", ignoreCase = true) &&
+                    s.receivedAmount != null && s.receivedAmount > s.totalAmount
+                ) s.receivedAmount - s.totalAmount else null
+                writer.append(change?.let { MoneyUtils.toInputString(it) }.orEmpty()).append(",")
                 writer.append(csvField(s.customerId?.toString().orEmpty())).append(",")
                 writer.append("${s.createdAt}\n")
             }

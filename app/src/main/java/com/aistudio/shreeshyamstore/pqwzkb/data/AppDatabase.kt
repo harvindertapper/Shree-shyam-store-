@@ -20,7 +20,7 @@ import java.util.UUID
         User::class,
         SyncOutbox::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -254,6 +254,27 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE sales ADD COLUMN paymentState TEXT NOT NULL DEFAULT 'PENDING'")
+                database.execSQL("ALTER TABLE sales ADD COLUMN receivedAmount INTEGER")
+                database.execSQL(
+                    """
+                    UPDATE sales
+                    SET paymentState = CASE
+                        WHEN UPPER(TRIM(paymentMode)) = 'UDHAAR' THEN 'NOT_REQUIRED'
+                        ELSE 'RECEIVED'
+                    END,
+                    receivedAmount = CASE
+                        WHEN UPPER(TRIM(paymentMode)) = 'UDHAAR' THEN 0
+                        ELSE totalAmount
+                    END
+                    WHERE isDeleted = 0
+                    """.trimIndent()
+                )
+            }
+        }
+
         internal val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE products ADD COLUMN barcodeKey TEXT")
@@ -326,7 +347,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     DATABASE_NAME
                 )
-                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .addCallback(seedCategoriesCallback())
                     .build()
                     .also { INSTANCE = it }
