@@ -13,6 +13,12 @@ import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.PlatformActor
 import com.aistudio.shreeshyamstore.pqwzkb.data.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AuthenticatedBackupTableClient
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AuthenticatedRestBackupProvider
+import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupAuthContext
+import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupIncompatibleException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupProviderException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnauthorizedException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
@@ -27,7 +33,9 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotUnavailableException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.File
+import java.net.URI
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -1020,20 +1028,51 @@ class ShopViewModel(
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
 
-    private fun hashStringSHA256(input: String): String {
-        return try {
-            val digest = java.security.MessageDigest.getInstance("SHA-256")
-            val hash = digest.digest(input.toByteArray(Charsets.UTF_8))
-            val hexString = java.lang.StringBuilder()
-            for (b in hash) {
-                val hex = java.lang.Integer.toHexString(0xff and b.toInt())
-                if (hex.length == 1) hexString.append('0')
-                hexString.append(hex)
-            }
-            hexString.toString()
-        } catch (e: Exception) {
-            input.replace(Regex("[.\\s$#\\[\\]/]"), "_")
+    private suspend fun authenticatedBackupClient(
+        settings: StoreSettings,
+        session: IdentitySession
+    ): AuthenticatedBackupTableClient {
+        val firebaseUser = com.aistudio.shreeshyamstore.pqwzkb.utils.AuthManager.currentUser
+        if (session.provider != IdentityProvider.FIREBASE || firebaseUser?.uid != session.uid) {
+            throw BackupUnauthorizedException("Cloud backup requires an active authenticated Firebase session")
         }
+        val token = firebaseUser.getIdToken(false).await()?.token?.trim().orEmpty()
+        if (token.isEmpty()) {
+            throw BackupUnauthorizedException("Cloud backup authentication token is unavailable")
+        }
+        val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }.trim()
+        val trustedHost = runCatching {
+            URI(com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL).host?.trim()?.lowercase()
+        }.getOrNull()
+        if (trustedHost.isNullOrBlank()) {
+            throw BackupIncompatibleException("Backup provider trusted host is not configured")
+        }
+        val tenantContext = settingsDataStore.getOrCreateTenantDeviceContext(session)
+        val provider = AuthenticatedRestBackupProvider(
+            baseUrl = url,
+            basePrefix = settings.firebasePrefix,
+            auth = BackupAuthContext.fromFirebaseSession(
+                session = session,
+                tenant = tenantContext.toTenantScope(),
+                bearerToken = token
+            ),
+            allowedHosts = setOf(trustedHost)
+        )
+        return AuthenticatedBackupTableClient(provider)
+    }
+
+    private fun backupFailureMessage(error: Throwable): String = when (error) {
+        is BackupProviderException -> when (error) {
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnauthorizedException -> "Backup authorization failed. Sign in again."
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupWrongTenantException -> "Backup belongs to a different store and was rejected."
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnavailableException -> "Backup provider is unavailable. Try again when online."
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupMalformedException -> "Backup data is malformed or incomplete. Local data was not changed."
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupIncompatibleException -> "Backup format or provider configuration is incompatible."
+            is com.aistudio.shreeshyamstore.pqwzkb.utils.BackupReplayException -> "This backup snapshot was already seen and was rejected."
+        }
+        is RestoreSnapshotException -> "Backup snapshot validation failed. Local data was not changed."
+        is IllegalArgumentException -> error.message ?: "Backup configuration is invalid."
+        else -> "Backup operation failed. Local data was not changed."
     }
 
     private suspend fun currentCloudRestorableSnapshot(): CloudRestorableSnapshot = CloudRestorableSnapshot(
@@ -1103,28 +1142,28 @@ class ShopViewModel(
                 return@launch
             }
             val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
-            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
-            val prefix = "${settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }}/users/${hashStringSHA256(identitySession.shopUid.lowercase().trim())}"
+            val backupClient = try {
+                authenticatedBackupClient(settings, identitySession)
+            } catch (error: Exception) {
+                onResult(false, backupFailureMessage(error))
+                return@launch
+            }
 
             _syncInProgress.value = true
             _syncMessage.value = "Starting Backup..."
             try {
-                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)) {
-                    throw SnapshotUnavailableException("Could not connect to backup database")
-                }
                 _syncMessage.value = "Creating verified snapshot..."
                 val envelope = SnapshotEnvelope.create(currentCloudRestorableSnapshot(), tenant)
                 RestoreSnapshotValidator.validate(envelope, tenant)
-                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.uploadSnapshot(url, prefix, envelope)) {
-                    throw SnapshotUnavailableException("Complete backup snapshot upload failed")
-                }
+                _syncMessage.value = "Uploading authenticated snapshot..."
+                backupClient.uploadSnapshot(envelope)
                 settingsDataStore.updateLastSyncTime(
                     SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", Locale.ENGLISH).format(Date())
                 )
                 _syncMessage.value = "Backup Completed!"
                 onResult(true, "Cloud Backup successful!")
             } catch (error: Exception) {
-                onResult(false, "Backup failed: ${error.message ?: "snapshot validation failed"}")
+                onResult(false, backupFailureMessage(error))
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null
@@ -1141,16 +1180,18 @@ class ShopViewModel(
                 return@launch
             }
             val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
-            val url = settings.firebaseUrl.ifBlank { com.aistudio.shreeshyamstore.pqwzkb.BuildConfig.FIREBASE_URL }
-            val prefix = "${settings.firebasePrefix.trim().ifEmpty { "shreeshyam_sync" }}/users/${hashStringSHA256(identitySession.shopUid.lowercase().trim())}"
+            val backupClient = try {
+                authenticatedBackupClient(settings, identitySession)
+            } catch (error: Exception) {
+                onResult(false, backupFailureMessage(error))
+                return@launch
+            }
 
             _syncInProgress.value = true
             _syncMessage.value = "Downloading complete snapshot..."
             try {
-                if (!com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.testFirebaseConnection(url)) {
-                    throw SnapshotUnavailableException("Backup provider is unavailable")
-                }
-                val remoteEnvelope = com.aistudio.shreeshyamstore.pqwzkb.utils.FirebaseSyncService.downloadSnapshot(url, prefix)
+                _syncMessage.value = "Downloading authenticated snapshot..."
+                val remoteEnvelope = backupClient.downloadSnapshot()
                 _syncMessage.value = "Validating snapshot integrity..."
                 val remoteSnapshot = RestoreSnapshotValidator.validate(remoteEnvelope, tenant)
 
@@ -1163,7 +1204,7 @@ class ShopViewModel(
                 _syncMessage.value = "Database Restored!"
                 onResult(true, "All data successfully synchronized from Cloud!")
             } catch (error: Exception) {
-                onResult(false, restoreFailureMessage(error))
+                onResult(false, backupFailureMessage(error))
             } finally {
                 _syncInProgress.value = false
                 _syncMessage.value = null

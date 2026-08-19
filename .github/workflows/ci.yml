@@ -80,6 +80,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantAuthorizationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.AuthenticatedBackupProviderTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreRecoveryEnvelopeTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
@@ -91,6 +92,14 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
+
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shree-shyam-store-unit-test-results
+          path: app/build/test-results/testDebugUnitTest
+          if-no-files-found: warn
 
       - name: Verify Room schema artifacts
         shell: bash
