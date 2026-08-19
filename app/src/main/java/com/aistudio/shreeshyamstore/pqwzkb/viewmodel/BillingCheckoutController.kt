@@ -9,10 +9,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -95,13 +93,14 @@ class BillingCheckoutController(
     private val onCheckoutSuccess: () -> Unit = {}
 ) {
     private val billingCart = BillingCartState()
+    private val _cartTotal = MutableStateFlow(0L)
 
     val cartState: StateFlow<Map<Product, Double>> = billingCart.items
-    val cartTotal: StateFlow<Long> = billingCart.total.stateIn(
-        scope = scope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0L
-    )
+    val cartTotal: StateFlow<Long> = _cartTotal.asStateFlow()
+
+    private fun refreshCartTotal() {
+        _cartTotal.value = billingCart.currentTotal
+    }
 
     private val _lastSale = MutableStateFlow<Sale?>(null)
     val lastSale: StateFlow<Sale?> = _lastSale.asStateFlow()
@@ -117,18 +116,22 @@ class BillingCheckoutController(
 
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
         billingCart.add(product, quantity)
+        refreshCartTotal()
     }
 
     fun setProductQuantityInCart(product: Product, quantity: Double) {
         billingCart.setQuantity(product, quantity)
+        refreshCartTotal()
     }
 
     fun removeProductFromCart(product: Product) {
         billingCart.remove(product)
+        refreshCartTotal()
     }
 
     fun clearCart() {
         billingCart.clear()
+        refreshCartTotal()
     }
 
     fun clearCheckoutError() {

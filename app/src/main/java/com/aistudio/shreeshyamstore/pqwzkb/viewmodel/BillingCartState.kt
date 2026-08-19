@@ -27,6 +27,11 @@ class BillingCartState {
         }
     }
 
+    val currentTotal: Long
+        get() = _items.value.entries.sumOf { (product, quantity) ->
+            CommerceValidation.calculateLineTotal(product.getEffectivePrice(), quantity)
+        }
+
     fun add(product: Product, quantity: Double = 1.0) {
         if (!quantity.isFinite()) return
         val current = _items.value.toMutableMap()

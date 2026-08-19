@@ -30,7 +30,7 @@ class BillingCheckoutControllerTest {
         var successObserved = false
         val controller = BillingCheckoutController(
             gateway = gateway,
-            scope = backgroundScope,
+            scope = this,
             onAutoSync = { autoSyncObserved = true },
             onCheckoutSuccess = { successObserved = true }
         )
@@ -57,7 +57,7 @@ class BillingCheckoutControllerTest {
     fun failedCheckoutPreservesCartAndPublishesSafeError() = runTest {
         val gateway = FakeBillingGateway()
         gateway.insertFailure = IllegalArgumentException("stock underflow")
-        val controller = BillingCheckoutController(gateway, backgroundScope)
+        val controller = BillingCheckoutController(gateway, this)
         val cartProduct = product()
         controller.addProductToCart(cartProduct)
 
@@ -72,7 +72,7 @@ class BillingCheckoutControllerTest {
     @Test
     fun udhaarWithoutCustomerFailsBeforeRepositoryWrite() = runTest {
         val gateway = FakeBillingGateway()
-        val controller = BillingCheckoutController(gateway, backgroundScope)
+        val controller = BillingCheckoutController(gateway, this)
         controller.addProductToCart(product())
 
         controller.completeBill(paymentMode = "UDHAAR", receivedAmount = null)
