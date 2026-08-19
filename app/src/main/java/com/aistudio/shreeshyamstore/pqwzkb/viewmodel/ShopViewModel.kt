@@ -17,7 +17,14 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
+import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalRecoveryPointStore
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreRecoveryCoordinator
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotValidator
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotUnavailableException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -1064,7 +1071,7 @@ class ShopViewModel(
         tenant: com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope,
         recoveryEnvelope: SnapshotEnvelope
     ) {
-        RestoreRecoveryCoordinator { restored ->
+        RestoreRecoveryCoordinator { restored: CloudRestorableSnapshot ->
             repository.replaceCloudRestorableTables(
                 categoriesList = restored.categories,
                 productsList = restored.products,
