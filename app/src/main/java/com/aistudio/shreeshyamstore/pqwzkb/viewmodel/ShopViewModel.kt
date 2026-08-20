@@ -32,6 +32,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotValidator
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotUnavailableException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncCursor
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncHealthSnapshot
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -515,33 +517,30 @@ class ShopViewModel(
     }
 
     // --- Billing State (Cart) ---
-    private val billingCart = BillingCartState()
-    val cartState: StateFlow<Map<Product, Double>> = billingCart.items
-    val cartTotal: StateFlow<Long> = billingCart.total.stateIn(
+    private val billingCheckout = BillingCheckoutController(
+        gateway = ShopRepositoryBillingGateway(repository) { currentCommandMetadata() },
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000),
-        initialValue = 0L
+        onAutoSync = ::triggerAutoSync,
+        onCheckoutSuccess = { navigateTo(Screen.BillSuccess) }
     )
 
-    /** Compatibility facade while billing screens migrate to BillingCartState. */
-    fun addProductToCart(product: Product, quantity: Double = 1.0) {
-        billingCart.add(product, quantity)
-    }
+    val cartState: StateFlow<Map<Product, Double>> = billingCheckout.cartState
+    val cartTotal: StateFlow<Long> = billingCheckout.cartTotal
 
-    /** Compatibility facade while billing screens migrate to BillingCartState. */
-    fun setProductQuantityInCart(product: Product, qty: Double) {
-        billingCart.setQuantity(product, qty)
-    }
+    /** Compatibility facade while billing screens migrate to the focused billing boundary. */
+    fun addProductToCart(product: Product, quantity: Double = 1.0) =
+        billingCheckout.addProductToCart(product, quantity)
 
-    /** Compatibility facade while billing screens migrate to BillingCartState. */
-    fun removeProductFromCart(product: Product) {
-        billingCart.remove(product)
-    }
+    /** Compatibility facade while billing screens migrate to the focused billing boundary. */
+    fun setProductQuantityInCart(product: Product, qty: Double) =
+        billingCheckout.setProductQuantityInCart(product, qty)
 
-    /** Compatibility facade while billing screens migrate to BillingCartState. */
-    fun clearCart() {
-        billingCart.clear()
-    }
+    /** Compatibility facade while billing screens migrate to the focused billing boundary. */
+    fun removeProductFromCart(product: Product) =
+        billingCheckout.removeProductFromCart(product)
+
+    /** Compatibility facade while billing screens migrate to the focused billing boundary. */
+    fun clearCart() = billingCheckout.clearCart()
 
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
@@ -593,50 +592,19 @@ class ShopViewModel(
 
 
     // --- Payment & Saving State ---
-    private val _lastSale = MutableStateFlow<Sale?>(null)
-    val lastSale: StateFlow<Sale?> = _lastSale.asStateFlow()
+    val lastSale: StateFlow<Sale?> = billingCheckout.lastSale
+    val lastSaleItems: StateFlow<List<SaleItem>> = billingCheckout.lastSaleItems
+    val checkoutInFlight: StateFlow<Boolean> = billingCheckout.checkoutInFlight
+    val checkoutError: StateFlow<String?> = billingCheckout.checkoutError
 
-    private val _lastSaleItems = MutableStateFlow<List<SaleItem>>(emptyList())
-    val lastSaleItems: StateFlow<List<SaleItem>> = _lastSaleItems.asStateFlow()
-
-    private val _checkoutInFlight = MutableStateFlow(false)
-    val checkoutInFlight: StateFlow<Boolean> = _checkoutInFlight.asStateFlow()
-
-    private val _checkoutError = MutableStateFlow<String?>(null)
-    val checkoutError: StateFlow<String?> = _checkoutError.asStateFlow()
-
-    fun clearCheckoutError() {
-        _checkoutError.value = null
-    }
+    fun clearCheckoutError() = billingCheckout.clearCheckoutError()
 
     fun reconcilePaymentState(
         saleId: Long,
         targetState: PaymentState,
         receivedAmount: Long,
         onResult: (Boolean) -> Unit = {}
-    ) {
-        viewModelScope.launch {
-            try {
-                val updatedSale = repository.reconcilePaymentState(
-                    saleId = saleId,
-                    targetState = targetState,
-                    receivedAmount = receivedAmount,
-                    command = currentCommandMetadata()
-                )
-                if (_lastSale.value?.id == updatedSale.id) {
-                    _lastSale.value = updatedSale
-                }
-                triggerAutoSync()
-                onResult(true)
-            } catch (error: IllegalArgumentException) {
-                _checkoutError.value = error.message ?: "Payment state could not be updated"
-                onResult(false)
-            } catch (_: Exception) {
-                _checkoutError.value = "Payment state could not be updated"
-                onResult(false)
-            }
-        }
-    }
+    ) = billingCheckout.reconcilePaymentState(saleId, targetState, receivedAmount, onResult)
 
     fun completeBill(
         paymentMode: String, // "CASH", "UPI", "UDHAAR"
@@ -645,111 +613,14 @@ class ShopViewModel(
         customerPhone: String = "",
         note: String? = null,
         receivedAmount: Long? = null
-    ) {
-        if (_checkoutInFlight.value) return
-        val cartItems = billingCart.items.value
-        if (cartItems.isEmpty()) return
-
-        _checkoutInFlight.value = true
-        _checkoutError.value = null
-        viewModelScope.launch {
-            try {
-                val total = cartTotal.value
-                val formatter = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ENGLISH)
-                val billNo = "BILL-${formatter.format(Date())}-${UUID.randomUUID().toString().take(8).uppercase(Locale.ENGLISH)}"
-
-                val isUdhaar = paymentMode.trim().equals("UDHAAR", ignoreCase = true)
-                val command = currentCommandMetadata()
-                var newCustomer: Customer? = null
-                val finalCustomerId = if (isUdhaar) {
-                    if (customerId != null) {
-                        customerId
-                    } else {
-                        val trimmedName = customerName.trim()
-                        require(trimmedName.isNotEmpty()) { "Customer name is required for udhaar" }
-                        val existing = repository.getCustomerByName(trimmedName)
-                        if (existing != null) {
-                            existing.id
-                        } else {
-                            newCustomer = Customer(
-                                name = trimmedName,
-                                phone = customerPhone.trim().ifEmpty { null },
-                                createdAt = System.currentTimeMillis(),
-                                updatedAt = System.currentTimeMillis()
-                            )
-                            null
-                        }
-                    }
-                } else {
-                    null
-                }
-
-                val now = System.currentTimeMillis()
-                val saleItems = cartItems.map { (prod, qty) ->
-                    val unitPrice = CommerceValidation.normalizeUnitPrice(prod.getEffectivePrice())
-                    SaleItem(
-                        saleId = 0,
-                        productId = prod.id,
-                        productNameSnapshot = prod.name,
-                        quantity = qty,
-                        unit = prod.unit,
-                        unitPrice = unitPrice,
-                        lineTotal = CommerceValidation.calculateLineTotal(unitPrice, qty),
-                        updatedAt = now
-                    )
-                }
-                val sale = Sale(
-                    billNumber = billNo,
-                    totalAmount = CommerceValidation.calculateBillTotal(saleItems),
-                    paymentMode = paymentMode,
-                    receivedAmount = receivedAmount,
-                    customerId = finalCustomerId,
-                    note = note,
-                    createdAt = now,
-                    updatedAt = now
-                )
-
-                val savedSaleId = if (newCustomer != null) {
-                    repository.insertSaleWithNewCustomer(
-                        sale = sale,
-                        items = saleItems,
-                        newCustomer = newCustomer,
-                        command = command
-                    )
-                } else {
-                    repository.insertSaleWithItems(
-                        sale = sale,
-                        items = saleItems,
-                        selectedCustomerId = finalCustomerId,
-                        command = command
-                    )
-                }
-                val savedSale = repository.getSaleById(savedSaleId)
-                if (savedSale != null) {
-                    _lastSale.value = savedSale
-                    _lastSaleItems.value = repository.getSaleItemsForSaleList(savedSaleId)
-                }
-
-                clearCart()
-                triggerAutoSync()
-                navigateTo(Screen.BillSuccess)
-            } catch (error: IllegalArgumentException) {
-                _checkoutError.value = when {
-                    error.message?.contains("credit limit", ignoreCase = true) == true ->
-                        "Udhaar credit limit exceeded. Bill was not saved."
-                    error.message?.contains("stock", ignoreCase = true) == true ->
-                        "Insufficient stock. Bill was not saved."
-                    error.message?.contains("customer", ignoreCase = true) == true ->
-                        "Valid customer details are required. Bill was not saved."
-                    else -> "Bill details are invalid. Bill was not saved."
-                }
-            } catch (_: Exception) {
-                _checkoutError.value = "Bill could not be saved. Please try again."
-            } finally {
-                _checkoutInFlight.value = false
-            }
-        }
-    }
+    ) = billingCheckout.completeBill(
+        paymentMode = paymentMode,
+        customerId = customerId,
+        customerName = customerName,
+        customerPhone = customerPhone,
+        note = note,
+        receivedAmount = receivedAmount
+    )
 
 
     // --- Udhaar State ---
@@ -871,8 +742,8 @@ class ShopViewModel(
 
     // Helper functions for clipboard copy text and sharing
     fun generateInvoiceText(customSale: Sale? = null, customItems: List<SaleItem>? = null): String {
-        val sale = customSale ?: _lastSale.value ?: return "No Invoice Found"
-        val items = customItems ?: _lastSaleItems.value
+        val sale = customSale ?: lastSale.value ?: return "No Invoice Found"
+        val items = customItems ?: lastSaleItems.value
         val settings = storeSettings.value
         val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
         val shopDisplayName = settings.shopName.ifEmpty { strings.defaultShopName }
@@ -1029,6 +900,35 @@ class ShopViewModel(
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    private val _syncHealthSnapshot = MutableStateFlow(SyncHealthSnapshot.empty())
+    val syncHealthSnapshot: StateFlow<SyncHealthSnapshot> = _syncHealthSnapshot.asStateFlow()
+
+    /** Refreshes only redacted counts and the legacy local cursor; no payload leaves the repository. */
+    fun refreshSyncHealth() {
+        viewModelScope.launch {
+            refreshSyncHealthNow()
+        }
+    }
+
+    private suspend fun refreshSyncHealthNow(nowEpochMs: Long = System.currentTimeMillis()) {
+        val settings = settingsDataStore.settingsFlow.first()
+        val summary = repository.getSyncOutboxSummary()
+        _syncHealthSnapshot.value = SyncHealthSnapshot.from(
+            nowEpochMs = nowEpochMs,
+            lastSyncEpochMs = SyncCursor.parse(settings.lastSyncTime),
+            outbox = summary
+        )
+    }
+
+    /** Operator recovery: reset dead letters and let the normal sync worker retry them. */
+    fun retrySyncDeadLetters() {
+        viewModelScope.launch {
+            repository.requeueSyncDeadLetters()
+            refreshSyncHealthNow()
+            triggerAutoSync()
+        }
+    }
 
     private suspend fun authenticatedBackupClient(
         settings: StoreSettings,
