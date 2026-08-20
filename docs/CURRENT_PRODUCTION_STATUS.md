@@ -1,8 +1,8 @@
 # Shree Shyam Store — Current Production Status
 
-**Status date:** 20 August 2026  
-**Repository:** [`harvindertapper/Shree-shyam-store-`](https://github.com/harvindertapper/Shree-shyam-store-)  
-**Current main:** `7abf378` — PR #35, restore snapshot envelope and recovery point  
+**Status date:** 20 August 2026
+**Repository:** [`harvindertapper/Shree-shyam-store-`](https://github.com/harvindertapper/Shree-shyam-store-)
+**Current main:** `7abf378` — PR #35, restore snapshot envelope and recovery point
 **Product scope:** Merchant Android OS first; SaaS Control Plane/Admin Portal and Pickup Marketplace remain separate future repositories.
 
 ## Executive status
