@@ -85,12 +85,14 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.BillingCartStateTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.BillingCheckoutControllerTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncObservabilityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
 
