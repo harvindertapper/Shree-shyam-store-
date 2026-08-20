@@ -31,6 +31,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotValidator
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotUnavailableException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncCursor
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncHealthSnapshot
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -896,6 +898,35 @@ class ShopViewModel(
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    private val _syncHealthSnapshot = MutableStateFlow(SyncHealthSnapshot.empty())
+    val syncHealthSnapshot: StateFlow<SyncHealthSnapshot> = _syncHealthSnapshot.asStateFlow()
+
+    /** Refreshes only redacted counts and the legacy local cursor; no payload leaves the repository. */
+    fun refreshSyncHealth() {
+        viewModelScope.launch {
+            refreshSyncHealthNow()
+        }
+    }
+
+    private suspend fun refreshSyncHealthNow(nowEpochMs: Long = System.currentTimeMillis()) {
+        val settings = settingsDataStore.settingsFlow.first()
+        val summary = repository.getSyncOutboxSummary()
+        _syncHealthSnapshot.value = SyncHealthSnapshot.from(
+            nowEpochMs = nowEpochMs,
+            lastSyncEpochMs = SyncCursor.parse(settings.lastSyncTime),
+            outbox = summary
+        )
+    }
+
+    /** Operator recovery: reset dead letters and let the normal sync worker retry them. */
+    fun retrySyncDeadLetters() {
+        viewModelScope.launch {
+            repository.requeueSyncDeadLetters()
+            refreshSyncHealthNow()
+            triggerAutoSync()
+        }
+    }
 
     private suspend fun authenticatedBackupClient(
         settings: StoreSettings,

@@ -716,6 +716,21 @@ class ShopRepository(
         if (database != null) database.withTransaction { operation() } else operation()
     }
 
+    suspend fun getSyncOutboxSummary(): SyncOutboxSummary {
+        val outbox = syncOutboxDao()
+        return SyncOutboxSummary(
+            pendingCount = outbox.countByState(SyncOutboxState.PENDING),
+            inFlightCount = outbox.countByState(SyncOutboxState.IN_FLIGHT),
+            retryableCount = outbox.countByState(SyncOutboxState.RETRYABLE),
+            deadLetterCount = outbox.countByState(SyncOutboxState.DEAD_LETTER),
+            conflictCount = outbox.countConflictDeadLetters(),
+            nextRetryAtEpochMs = outbox.getNextRetryAt()
+        )
+    }
+
+    suspend fun requeueSyncDeadLetters(now: Long = System.currentTimeMillis()): Int =
+        syncOutboxDao().requeueDeadLetters(now)
+
     private suspend fun syncOutboxDao(): SyncOutboxDao =
         database?.syncOutboxDao() ?: error("Sync outbox requires a database")
 
