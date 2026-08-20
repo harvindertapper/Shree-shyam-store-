@@ -37,3 +37,13 @@ data class SyncOutbox(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** Aggregate counts used for redacted operator-facing sync health. */
+data class SyncOutboxSummary(
+    val pendingCount: Int = 0,
+    val inFlightCount: Int = 0,
+    val retryableCount: Int = 0,
+    val deadLetterCount: Int = 0,
+    val conflictCount: Int = 0,
+    val nextRetryAtEpochMs: Long? = null
+)
