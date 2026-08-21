@@ -16,6 +16,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
@@ -63,11 +65,6 @@ class MainActivity : FragmentActivity() {
             settingsDataStore = settingsStore
         )
 
-        // Initialize WorkManager Sync Engine and Network Callback
-        com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.registerNetworkCallback(applicationContext)
-        com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.schedulePeriodicSync(applicationContext)
-        com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.scheduleInstantSync(applicationContext)
-
         // 2. ViewModel instantiation using custom provider factory
         viewModel = ViewModelProvider(
             this,
@@ -93,7 +90,15 @@ class MainActivity : FragmentActivity() {
             MyApplicationTheme {
                 val currentScreen by viewModel.currentScreen.collectAsState()
                 val settings by viewModel.storeSettings.collectAsState()
+                val context = LocalContext.current
                 val strings = remember(settings.appLanguage) { com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage) }
+
+                LaunchedEffect(settings.isUserLoggedIn, settings.autoSyncEnabled) {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.configureAutomaticSync(
+                        context = context,
+                        enabled = settings.isUserLoggedIn && settings.autoSyncEnabled
+                    )
+                }
 
                 // Initial Startup Router: derive navigation from one reconciled identity session.
                 LaunchedEffect(
@@ -125,7 +130,16 @@ class MainActivity : FragmentActivity() {
                     bottomBar = {
                         // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
                         if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
+                            val navItemColors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.White,
+                                selectedTextColor = Color.White,
+                                indicatorColor = SaffronPrimary,
+                                unselectedIconColor = Color(0xFFE2E8F0),
+                                unselectedTextColor = Color(0xFFE2E8F0)
+                            )
                             NavigationBar(
+                                containerColor = SlateSecondary,
+                                contentColor = Color.White,
                                 modifier = Modifier.testTag("bottom_nav")
                             ) {
                                 NavigationBarItem(
@@ -133,6 +147,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Home) },
                                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                                     label = { Text(strings.navHome, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_home")
                                 )
                                 NavigationBarItem(
@@ -140,6 +155,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Billing) },
                                     icon = { Icon(Icons.Default.AddShoppingCart, contentDescription = "Billing") },
                                     label = { Text(strings.navBilling, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_billing")
                                 )
                                 NavigationBarItem(
@@ -147,6 +163,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Products) },
                                     icon = { Icon(Icons.Default.Store, contentDescription = "Products") },
                                     label = { Text(strings.navProducts, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_products")
                                 )
                                 NavigationBarItem(
@@ -154,6 +171,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Udhaar) },
                                     icon = { Icon(Icons.Default.ImportContacts, contentDescription = "Udhaar") },
                                     label = { Text(strings.navUdhaar, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_udhaar")
                                 )
                                 NavigationBarItem(
@@ -161,6 +179,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Reports) },
                                     icon = { Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = "Reports") },
                                     label = { Text(strings.navReports, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_reports")
                                 )
                                 NavigationBarItem(
@@ -168,6 +187,7 @@ class MainActivity : FragmentActivity() {
                                     onClick = { viewModel.navigateTo(Screen.Settings) },
                                     icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                                     label = { Text(strings.navSettings, style = MaterialTheme.typography.labelSmall) },
+                                    colors = navItemColors,
                                     modifier = Modifier.testTag("nav_settings")
                                 )
                             }

@@ -40,22 +40,22 @@ class InventoryViewModel(
         initialValue = emptyList()
     )
 
-    fun addCategory(name: String) {
+    fun addCategory(name: String, onSuccess: (Category) -> Unit = {}) {
         viewModelScope.launch {
             try {
                 val normalizedName = InventoryValidation.validateCategoryName(name)
                 require(repository.getCategoryByName(normalizedName) == null) {
                     "Category name already exists"
                 }
-                repository.insertCategory(
-                    category = Category(name = normalizedName),
+                val category = Category(name = normalizedName)
+                val insertedId = repository.insertCategory(
+                    category = category,
                     command = commandProvider()
                 )
                 onMutation()
-            } catch (error: IllegalArgumentException) {
-                onError(error.message ?: "Category could not be saved")
-            } catch (_: Exception) {
-                onError("Category could not be saved")
+                onSuccess(category.copy(id = insertedId))
+            } catch (error: Exception) {
+                onError(safeMutationMessage("Category could not be saved", error))
             }
         }
     }
@@ -72,10 +72,8 @@ class InventoryViewModel(
                     command = commandProvider()
                 )
                 onMutation()
-            } catch (error: IllegalArgumentException) {
-                onError(error.message ?: "Category could not be renamed")
-            } catch (_: Exception) {
-                onError("Category could not be renamed")
+            } catch (error: Exception) {
+                onError(safeMutationMessage("Category could not be renamed", error))
             }
         }
     }
@@ -92,7 +90,8 @@ class InventoryViewModel(
         trackStock: Boolean,
         lowStockAlertQty: Double,
         isActive: Boolean,
-        barcode: String = ""
+        barcode: String = "",
+        onSuccess: () -> Unit = {}
     ) {
         viewModelScope.launch {
             try {
@@ -160,11 +159,26 @@ class InventoryViewModel(
                     )
                 }
                 onMutation()
-            } catch (error: IllegalArgumentException) {
-                onError(error.message ?: "Product could not be saved")
-            } catch (_: Exception) {
-                onError("Product could not be saved")
+                onSuccess()
+            } catch (error: Exception) {
+                onError(safeMutationMessage("Product could not be saved", error))
             }
+        }
+    }
+
+    private fun safeMutationMessage(fallback: String, error: Throwable): String {
+        val message = error.message?.trim().orEmpty()
+        return when {
+            message.contains("Authenticated actor is required", ignoreCase = true) ->
+                "Session expired. Sign in again before saving."
+            message.contains("not authorized", ignoreCase = true) ->
+                "This account cannot edit the catalog."
+            message.contains("barcode", ignoreCase = true) ||
+                message.contains("category", ignoreCase = true) ||
+                message.contains("stock", ignoreCase = true) ||
+                message.contains("price", ignoreCase = true) ||
+                message.contains("name", ignoreCase = true) -> message
+            else -> fallback
         }
     }
 
