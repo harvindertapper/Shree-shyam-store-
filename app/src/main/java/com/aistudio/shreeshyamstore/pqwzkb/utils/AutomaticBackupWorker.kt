@@ -115,4 +115,3 @@ class AutomaticBackupWorker(
         private const val MAX_RETRY_ATTEMPTS = 3
     }
 }
-
