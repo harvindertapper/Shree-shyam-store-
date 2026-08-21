@@ -733,8 +733,7 @@ fun AddEditProductScreen(
                 DropdownMenu(
                     expanded = catDropdownExpanded,
                     onDismissRequest = { catDropdownExpanded = false },
-                    containerColor = Color.White,
-                    contentColor = TextNearBlack
+                    containerColor = Color.White
                 ) {
                     categories.forEach { cat ->
                         DropdownMenuItem(

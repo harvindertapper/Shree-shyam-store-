@@ -26,6 +26,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.SettingsDataStore
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import com.aistudio.shreeshyamstore.pqwzkb.ui.screens.*
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.MyApplicationTheme
+import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.SaffronPrimary
+import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.SlateSecondary
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModelFactory
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
