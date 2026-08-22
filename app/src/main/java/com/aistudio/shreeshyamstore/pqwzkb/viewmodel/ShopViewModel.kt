@@ -6,6 +6,7 @@ import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.aistudio.shreeshyamstore.pqwzkb.BuildConfig
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
@@ -143,6 +144,7 @@ class ShopViewModel(
     }
 
     fun triggerAutoSync() {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         context?.let { ctx ->
             viewModelScope.launch {
                 val settings = settingsDataStore.settingsFlow.first()
@@ -1046,6 +1048,10 @@ class ShopViewModel(
     }
 
     fun syncAllToCloud(onResult: (Boolean, String) -> Unit) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) {
+            onResult(false, "Cloud sync is disabled in this debug build.")
+            return
+        }
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
             val identitySession = reconcileIdentitySession()
@@ -1084,6 +1090,10 @@ class ShopViewModel(
     }
 
     fun restoreAllFromCloud(onResult: (Boolean, String) -> Unit) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) {
+            onResult(false, "Cloud restore is disabled in this debug build.")
+            return
+        }
         viewModelScope.launch {
             val settings = settingsDataStore.settingsFlow.first()
             val identitySession = reconcileIdentitySession()
