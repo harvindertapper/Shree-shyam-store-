@@ -64,6 +64,21 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
+      - name: Verify release configuration
+        run: ./gradlew --no-daemon --stacktrace :app:verifyReleaseConfiguration
+
+      - name: Assemble minified release artifact
+        run: ./gradlew --no-daemon --stacktrace assembleRelease
+
+      - name: Check release secrets are external
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(\.env$|local\.properties$|.*\.keystore$|.*\.jks$)'; then
+            echo "Tracked release secret or keystore detected" >&2
+            exit 1
+          fi
+
       - name: Run lint
         run: ./gradlew --no-daemon --stacktrace lintDebug
 
@@ -92,7 +107,8 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.OperationsReadinessTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.BuildConfigurationTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.StagingEvidenceTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncObservabilityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
@@ -139,4 +155,12 @@ jobs:
         with:
           name: shree-shyam-store-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: warn
+
+      - name: Upload minified release outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shree-shyam-store-release-outputs
+          path: app/build/outputs/apk/release
           if-no-files-found: warn
