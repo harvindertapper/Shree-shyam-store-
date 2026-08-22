@@ -55,7 +55,12 @@ object AuthManager {
     ): Result<FirebaseUser> {
         return try {
             val auth = getFirebaseAuth(context)
-                ?: return Result.failure(Exception("Google Sign-In requires Firebase configuration."))
+                ?: return Result.failure(
+                    Exception(
+                        "Google Sign-In is unavailable. Add google-services.json for " +
+                            "com.aistudio.shreeshyamstore.pqwzkb and rebuild."
+                    )
+                )
             val credentialManager = CredentialManager.create(context)
 
             val rawNonce = UUID.randomUUID().toString()

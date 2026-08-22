@@ -51,7 +51,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     var securityPin by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
     var qrUriString by remember { mutableStateOf("") }
-    var autoSyncEnabled by remember { mutableStateOf(false) }
+    var autoSyncEnabled by remember { mutableStateOf(true) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
 
     val syncInProgress by viewModel.syncInProgress.collectAsState()
@@ -259,6 +259,47 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(strings.logout, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
+                        }
+                    }
+                }
+            }
+
+            if (!settings.isUserLoggedIn) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = ErrorRedLight),
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.5.dp, ErrorRed.copy(alpha = 0.6f)),
+                    modifier = Modifier.fillMaxWidth().testTag("session_sign_in_card")
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(Icons.Default.AccountCircle, null, tint = ErrorRed, modifier = Modifier.size(32.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (settings.appLanguage == AppLanguage.HINDI) "क्लाउड सत्र सक्रिय नहीं है" else "Cloud session is not active",
+                                fontWeight = FontWeight.Black,
+                                color = ErrorRed
+                            )
+                            Text(
+                                text = if (settings.appLanguage == AppLanguage.HINDI) {
+                                    "साइन इन करने पर सुरक्षित सिंक और बैकअप उपलब्ध होंगे।"
+                                } else {
+                                    "Sign in to enable secure sync and automatic backups."
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextNearBlack
+                            )
+                        }
+                        Button(
+                            onClick = { viewModel.navigateTo(Screen.Welcome) },
+                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                            modifier = Modifier.testTag("settings_sign_in_button")
+                        ) {
+                            Text(if (settings.appLanguage == AppLanguage.HINDI) "साइन इन" else "Sign in")
                         }
                     }
                 }
@@ -546,6 +587,55 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Text(strings.uploadQr, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                     }
+                }
+            }
+
+            // Automatic sync and backup policy
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth().testTag("automatic_sync_policy_card")
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(36.dp).background(SuccessGreenLight, RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Sync, null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (settings.appLanguage == AppLanguage.HINDI) "स्वचालित सिंक और बैकअप" else "Automatic sync & backup",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            color = SaffronDark
+                        )
+                        Text(
+                            text = if (settings.appLanguage == AppLanguage.HINDI) {
+                                "इंटरनेट मिलते ही डेटा सिंक होगा और सुरक्षित snapshot बैकअप बनेगा।"
+                            } else {
+                                "Sync when online and create protected snapshot backups automatically."
+                            },
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMutedGray
+                        )
+                    }
+                    Switch(
+                        checked = autoSyncEnabled,
+                        onCheckedChange = { autoSyncEnabled = it },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = SuccessGreen
+                        ),
+                        modifier = Modifier.testTag("automatic_sync_switch")
+                    )
                 }
             }
 

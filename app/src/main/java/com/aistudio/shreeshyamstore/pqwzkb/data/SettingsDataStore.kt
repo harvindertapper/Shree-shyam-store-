@@ -59,7 +59,7 @@ data class StoreSettings(
     val firebaseUrl: String = "",
     val firebasePrefix: String = DEFAULT_FIREBASE_PREFIX,
     val lastSyncTime: String = "Never Synced",
-    val autoSyncEnabled: Boolean = false,
+    val autoSyncEnabled: Boolean = true,
     val appLanguage: AppLanguage = AppLanguage.HINDI
 )
 
@@ -155,7 +155,7 @@ class SettingsDataStore(private val context: Context) {
                     ?.trim()
                     ?.ifEmpty { "Never Synced" }
                     ?: "Never Synced",
-                autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: false,
+                autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: true,
                 appLanguage = language
             )
         }
