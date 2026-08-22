@@ -107,6 +107,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.OperationsReadinessTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.BuildConfigurationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StagingEvidenceTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncObservabilityTest
