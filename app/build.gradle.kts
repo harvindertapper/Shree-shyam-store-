@@ -1,5 +1,42 @@
+import java.io.File
+import org.gradle.api.DefaultTask
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.TaskAction
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+val appVersionCode = providers.gradleProperty("APP_VERSION_CODE")
+  .orElse("1")
+  .get()
+  .toIntOrNull()
+  ?: error("APP_VERSION_CODE must be a positive integer")
+require(appVersionCode > 0) { "APP_VERSION_CODE must be positive" }
+val appVersionName = providers.gradleProperty("APP_VERSION_NAME")
+  .orElse("1.0.0")
+  .get()
+  .trim()
+require(appVersionName.isNotBlank()) { "APP_VERSION_NAME must not be blank" }
+
+val releaseKeystorePath = providers.environmentVariable("RELEASE_KEYSTORE_PATH")
+  .orNull
+  ?.trim()
+  .orEmpty()
+val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD")
+  .orNull
+val releaseKeyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS")
+  .orNull
+  ?.trim()
+  .orEmpty()
+val releaseKeyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD")
+  .orNull
+val releaseSigningConfigured = releaseKeystorePath.isNotBlank() &&
+  !releaseStorePassword.isNullOrBlank() &&
+  releaseKeyAlias.isNotBlank() &&
+  !releaseKeyPassword.isNullOrBlank()
+val releaseSigningRequired = providers.gradleProperty("REQUIRE_RELEASE_SIGNING")
+  .orElse("false")
+  .get()
+  .toBoolean()
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.kotlin.android)
@@ -23,19 +60,20 @@ android {
     applicationId = "com.aistudio.shreeshyamstore.pqwzkb"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    versionCode = appVersionCode
+    versionName = appVersionName
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      if (releaseSigningConfigured) {
+        storeFile = file(releaseKeystorePath)
+        storePassword = releaseStorePassword
+        keyAlias = releaseKeyAlias
+        keyPassword = releaseKeyPassword
+      }
     }
     create("debugConfig") {
       storeFile = file("${rootDir}/debug.keystore")
@@ -48,11 +86,18 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
+      buildConfigField("String", "BUILD_ENVIRONMENT", "\"production\"")
+      buildConfigField("Boolean", "CLOUD_SYNC_ENABLED", "true")
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-      signingConfig = signingConfigs.getByName("release")
+      if (releaseSigningConfigured) {
+        signingConfig = signingConfigs.getByName("release")
+      }
     }
     debug {
+      buildConfigField("String", "BUILD_ENVIRONMENT", "\"debug\"")
+      buildConfigField("Boolean", "CLOUD_SYNC_ENABLED", "false")
       signingConfig = signingConfigs.getByName("debugConfig")
     }
   }
@@ -65,6 +110,90 @@ android {
     buildConfig = true
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
+}
+
+val releaseMinifyEnabled = android.buildTypes.getByName("release").isMinifyEnabled
+val releaseBuildEnvironment = android.buildTypes.getByName("release")
+  .buildConfigFields["BUILD_ENVIRONMENT"]?.value
+val releaseCloudSyncFlag = android.buildTypes.getByName("release")
+  .buildConfigFields["CLOUD_SYNC_ENABLED"]?.value
+val debugBuildEnvironment = android.buildTypes.getByName("debug")
+  .buildConfigFields["BUILD_ENVIRONMENT"]?.value
+val debugCloudSyncFlag = android.buildTypes.getByName("debug")
+  .buildConfigFields["CLOUD_SYNC_ENABLED"]?.value
+
+abstract class VerifyReleaseConfigurationTask : DefaultTask() {
+  @get:Input
+  abstract val versionCode: Property<Int>
+
+  @get:Input
+  abstract val versionName: Property<String>
+
+  @get:Input
+  abstract val minifyEnabled: Property<Boolean>
+
+  @get:Input
+  abstract val releaseEnvironment: Property<String>
+
+  @get:Input
+  abstract val releaseCloudSyncEnabled: Property<String>
+
+  @get:Input
+  abstract val debugEnvironment: Property<String>
+
+  @get:Input
+  abstract val debugCloudSyncEnabled: Property<String>
+
+  @get:Input
+  abstract val signingRequired: Property<Boolean>
+
+  @get:Input
+  abstract val signingConfigured: Property<Boolean>
+
+  @get:Input
+  abstract val keystorePath: Property<String>
+
+  @TaskAction
+  fun verify() {
+    check(versionCode.get() > 0) { "Release versionCode must be positive" }
+    check(versionName.get().isNotBlank()) { "Release versionName must not be blank" }
+    check(minifyEnabled.get()) { "Release minification must remain enabled" }
+    check(releaseEnvironment.get() == "\"production\"") {
+      "Release must be marked as production"
+    }
+    check(releaseCloudSyncEnabled.get() == "true") {
+      "Release cloud sync must be enabled"
+    }
+    check(debugEnvironment.get() == "\"debug\"") {
+      "Debug must be marked as debug"
+    }
+    check(debugCloudSyncEnabled.get() == "false") {
+      "Debug cloud sync must be disabled"
+    }
+    if (signingRequired.get()) {
+      check(signingConfigured.get()) {
+        "Release signing is required but RELEASE_KEYSTORE_PATH and release secret variables are incomplete"
+      }
+      check(File(keystorePath.get()).isFile) {
+        "Configured RELEASE_KEYSTORE_PATH does not point to a keystore file"
+      }
+    }
+  }
+}
+
+tasks.register<VerifyReleaseConfigurationTask>("verifyReleaseConfiguration") {
+  group = "verification"
+  description = "Verifies release signing, version, minification, and debug isolation invariants."
+  versionCode.set(appVersionCode)
+  versionName.set(appVersionName)
+  minifyEnabled.set(releaseMinifyEnabled)
+  releaseEnvironment.set(releaseBuildEnvironment)
+  releaseCloudSyncEnabled.set(releaseCloudSyncFlag)
+  debugEnvironment.set(debugBuildEnvironment)
+  debugCloudSyncEnabled.set(debugCloudSyncFlag)
+  signingRequired.set(releaseSigningRequired)
+  signingConfigured.set(releaseSigningConfigured)
+  keystorePath.set(releaseKeystorePath)
 }
 
 kotlin {
