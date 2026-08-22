@@ -1,6 +1,7 @@
 package com.aistudio.shreeshyamstore.pqwzkb.utils
 
 import android.content.Context
+import com.aistudio.shreeshyamstore.pqwzkb.BuildConfig
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -18,6 +19,7 @@ object SyncManager {
      * unsynced local store data is automatically synced to the cloud.
      */
     fun registerNetworkCallback(context: Context) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         if (isNetworkCallbackRegistered) return
         try {
             val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
@@ -40,6 +42,7 @@ object SyncManager {
      * Triggers an immediate background sync with exponential retry when network is connected.
      */
     fun triggerImmediateSync(context: Context) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -76,6 +79,7 @@ object SyncManager {
      * Schedules periodic background sync every 1 hour when connected to network.
      */
     fun schedulePeriodicSync(context: Context) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
