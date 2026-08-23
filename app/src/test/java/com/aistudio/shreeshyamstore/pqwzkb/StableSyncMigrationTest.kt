@@ -3,6 +3,7 @@ package com.aistudio.shreeshyamstore.pqwzkb
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.runBlocking
@@ -79,8 +80,8 @@ class StableSyncMigrationTest {
 
 }
 
-internal fun indexNames(database: SQLiteDatabase, table: String): Set<String> =
-    database.rawQuery("PRAGMA index_list($table)", null).use { cursor ->
+internal fun indexNames(database: SupportSQLiteDatabase, table: String): Set<String> =
+    database.query("PRAGMA index_list($table)").use { cursor ->
         val nameColumn = cursor.getColumnIndexOrThrow("name")
         buildSet {
             while (cursor.moveToNext()) add(cursor.getString(nameColumn))
