@@ -90,7 +90,8 @@ class BillingCheckoutController(
     private val gateway: BillingCheckoutGateway,
     private val scope: CoroutineScope,
     private val onAutoSync: () -> Unit = {},
-    private val onCheckoutSuccess: () -> Unit = {}
+    private val onCheckoutSuccess: () -> Unit = {},
+    private val onGateError: (Throwable) -> String? = { null }
 ) {
     private val billingCart = BillingCartState()
     private val _cartTotal = MutableStateFlow(0L)
@@ -158,7 +159,9 @@ class BillingCheckoutController(
                 onAutoSync()
                 onResult(true)
             } catch (error: IllegalArgumentException) {
-                _checkoutError.value = error.message ?: "Payment state could not be updated"
+                _checkoutError.value = onGateError(error)?.takeIf { it.isNotBlank() }
+                    ?: error.message
+                    ?: "Payment state could not be updated"
                 onResult(false)
             } catch (_: Exception) {
                 _checkoutError.value = "Payment state could not be updated"
@@ -254,7 +257,7 @@ class BillingCheckoutController(
                 onAutoSync()
                 onCheckoutSuccess()
             } catch (error: IllegalArgumentException) {
-                _checkoutError.value = when {
+                _checkoutError.value = onGateError(error)?.takeIf { it.isNotBlank() } ?: when {
                     error.message?.contains("credit limit", ignoreCase = true) == true ->
                         "Udhaar credit limit exceeded. Bill was not saved."
                     error.message?.contains("stock", ignoreCase = true) == true ->

@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.InventoryValidation
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.OperatorAction
+import com.aistudio.shreeshyamstore.pqwzkb.utils.localizedOperatorGateMessage
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
@@ -26,7 +29,9 @@ class InventoryViewModel(
     private val repository: ShopRepository,
     private val commandProvider: suspend () -> CommandMetadata,
     private val onMutation: () -> Unit,
-    private val onError: (String) -> Unit = {}
+    private val onError: (String) -> Unit = {},
+    private val actionCommandProvider: suspend (OperatorAction) -> CommandMetadata = { commandProvider() },
+    private val languageProvider: () -> AppLanguage = { AppLanguage.ENGLISH }
 ) : ViewModel() {
     val categories: StateFlow<List<Category>> = repository.allCategories.stateIn(
         scope = viewModelScope,
@@ -50,7 +55,7 @@ class InventoryViewModel(
                 val category = Category(name = normalizedName)
                 val insertedId = repository.insertCategory(
                     category = category,
-                    command = commandProvider()
+                    command = actionCommandProvider(OperatorAction.CATALOG_WRITE)
                 )
                 onMutation()
                 onSuccess(category.copy(id = insertedId))
@@ -69,7 +74,7 @@ class InventoryViewModel(
                         name = normalizedName,
                         updatedAt = System.currentTimeMillis()
                     ),
-                    command = commandProvider()
+                    command = actionCommandProvider(OperatorAction.CATALOG_WRITE)
                 )
                 onMutation()
             } catch (error: Exception) {
@@ -155,7 +160,7 @@ class InventoryViewModel(
                         newStock = finalStock,
                         reason = "Manual correction during edit",
                         createdAt = now,
-                        command = commandProvider()
+                        command = actionCommandProvider(OperatorAction.CATALOG_WRITE)
                     )
                 }
                 onMutation()
@@ -167,12 +172,15 @@ class InventoryViewModel(
     }
 
     private fun safeMutationMessage(fallback: String, error: Throwable): String {
+        localizedOperatorGateMessage(error, languageProvider())?.let { return it }
         val message = error.message?.trim().orEmpty()
+        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+            .getStrings(languageProvider())
         return when {
             message.contains("Authenticated actor is required", ignoreCase = true) ->
-                "Session expired. Sign in again before saving."
+                strings.actionSignInRequired
             message.contains("not authorized", ignoreCase = true) ->
-                "This account cannot edit the catalog."
+                strings.actionPermissionDenied
             message.contains("barcode", ignoreCase = true) ||
                 message.contains("category", ignoreCase = true) ||
                 message.contains("stock", ignoreCase = true) ||
@@ -191,7 +199,7 @@ class InventoryViewModel(
                     productId = productId,
                     actualStockCounted = actualStockCounted,
                     reason = reason,
-                    command = commandProvider()
+                    command = actionCommandProvider(OperatorAction.INVENTORY_ADJUSTMENT)
                 )
                 onMutation()
             } catch (error: IllegalArgumentException) {
@@ -210,12 +218,21 @@ class InventoryViewModelFactory(
     private val repository: ShopRepository,
     private val commandProvider: suspend () -> CommandMetadata,
     private val onMutation: () -> Unit,
-    private val onError: (String) -> Unit = {}
+    private val onError: (String) -> Unit = {},
+    private val actionCommandProvider: suspend (OperatorAction) -> CommandMetadata = { commandProvider() },
+    private val languageProvider: () -> AppLanguage = { AppLanguage.ENGLISH }
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(InventoryViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return InventoryViewModel(repository, commandProvider, onMutation, onError) as T
+            return InventoryViewModel(
+                repository,
+                commandProvider,
+                onMutation,
+                onError,
+                actionCommandProvider,
+                languageProvider
+            ) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

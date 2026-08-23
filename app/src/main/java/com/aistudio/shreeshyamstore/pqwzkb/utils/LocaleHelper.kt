@@ -54,6 +54,10 @@ interface AppStrings {
     val registeredEmail: String
     val sendLink: String
     val cancel: String
+    val actionSignInRequired: String
+    val cloudAccountRequired: String
+    val actionPermissionDenied: String
+    val actionRoleInvalid: String
 
     // Setup
     val shopSetupTitle: String
@@ -231,6 +235,10 @@ object HindiStrings : AppStrings {
     override val registeredEmail = "रजिस्टर्ड ईमेल"
     override val sendLink = "लिंक भेजें"
     override val cancel = "रद्द करें"
+    override val actionSignInRequired = "इस काम के लिए पहले साइन इन करें। डेटा डिवाइस पर सुरक्षित रहेगा।"
+    override val cloudAccountRequired = "क्लाउड बैकअप या रिस्टोर के लिए Google खाते से साइन इन करें।"
+    override val actionPermissionDenied = "इस खाते को यह काम करने की अनुमति नहीं है। मालिक से संपर्क करें।"
+    override val actionRoleInvalid = "खाते की भूमिका मान्य नहीं है। मालिक से संपर्क करें।"
 
     override val shopSetupTitle = "दुकान प्रोफाइल सेटअप"
     override val shopSetupDesc = "अपनी दुकान का विवरण और 4-अंकों का सुरक्षित पिन सेट करें।"
@@ -399,6 +407,10 @@ object EnglishStrings : AppStrings {
     override val registeredEmail = "Registered Email"
     override val sendLink = "Send Link"
     override val cancel = "Cancel"
+    override val actionSignInRequired = "Sign in before continuing. Your data remains safe on this device."
+    override val cloudAccountRequired = "Sign in with Google for cloud backup or restore."
+    override val actionPermissionDenied = "This account is not allowed to perform this action. Contact the owner."
+    override val actionRoleInvalid = "This account has an invalid role. Contact the owner."
 
     override val shopSetupTitle = "Shop Profile Setup"
     override val shopSetupDesc = "Enter your store details and set a 4-digit security PIN."
