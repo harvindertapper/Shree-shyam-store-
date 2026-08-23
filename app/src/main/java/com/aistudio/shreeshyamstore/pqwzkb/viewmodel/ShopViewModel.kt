@@ -345,6 +345,97 @@ class ShopViewModel(
         }
     }
 
+    fun recoverAppLockWithLocalCredentials(
+        identifier: String,
+        password: String,
+        newPin: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                if (!SecurityUtils.isAcceptableNewPin(newPin)) {
+                    onError("Choose a different 4-digit PIN. Avoid 1234, repeated digits, or simple sequences.")
+                    return@launch
+                }
+                val session = settingsDataStore.settingsFlow.first().identitySessionOrNull()
+                if (session?.provider != IdentityProvider.LOCAL) {
+                    onError("This device is not using a local account. Use the matching recovery method.")
+                    return@launch
+                }
+                val key = identifier.trim()
+                val user = if (key.contains("@")) {
+                    repository.getUserByEmail(key.lowercase())
+                } else {
+                    repository.getUserByUsername(key)
+                }
+                if (user == null || user.uid.trim() != session.uid) {
+                    onError("The local account does not match this device session.")
+                    return@launch
+                }
+                val verification = SecurityUtils.verifyCredential(
+                    secret = password,
+                    storedCredential = user.passwordHash,
+                    scope = SecurityUtils.CredentialScope.LOCAL_ACCOUNT
+                )
+                if (!verification.matched) {
+                    onError("Incorrect local account password.")
+                    return@launch
+                }
+                updateSecurityPinAfterRecovery(newPin)
+                onSuccess()
+            } catch (_: Exception) {
+                onError("Local recovery failed. Verify the account details and try again.")
+            }
+        }
+    }
+
+    fun recoverAppLockWithFirebase(
+        newPin: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                if (!SecurityUtils.isAcceptableNewPin(newPin)) {
+                    onError("Choose a different 4-digit PIN. Avoid 1234, repeated digits, or simple sequences.")
+                    return@launch
+                }
+                val session = settingsDataStore.settingsFlow.first().identitySessionOrNull()
+                if (session?.provider != IdentityProvider.FIREBASE) {
+                    onError("This device is not using a Google account. Use the matching recovery method.")
+                    return@launch
+                }
+                val appContext = context
+                if (appContext == null) {
+                    onError("Google recovery is unavailable without an active app context.")
+                    return@launch
+                }
+                val currentFirebaseUser = com.aistudio.shreeshyamstore.pqwzkb.utils.AuthManager.currentUser
+                if (currentFirebaseUser == null || currentFirebaseUser.uid != session.uid) {
+                    onError("Google session expired. Sign in again before changing the PIN.")
+                    return@launch
+                }
+                val result = com.aistudio.shreeshyamstore.pqwzkb.utils.AuthManager.signInWithGoogle(appContext)
+                val verifiedUser = result.getOrNull()
+                if (verifiedUser == null || verifiedUser.uid != session.uid) {
+                    onError("The verified Google account does not match this store session.")
+                    return@launch
+                }
+                updateSecurityPinAfterRecovery(newPin)
+                onSuccess()
+            } catch (_: Exception) {
+                onError("Google verification failed. Check Firebase configuration and try again.")
+            }
+        }
+    }
+
+    private suspend fun updateSecurityPinAfterRecovery(newPin: String) {
+        settingsDataStore.updateSecurityPin(newPin)
+        settingsDataStore.updateAppLockEnabled(true)
+        settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
+    }
+
     fun sendForgotPinEmail(
         email: String,
         onSuccess: () -> Unit,

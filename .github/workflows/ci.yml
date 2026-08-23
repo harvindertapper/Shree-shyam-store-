@@ -94,6 +94,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantDeviceContextMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantAuthorizationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockRecoveryPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AuthenticatedBackupProviderTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreRecoveryEnvelopeTest
@@ -127,7 +128,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/9.json"
+          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/10.json"
           test -f "$schema_path"
 
           if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
