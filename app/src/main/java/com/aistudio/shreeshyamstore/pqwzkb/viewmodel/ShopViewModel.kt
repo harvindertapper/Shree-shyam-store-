@@ -146,10 +146,16 @@ class ShopViewModel(
     fun triggerAutoSync() {
         if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         context?.let { ctx ->
-            try {
-                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.scheduleInstantSync(ctx)
-            } catch (e: Exception) {
-                // Ignore sync scheduling if running in unit test without context
+            viewModelScope.launch {
+                val settings = settingsDataStore.settingsFlow.first()
+                if (settings.isUserLoggedIn && settings.autoSyncEnabled) {
+                    try {
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.triggerImmediateSync(ctx)
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.triggerAutomaticBackup(ctx)
+                    } catch (_: Exception) {
+                        // Ignore sync scheduling if running in unit test without context.
+                    }
+                }
             }
         }
     }
@@ -184,7 +190,7 @@ class ShopViewModel(
                 firebaseUrl = "",
                 firebasePrefix = "shreeshyam_sync",
                 lastSyncTime = "Never Synced",
-                autoSyncEnabled = false,
+                autoSyncEnabled = true,
                 appLanguage = com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage.HINDI
             )
         )
@@ -1032,6 +1038,12 @@ class ShopViewModel(
             val effectivePrefix = prefix.trim().ifEmpty { current.firebasePrefix }
             settingsDataStore.updateFirebaseConfig(effectiveUrl, effectivePrefix)
             settingsDataStore.updateAutoSyncEnabled(autoSync)
+            context?.let { ctx ->
+                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.configureAutomaticSync(
+                    context = ctx,
+                    enabled = current.isUserLoggedIn && autoSync
+                )
+            }
         }
     }
 

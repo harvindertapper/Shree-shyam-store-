@@ -704,6 +704,8 @@ fun AddEditProductScreen(
 
             // Category Selection Spinner Box
             var catDropdownExpanded by remember { mutableStateOf(false) }
+            var showNewCategoryDialog by remember { mutableStateOf(false) }
+            var newCategoryName by remember { mutableStateOf("") }
             val selectedCategoryName = remember(categoryId, categories) {
                 categories.find { it.id == categoryId }?.name ?: "General"
             }
@@ -728,25 +730,93 @@ fun AddEditProductScreen(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .clickable { catDropdownExpanded = true }
-                )
                 DropdownMenu(
                     expanded = catDropdownExpanded,
-                    onDismissRequest = { catDropdownExpanded = false }
+                    onDismissRequest = { catDropdownExpanded = false },
+                    containerColor = Color.White
                 ) {
                     categories.forEach { cat ->
                         DropdownMenuItem(
-                            text = { Text(cat.name, fontWeight = FontWeight.Bold) },
+                            text = { Text(cat.name, fontWeight = FontWeight.Bold, color = TextNearBlack) },
                             onClick = {
                                 categoryId = cat.id
                                 catDropdownExpanded = false
-                            }
+                            },
+                            colors = MenuDefaults.itemColors(textColor = TextNearBlack)
                         )
                     }
+                    HorizontalDivider(color = BorderStrong)
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = if (settings.appLanguage == AppLanguage.HINDI) "＋ नई कैटेगरी" else "＋ New Category",
+                                fontWeight = FontWeight.Black,
+                                color = SaffronPrimary
+                            )
+                        },
+                        onClick = {
+                            catDropdownExpanded = false
+                            newCategoryName = ""
+                            showNewCategoryDialog = true
+                        },
+                        colors = MenuDefaults.itemColors(textColor = SaffronPrimary)
+                    )
                 }
+            }
+
+            if (showNewCategoryDialog) {
+                AlertDialog(
+                    onDismissRequest = { showNewCategoryDialog = false },
+                    title = {
+                        Text(
+                            text = if (settings.appLanguage == AppLanguage.HINDI) "नई कैटेगरी जोड़ें" else "Add New Category",
+                            fontWeight = FontWeight.Black,
+                            color = SaffronDark
+                        )
+                    },
+                    text = {
+                        OutlinedTextField(
+                            value = newCategoryName,
+                            onValueChange = { newCategoryName = it },
+                            singleLine = true,
+                            label = {
+                                Text(if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी नाम" else "Category name")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextNearBlack,
+                                unfocusedTextColor = TextNearBlack,
+                                focusedBorderColor = SaffronPrimary,
+                                unfocusedBorderColor = BorderStrong
+                            )
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                inventoryViewModel.addCategory(newCategoryName) { created ->
+                                    categoryId = created.id
+                                    newCategoryName = ""
+                                    showNewCategoryDialog = false
+                                    val message = if (settings.appLanguage == AppLanguage.HINDI) {
+                                        "कैटेगरी जोड़ दी गई"
+                                    } else {
+                                        "Category added"
+                                    }
+                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            enabled = newCategoryName.trim().isNotEmpty()
+                        ) {
+                            Text(if (settings.appLanguage == AppLanguage.HINDI) "जोड़ें" else "Add")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showNewCategoryDialog = false }) {
+                            Text(strings.cancel, color = TextMediumGray)
+                        }
+                    }
+                )
             }
 
             // MRP
@@ -876,11 +946,13 @@ fun AddEditProductScreen(
                             trackStock = trackStock,
                             lowStockAlertQty = alertValue,
                             isActive = isActive,
-                            barcode = barcode
+                            barcode = barcode,
+                            onSuccess = {
+                                val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} सुरक्षित हो गया!" else "${name.trim()} saved successfully!"
+                                Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
+                                viewModel.navigateTo(Screen.Products)
+                            }
                         )
-                        val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} सुरक्षित हो गया!" else "${name.trim()} saved successfully!"
-                        Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
-                        viewModel.navigateTo(Screen.Products)
                     }
                 },
                 shape = RoundedCornerShape(12.dp),
@@ -1093,13 +1165,15 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                                         currentStock = if (trackStock) stockValue else 0.0,
                                         trackStock = trackStock,
                                         lowStockAlertQty = 5.0,
-                                        isActive = true
+                                        isActive = true,
+                                        onSuccess = {
+                                            val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} जुड़ गया!" else "${name.trim()} added!"
+                                            Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
+                                            name = ""
+                                            mrp = ""
+                                            sp = ""
+                                        }
                                     )
-                                    val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} जुड़ गया!" else "${name.trim()} added!"
-                                    Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
-                                    name = ""
-                                    mrp = ""
-                                    sp = ""
                                 }
                             },
                             shape = RoundedCornerShape(10.dp),

@@ -46,6 +46,13 @@ plugins {
   alias(libs.plugins.secrets)
 }
 
+// Firebase client configuration is machine-local and ignored by Git. When the
+// current application ID has a matching google-services.json, the plugin
+// generates google_app_id/default_web_client_id resources for Google Sign-In.
+if (file("google-services.json").isFile) {
+  apply(plugin = "com.google.gms.google-services")
+}
+
 ksp {
   arg("room.schemaLocation", "$projectDir/schemas")
   arg("room.generateKotlin", "true")

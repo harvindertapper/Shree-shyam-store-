@@ -111,6 +111,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.BuildConfigurationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StagingEvidenceTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncObservabilityTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.AutomaticSyncPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
 
