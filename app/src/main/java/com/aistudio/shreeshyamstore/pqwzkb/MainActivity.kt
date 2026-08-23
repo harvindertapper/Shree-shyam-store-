@@ -1,7 +1,6 @@
 package com.aistudio.shreeshyamstore.pqwzkb
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
@@ -84,9 +83,7 @@ class MainActivity : FragmentActivity() {
                 actionCommandProvider = viewModel::currentCommandMetadata,
                 languageProvider = { viewModel.storeSettings.value.appLanguage },
                 onMutation = { viewModel.triggerAutoSync() },
-                onError = { message ->
-                    Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
-                }
+                onError = { }
             )
         )[InventoryViewModel::class.java]
 

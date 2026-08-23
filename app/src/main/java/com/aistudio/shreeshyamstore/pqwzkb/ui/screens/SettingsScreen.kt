@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppOutlinedTextField
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppPrimaryButton
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
@@ -54,8 +55,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     var autoSyncEnabled by remember { mutableStateOf(true) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
 
-    val syncInProgress by viewModel.syncInProgress.collectAsState()
-    val syncMessage by viewModel.syncMessage.collectAsState()
+    val mutationStatus by viewModel.mutationStatus.collectAsState()
+    val mutationInFlight by viewModel.mutationInFlight.collectAsState()
 
     LaunchedEffect(settings) {
         shopName = settings.shopName
@@ -696,6 +697,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         lineHeight = 18.sp
                     )
 
+                    AppMutationStatusCard(
+                        status = mutationStatus,
+                        strings = strings,
+                        onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                        onDismiss = if (!mutationInFlight) viewModel::clearMutationStatus else null
+                    )
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -740,15 +748,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
 
                     // Action Button: Manual Sync Now
                     Button(
-                        onClick = {
-                            SyncManager.triggerImmediateSync(context)
-                            val toastMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                                "सिंक शुरू हो गया है... (Sync started)"
-                            } else {
-                                "Sync started in background..."
-                            }
-                            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
-                        },
+                        onClick = { SyncManager.triggerImmediateSync(context) },
+                        enabled = !mutationInFlight,
                         colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
@@ -767,56 +768,40 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         )
                     }
 
-                    if (syncInProgress) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
+                                viewModel.syncAllToCloud { _, _ -> }
+                            },
+                            enabled = !mutationInFlight,
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                         ) {
-                            CircularProgressIndicator(color = SaffronPrimary)
-                            Text(
-                                text = syncMessage ?: "Processing...",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black,
-                                color = TextNearBlack
-                            )
+                            Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val backupBtn = if (settings.appLanguage == AppLanguage.HINDI) "बैकअप लें" else "Backup Now"
+                            Text(backupBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
-                    } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Button(
-                                onClick = {
-                                    viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
-                                    viewModel.syncAllToCloud { success, message ->
-                                        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) {
-                                Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                val backupBtn = if (settings.appLanguage == AppLanguage.HINDI) "बैकअप लें" else "Backup Now"
-                                Text(backupBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
 
-                            Button(
-                                onClick = {
-                                    viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
-                                    showRestoreConfirmDialog = true
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63)),
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) {
-                                Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                val restoreBtn = if (settings.appLanguage == AppLanguage.HINDI) "रीस्टोर करें" else "Restore"
-                                Text(restoreBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
+                        Button(
+                            onClick = {
+                                viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
+                                showRestoreConfirmDialog = true
+                            },
+                            enabled = !mutationInFlight,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63)),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                        ) {
+                            Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            val restoreBtn = if (settings.appLanguage == AppLanguage.HINDI) "रीस्टोर करें" else "Restore"
+                            Text(restoreBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -853,9 +838,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         Button(
                             onClick = {
                                 showRestoreConfirmDialog = false
-                                viewModel.restoreAllFromCloud { success, message ->
-                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                }
+                                viewModel.restoreAllFromCloud { _, _ -> }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
                         ) {

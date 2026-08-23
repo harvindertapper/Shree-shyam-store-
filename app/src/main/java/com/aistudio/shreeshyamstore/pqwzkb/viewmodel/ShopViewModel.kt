@@ -30,6 +30,9 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.localizedOperatorGateMessage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalRecoveryPointStore
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus
+import com.aistudio.shreeshyamstore.pqwzkb.utils.mutationStageFor
 import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreRecoveryCoordinator
 import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.RestoreSnapshotValidator
@@ -141,6 +144,78 @@ class ShopViewModel(
             }
         }
         return null
+    }
+
+    private val _mutationStatus = MutableStateFlow(MutationStatus())
+    val mutationStatus: StateFlow<MutationStatus> = _mutationStatus.asStateFlow()
+
+    private val _mutationInFlight = MutableStateFlow(false)
+    val mutationInFlight: StateFlow<Boolean> = _mutationInFlight.asStateFlow()
+
+    private var retryMutation: (() -> Unit)? = null
+
+    private fun beginMutation(retry: () -> Unit): Boolean {
+        if (_mutationInFlight.value) return false
+        retryMutation = retry
+        _mutationInFlight.value = true
+        _mutationStatus.value = MutationStatus(MutationStage.VALIDATING)
+        return true
+    }
+
+    private fun markMutationSavingLocally() {
+        _mutationStatus.value = MutationStatus(MutationStage.SAVING_LOCALLY)
+    }
+
+    private fun markMutationSavedLocally() {
+        _mutationInFlight.value = false
+        retryMutation = null
+        _mutationStatus.value = MutationStatus(
+            stage = MutationStage.SAVED_LOCALLY,
+            message = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                .getStrings(storeSettings.value.appLanguage).statusSavedLocallyDetail
+        )
+    }
+
+    private fun markMutationSuccess(message: String? = null) {
+        _mutationInFlight.value = false
+        retryMutation = null
+        _mutationStatus.value = MutationStatus(MutationStage.SUCCESS, message)
+    }
+
+    private fun setMutationStatus(stage: MutationStage, message: String? = null, canRetry: Boolean = false) {
+        _mutationInFlight.value = false
+        _mutationStatus.value = MutationStatus(stage, message, canRetry)
+    }
+
+    private fun markMutationFailure(error: Throwable, fallback: String, canRetry: Boolean = true) {
+        val localizedGateMessage = operatorGateMessage(error).takeIf { it.isNotBlank() }
+        val stage = mutationStageFor(error, localizedGateMessage)
+        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
+        val userMessage = localizedGateMessage ?: when (stage) {
+            MutationStage.VALIDATION_ERROR -> strings.statusValidationError
+            MutationStage.AUTH_ERROR -> strings.statusAuthError
+            MutationStage.RETRYABLE_ERROR -> strings.statusRetryableError
+            MutationStage.CONFLICT -> strings.statusConflict
+            MutationStage.FAILURE -> strings.statusFailure
+            else -> fallback
+        }
+        setMutationStatus(
+            stage = stage,
+            message = userMessage,
+            canRetry = canRetry && stage == MutationStage.RETRYABLE_ERROR
+        )
+    }
+
+    fun retryLastMutation() {
+        if (!_mutationInFlight.value) retryMutation?.invoke()
+    }
+
+    fun clearMutationStatus() {
+        if (!_mutationInFlight.value) {
+            _mutationStatus.value = MutationStatus()
+            retryMutation = null
+        }
     }
 
     private fun operatorGateMessage(error: Throwable): String =
@@ -641,7 +716,8 @@ class ShopViewModel(
         scope = viewModelScope,
         onAutoSync = ::triggerAutoSync,
         onCheckoutSuccess = { navigateTo(Screen.BillSuccess) },
-        onGateError = { error -> operatorGateMessage(error).takeIf { it.isNotBlank() } }
+        onGateError = { error -> operatorGateMessage(error).takeIf { it.isNotBlank() } },
+        languageProvider = { storeSettings.value.appLanguage }
     )
 
     val cartState: StateFlow<Map<Product, Double>> = billingCheckout.cartState
@@ -665,7 +741,19 @@ class ShopViewModel(
     /**
      * Allows adding a missing item on-the-fly and automatically adding it to the cart
      */
-    fun quickAddProduct(name: String, mrp: Long, categoryId: Long, trackStock: Boolean, currentStock: Double, unit: String = "pcs", barcode: String = "") {
+    fun quickAddProduct(
+        name: String,
+        mrp: Long,
+        categoryId: Long,
+        trackStock: Boolean,
+        currentStock: Double,
+        unit: String = "pcs",
+        barcode: String = "",
+        onSuccess: () -> Unit = {}
+    ) {
+        if (!beginMutation {
+                quickAddProduct(name, mrp, categoryId, trackStock, currentStock, unit, barcode, onSuccess)
+            }) return
         viewModelScope.launch {
             try {
                 val normalizedName = InventoryValidation.validateProductName(name)
@@ -677,6 +765,7 @@ class ShopViewModel(
                     "Barcode already belongs to another active product"
                 }
                 val now = System.currentTimeMillis()
+                markMutationSavingLocally()
                 val prod = Product(
                     name = normalizedName,
                     categoryId = categoryId,
@@ -700,11 +789,11 @@ class ShopViewModel(
 
                 // Add the inserted product directly to our cart.
                 addProductToCart(prod.copy(id = newId), 1.0)
+                markMutationSavedLocally()
                 triggerAutoSync()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, safeMutationMessage("Product could not be added", error), Toast.LENGTH_LONG).show()
-            } catch (_: Exception) {
-                Toast.makeText(context, "Product could not be added", Toast.LENGTH_LONG).show()
+                onSuccess()
+            } catch (error: Exception) {
+                markMutationFailure(error, safeMutationMessage("Product could not be added", error))
             }
         }
     }
@@ -716,8 +805,11 @@ class ShopViewModel(
     val lastSaleItems: StateFlow<List<SaleItem>> = billingCheckout.lastSaleItems
     val checkoutInFlight: StateFlow<Boolean> = billingCheckout.checkoutInFlight
     val checkoutError: StateFlow<String?> = billingCheckout.checkoutError
+    val checkoutMutationStatus: StateFlow<MutationStatus> = billingCheckout.mutationStatus
 
     fun clearCheckoutError() = billingCheckout.clearCheckoutError()
+    fun retryCheckoutMutation() = billingCheckout.retryLastMutation()
+    fun clearCheckoutMutationStatus() = billingCheckout.clearMutationStatus()
 
     fun reconcilePaymentState(
         saleId: Long,
@@ -777,42 +869,52 @@ class ShopViewModel(
         return repository.getCustomerBalance(customerId)
     }
 
-    fun addUdhaarPayment(customerId: Long, amountMinorUnits: Long, note: String?) {
+    fun addUdhaarPayment(
+        customerId: Long,
+        amountMinorUnits: Long,
+        note: String?,
+        onSuccess: () -> Unit = {}
+    ) {
+        if (!beginMutation { addUdhaarPayment(customerId, amountMinorUnits, note, onSuccess) }) return
         viewModelScope.launch {
             try {
+                markMutationSavingLocally()
                 repository.recordUdhaarPayment(
                     customerId = customerId,
                     amountMinorUnits = amountMinorUnits,
                     note = note,
                     command = currentCommandMetadata(OperatorAction.LEDGER_RECORD)
                 )
+                markMutationSavedLocally()
                 triggerAutoSync()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(
-                    context,
-                    safeMutationMessage("Payment was not saved", error),
-                    Toast.LENGTH_LONG
-                ).show()
-            } catch (_: Exception) {
-                Toast.makeText(context, "Payment could not be saved", Toast.LENGTH_LONG).show()
+                onSuccess()
+            } catch (error: Exception) {
+                markMutationFailure(error, safeMutationMessage("Payment was not saved", error))
             }
         }
     }
 
-    fun reverseUdhaarTransaction(customerId: Long, eventId: String, reason: String) {
+    fun reverseUdhaarTransaction(
+        customerId: Long,
+        eventId: String,
+        reason: String,
+        onSuccess: () -> Unit = {}
+    ) {
+        if (!beginMutation { reverseUdhaarTransaction(customerId, eventId, reason, onSuccess) }) return
         viewModelScope.launch {
             try {
+                markMutationSavingLocally()
                 repository.reverseUdhaarTransaction(
                     customerId = customerId,
                     eventId = eventId,
                     reason = reason,
                     command = currentCommandMetadata(OperatorAction.LEDGER_CORRECTION)
                 )
+                markMutationSavedLocally()
                 triggerAutoSync()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, safeMutationMessage("Ledger reversal was not saved", error), Toast.LENGTH_LONG).show()
-            } catch (_: Exception) {
-                Toast.makeText(context, "Ledger reversal could not be saved", Toast.LENGTH_LONG).show()
+                onSuccess()
+            } catch (error: Exception) {
+                markMutationFailure(error, safeMutationMessage("Ledger reversal was not saved", error))
             }
         }
     }
@@ -821,10 +923,15 @@ class ShopViewModel(
         customerId: Long,
         eventId: String,
         correctedAmountMinorUnits: Long,
-        reason: String
+        reason: String,
+        onSuccess: () -> Unit = {}
     ) {
+        if (!beginMutation {
+                correctUdhaarTransaction(customerId, eventId, correctedAmountMinorUnits, reason, onSuccess)
+            }) return
         viewModelScope.launch {
             try {
+                markMutationSavingLocally()
                 repository.correctUdhaarTransaction(
                     customerId = customerId,
                     eventId = eventId,
@@ -832,11 +939,11 @@ class ShopViewModel(
                     reason = reason,
                     command = currentCommandMetadata(OperatorAction.LEDGER_CORRECTION)
                 )
+                markMutationSavedLocally()
                 triggerAutoSync()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, safeMutationMessage("Ledger correction was not saved", error), Toast.LENGTH_LONG).show()
-            } catch (_: Exception) {
-                Toast.makeText(context, "Ledger correction could not be saved", Toast.LENGTH_LONG).show()
+                onSuccess()
+            } catch (error: Exception) {
+                markMutationFailure(error, safeMutationMessage("Ledger correction was not saved", error))
             }
         }
     }
@@ -988,7 +1095,12 @@ class ShopViewModel(
         Toast.makeText(context, "Re-order List Copied (ऑर्डर लिस्ट कॉपी हो गई) 📋", Toast.LENGTH_SHORT).show()
     }
 
-    fun bulkRestockProduct(product: Product, quantityToAdd: Double) {
+    fun bulkRestockProduct(
+        product: Product,
+        quantityToAdd: Double,
+        onSuccess: () -> Unit = {}
+    ) {
+        if (!beginMutation { bulkRestockProduct(product, quantityToAdd, onSuccess) }) return
         viewModelScope.launch {
             try {
                 val validatedQuantity = InventoryValidation.validateQuantity(quantityToAdd, "Restock quantity")
@@ -999,17 +1111,18 @@ class ShopViewModel(
                     current.currentStock + validatedQuantity,
                     "New stock"
                 )
+                markMutationSavingLocally()
                 repository.adjustProductStock(
                     productId = product.id,
                     actualStockCounted = newStock,
                     reason = "Bulk Wholesale Restock",
                     command = currentCommandMetadata(OperatorAction.INVENTORY_ADJUSTMENT)
                 )
+                markMutationSavedLocally()
                 triggerAutoSync()
-            } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, safeMutationMessage("Restock could not be saved", error), Toast.LENGTH_LONG).show()
-            } catch (_: Exception) {
-                Toast.makeText(context, "Restock could not be saved", Toast.LENGTH_LONG).show()
+                onSuccess()
+            } catch (error: Exception) {
+                markMutationFailure(error, safeMutationMessage("Restock could not be saved", error))
             }
         }
     }
@@ -1163,99 +1276,140 @@ class ShopViewModel(
     }
 
     fun syncAllToCloud(onResult: (Boolean, String) -> Unit) {
+        if (!beginMutation { syncAllToCloud(onResult) }) return
+        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
         if (!BuildConfig.CLOUD_SYNC_ENABLED) {
-            onResult(false, "Cloud sync is disabled in this debug build.")
+            setMutationStatus(MutationStage.FAILURE, strings.statusFailure)
+            onResult(false, strings.statusFailure)
             return
         }
         viewModelScope.launch {
-            val settings = settingsDataStore.settingsFlow.first()
-            val identitySession = reconcileIdentitySession()
-            if (identitySession == null) {
-                onResult(false, com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
-                    .getStrings(settings.appLanguage).actionSignInRequired)
-                return@launch
-            }
             try {
-                OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_BACKUP, identitySession)
-            } catch (error: OperatorGateException) {
-                onResult(false, operatorGateMessage(error))
-                return@launch
-            }
-            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
-            val backupClient = try {
-                authenticatedBackupClient(settings, identitySession)
-            } catch (error: Exception) {
-                onResult(false, backupFailureMessage(error))
-                return@launch
-            }
+                val settings = settingsDataStore.settingsFlow.first()
+                val identitySession = reconcileIdentitySession()
+                if (identitySession == null) {
+                    val message = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                        .getStrings(settings.appLanguage).actionSignInRequired
+                    setMutationStatus(MutationStage.AUTH_ERROR, message)
+                    onResult(false, message)
+                    return@launch
+                }
+                try {
+                    OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_BACKUP, identitySession)
+                } catch (error: OperatorGateException) {
+                    val message = operatorGateMessage(error)
+                    setMutationStatus(MutationStage.AUTH_ERROR, message)
+                    onResult(false, message)
+                    return@launch
+                }
+                val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
+                val backupClient = try {
+                    authenticatedBackupClient(settings, identitySession)
+                } catch (error: Exception) {
+                    val message = backupFailureMessage(error)
+                    markMutationFailure(error, message)
+                    onResult(false, message)
+                    return@launch
+                }
 
-            _syncInProgress.value = true
-            _syncMessage.value = "Starting Backup..."
-            try {
-                _syncMessage.value = "Creating verified snapshot..."
-                val envelope = SnapshotEnvelope.create(currentCloudRestorableSnapshot(), tenant)
-                RestoreSnapshotValidator.validate(envelope, tenant)
-                _syncMessage.value = "Uploading authenticated snapshot..."
-                backupClient.uploadSnapshot(envelope)
-                _syncMessage.value = "Backup Completed!"
-                onResult(true, "Cloud Backup successful!")
+                _syncInProgress.value = true
+                _syncMessage.value = strings.statusValidating
+                try {
+                    _mutationStatus.value = MutationStatus(MutationStage.VALIDATING)
+                    _syncMessage.value = strings.statusValidating
+                    val envelope = SnapshotEnvelope.create(currentCloudRestorableSnapshot(), tenant)
+                    RestoreSnapshotValidator.validate(envelope, tenant)
+                    _syncMessage.value = strings.statusSyncing
+                    _mutationStatus.value = MutationStatus(MutationStage.SYNCING)
+                    backupClient.uploadSnapshot(envelope)
+                    _syncMessage.value = strings.statusSuccess
+                    markMutationSuccess(strings.backupSuccess)
+                    onResult(true, strings.backupSuccess)
+                } catch (error: Exception) {
+                    val message = backupFailureMessage(error)
+                    markMutationFailure(error, message)
+                    onResult(false, message)
+                } finally {
+                    _syncInProgress.value = false
+                    _syncMessage.value = null
+                }
             } catch (error: Exception) {
-                onResult(false, backupFailureMessage(error))
-            } finally {
-                _syncInProgress.value = false
-                _syncMessage.value = null
+                val message = backupFailureMessage(error)
+                markMutationFailure(error, message)
+                onResult(false, message)
             }
         }
     }
 
     fun restoreAllFromCloud(onResult: (Boolean, String) -> Unit) {
+        if (!beginMutation { restoreAllFromCloud(onResult) }) return
+        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
         if (!BuildConfig.CLOUD_SYNC_ENABLED) {
-            onResult(false, "Cloud restore is disabled in this debug build.")
+            setMutationStatus(MutationStage.FAILURE, strings.statusFailure)
+            onResult(false, strings.statusFailure)
             return
         }
         viewModelScope.launch {
-            val settings = settingsDataStore.settingsFlow.first()
-            val identitySession = reconcileIdentitySession()
-            if (identitySession == null) {
-                onResult(false, com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
-                    .getStrings(settings.appLanguage).actionSignInRequired)
-                return@launch
-            }
             try {
-                OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_RESTORE, identitySession)
-            } catch (error: OperatorGateException) {
-                onResult(false, operatorGateMessage(error))
-                return@launch
-            }
-            val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
-            val backupClient = try {
-                authenticatedBackupClient(settings, identitySession)
+                val settings = settingsDataStore.settingsFlow.first()
+                val identitySession = reconcileIdentitySession()
+                if (identitySession == null) {
+                    val message = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                        .getStrings(settings.appLanguage).actionSignInRequired
+                    setMutationStatus(MutationStage.AUTH_ERROR, message)
+                    onResult(false, message)
+                    return@launch
+                }
+                try {
+                    OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_RESTORE, identitySession)
+                } catch (error: OperatorGateException) {
+                    val message = operatorGateMessage(error)
+                    setMutationStatus(MutationStage.AUTH_ERROR, message)
+                    onResult(false, message)
+                    return@launch
+                }
+                val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
+                val backupClient = try {
+                    authenticatedBackupClient(settings, identitySession)
+                } catch (error: Exception) {
+                    val message = backupFailureMessage(error)
+                    markMutationFailure(error, message)
+                    onResult(false, message)
+                    return@launch
+                }
+
+                _syncInProgress.value = true
+                _syncMessage.value = strings.statusSyncing
+                try {
+                    _mutationStatus.value = MutationStatus(MutationStage.SYNCING)
+                    _syncMessage.value = strings.statusSyncing
+                    val remoteEnvelope = backupClient.downloadSnapshot()
+                    _syncMessage.value = strings.statusValidating
+                    val remoteSnapshot = RestoreSnapshotValidator.validate(remoteEnvelope, tenant)
+
+                    _syncMessage.value = strings.statusSavingLocally
+                    val recoveryEnvelope = saveVerifiedRecoveryPoint(currentCloudRestorableSnapshot(), tenant)
+
+                    _syncMessage.value = strings.statusSavingLocally
+                    replaceCloudSnapshotWithRollback(remoteSnapshot, tenant, recoveryEnvelope)
+
+                    _syncMessage.value = strings.statusSuccess
+                    markMutationSuccess(strings.restoreSuccess)
+                    onResult(true, strings.restoreSuccess)
+                } catch (error: Exception) {
+                    val message = restoreFailureMessage(error)
+                    markMutationFailure(error, message)
+                    onResult(false, message)
+                } finally {
+                    _syncInProgress.value = false
+                    _syncMessage.value = null
+                }
             } catch (error: Exception) {
-                onResult(false, backupFailureMessage(error))
-                return@launch
-            }
-
-            _syncInProgress.value = true
-            _syncMessage.value = "Downloading complete snapshot..."
-            try {
-                _syncMessage.value = "Downloading authenticated snapshot..."
-                val remoteEnvelope = backupClient.downloadSnapshot()
-                _syncMessage.value = "Validating snapshot integrity..."
-                val remoteSnapshot = RestoreSnapshotValidator.validate(remoteEnvelope, tenant)
-
-                _syncMessage.value = "Creating local recovery point..."
-                val recoveryEnvelope = saveVerifiedRecoveryPoint(currentCloudRestorableSnapshot(), tenant)
-
-                _syncMessage.value = "Restoring validated database..."
-                replaceCloudSnapshotWithRollback(remoteSnapshot, tenant, recoveryEnvelope)
-
-                _syncMessage.value = "Database Restored!"
-                onResult(true, "All data successfully synchronized from Cloud!")
-            } catch (error: Exception) {
-                onResult(false, backupFailureMessage(error))
-            } finally {
-                _syncInProgress.value = false
-                _syncMessage.value = null
+                val message = restoreFailureMessage(error)
+                markMutationFailure(error, message)
+                onResult(false, message)
             }
         }
     }

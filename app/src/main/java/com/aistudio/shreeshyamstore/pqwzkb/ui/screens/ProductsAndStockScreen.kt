@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
@@ -52,6 +53,8 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
 
     val products by inventoryViewModel.products.collectAsState()
     val categories by inventoryViewModel.categories.collectAsState()
+    val mutationStatus by inventoryViewModel.mutationStatus.collectAsState()
+    val mutationInFlight by inventoryViewModel.mutationInFlight.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
@@ -124,7 +127,10 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                     ) {
                         Icon(Icons.Default.Download, contentDescription = "Export Stock CSV", tint = SaffronPrimary)
                     }
-                    IconButton(onClick = { showCategoryManagerDialog = true }) {
+                    IconButton(
+                        onClick = { if (!mutationInFlight) showCategoryManagerDialog = true },
+                        enabled = !mutationInFlight
+                    ) {
                         Icon(Icons.Default.Category, contentDescription = "Manage Categories")
                     }
                 }
@@ -132,7 +138,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { viewModel.navigateTo(Screen.AddEditProduct(null)) },
+                onClick = { if (!mutationInFlight) viewModel.navigateTo(Screen.AddEditProduct(null)) },
                 containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.testTag("fab_add_product")
             ) {
@@ -146,6 +152,12 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                 .padding(innerPadding)
                 .background(WarmCreamBg)
         ) {
+            AppMutationStatusCard(
+                status = mutationStatus,
+                strings = strings,
+                onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
+                onDismiss = if (!mutationInFlight) inventoryViewModel::dismissMutationStatus else null
+            )
             // Search Input Block
             OutlinedTextField(
                 value = searchQuery,
@@ -472,7 +484,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
 
         // --- SUB INLINE CATEGORY MANAGER DIALOG ---
         if (showCategoryManagerDialog) {
-            Dialog(onDismissRequest = { showCategoryManagerDialog = false }) {
+            Dialog(onDismissRequest = { if (!mutationInFlight) showCategoryManagerDialog = false }) {
                 var newCatName by remember { mutableStateOf("") }
                 var renamingCat by remember { mutableStateOf<Category?>(null) }
                 var renameText by remember { mutableStateOf("") }
@@ -487,6 +499,12 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        AppMutationStatusCard(
+                            status = mutationStatus,
+                            strings = strings,
+                            onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
+                            onDismiss = if (!mutationInFlight) inventoryViewModel::dismissMutationStatus else null
+                        )
                         val catManagerTitle = if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी प्रबंधन" else "Category Management"
                         Text(
                             catManagerTitle,
@@ -509,12 +527,16 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                                 modifier = Modifier.weight(1f).testTag("category_add_input")
                             )
                             val addBtnText = if (settings.appLanguage == AppLanguage.HINDI) "जोड़ें" else "Add"
-                            Button(onClick = {
-                                if (newCatName.trim().isNotEmpty()) {
-                                    inventoryViewModel.addCategory(newCatName)
-                                    newCatName = ""
+                            Button(
+                                enabled = !mutationInFlight,
+                                onClick = {
+                                    if (newCatName.trim().isNotEmpty()) {
+                                        inventoryViewModel.addCategory(newCatName) {
+                                            newCatName = ""
+                                        }
+                                    }
                                 }
-                            }) {
+                            ) {
                                 Text(addBtnText)
                             }
                         }
@@ -536,13 +558,17 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                                     modifier = Modifier.weight(1f)
                                 )
                                 val changeBtn = if (settings.appLanguage == AppLanguage.HINDI) "बदलें" else "Update"
-                                Button(onClick = {
-                                    renamingCat?.let {
-                                        inventoryViewModel.renameCategory(it, renameText)
-                                        renamingCat = null
-                                        renameText = ""
+                                Button(
+                                    enabled = !mutationInFlight,
+                                    onClick = {
+                                        renamingCat?.let {
+                                            inventoryViewModel.renameCategory(it, renameText) {
+                                                renamingCat = null
+                                                renameText = ""
+                                            }
+                                        }
                                     }
-                                }) {
+                                ) {
                                     Text(changeBtn)
                                 }
                             }
@@ -575,7 +601,8 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
 
                         val doneText = if (settings.appLanguage == AppLanguage.HINDI) "पूर्ण" else "Done"
                         Button(
-                            onClick = { showCategoryManagerDialog = false },
+                            onClick = { if (!mutationInFlight) showCategoryManagerDialog = false },
+                            enabled = !mutationInFlight,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(doneText)
@@ -602,6 +629,8 @@ fun AddEditProductScreen(
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val categories by inventoryViewModel.categories.collectAsState()
+    val mutationStatus by inventoryViewModel.mutationStatus.collectAsState()
+    val mutationInFlight by inventoryViewModel.mutationInFlight.collectAsState()
 
     var name by remember { mutableStateOf("") }
     var categoryId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
@@ -660,6 +689,13 @@ fun AddEditProductScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            AppMutationStatusCard(
+                status = mutationStatus,
+                strings = strings,
+                onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
+                onDismiss = if (!mutationInFlight) inventoryViewModel::dismissMutationStatus else null
+            )
+
             // Product Name
             OutlinedTextField(
                 value = name,
@@ -798,12 +834,6 @@ fun AddEditProductScreen(
                                     categoryId = created.id
                                     newCategoryName = ""
                                     showNewCategoryDialog = false
-                                    val message = if (settings.appLanguage == AppLanguage.HINDI) {
-                                        "कैटेगरी जोड़ दी गई"
-                                    } else {
-                                        "Category added"
-                                    }
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             enabled = newCategoryName.trim().isNotEmpty()
@@ -947,14 +977,11 @@ fun AddEditProductScreen(
                             lowStockAlertQty = alertValue,
                             isActive = isActive,
                             barcode = barcode,
-                            onSuccess = {
-                                val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} सुरक्षित हो गया!" else "${name.trim()} saved successfully!"
-                                Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
-                                viewModel.navigateTo(Screen.Products)
-                            }
+                            onSuccess = { viewModel.navigateTo(Screen.Products) }
                         )
                     }
                 },
+                enabled = !mutationInFlight,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
@@ -996,6 +1023,8 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
 
     val categories by inventoryViewModel.categories.collectAsState()
     val products by inventoryViewModel.products.collectAsState()
+    val mutationStatus by inventoryViewModel.mutationStatus.collectAsState()
+    val mutationInFlight by inventoryViewModel.mutationInFlight.collectAsState()
 
     var selectedCatId by remember { mutableStateOf<Long?>(null) }
     
@@ -1005,6 +1034,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
     var sp by remember { mutableStateOf("") }
     var stock by remember { mutableStateOf("10") }
     var trackStock by remember { mutableStateOf(true) }
+    var openingStockInputError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(categories) {
         if (selectedCatId == null && categories.isNotEmpty()) {
@@ -1034,6 +1064,18 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                 .padding(innerPadding)
                 .background(Color(0xFFF7F9FC))
         ) {
+            AppMutationStatusCard(
+                status = openingStockInputError?.let {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                    )
+                } ?: mutationStatus,
+                strings = strings,
+                onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
+                onDismiss = if (!mutationInFlight) {
+                    { openingStockInputError = null; inventoryViewModel.dismissMutationStatus() }
+                } else null
+            )
             val chooseCatLabel = if (settings.appLanguage == AppLanguage.HINDI) "कैटेगरी चुनें:" else "Choose Category:"
             Text(
                 chooseCatLabel,
@@ -1086,7 +1128,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
 
                         OutlinedTextField(
                             value = name,
-                            onValueChange = { name = it },
+                            onValueChange = { name = it; openingStockInputError = null },
                             placeholder = { Text(strings.productName) },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1097,7 +1139,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedTextField(
                                 value = mrp,
-                                onValueChange = { mrp = it },
+                                onValueChange = { mrp = it; openingStockInputError = null },
                                 label = { Text(strings.mrpPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
@@ -1108,7 +1150,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
 
                             OutlinedTextField(
                                 value = sp,
-                                onValueChange = { sp = it },
+                                onValueChange = { sp = it; openingStockInputError = null },
                                 label = { Text(strings.sellingPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier
@@ -1125,7 +1167,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                         ) {
                             OutlinedTextField(
                                 value = stock,
-                                onValueChange = { stock = it },
+                                onValueChange = { stock = it; openingStockInputError = null },
                                 label = { Text(strings.currentStock) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1.2f).testTag("opening_stock_item_qty"),
@@ -1152,9 +1194,9 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                                 val stockValue = stock.trim().toDoubleOrNull() ?: 0.0
 
                                 if (name.trim().isEmpty() || mrpValue == null || mrpValue <= 0L) {
-                                    val err = if (settings.appLanguage == AppLanguage.HINDI) "नाम और कीमत आवश्यक है!" else "Name and MRP price required!"
-                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                    openingStockInputError = strings.statusValidationError
                                 } else {
+                                    openingStockInputError = null
                                     inventoryViewModel.saveProduct(
                                         id = 0L,
                                         name = name,
@@ -1167,8 +1209,6 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                                         lowStockAlertQty = 5.0,
                                         isActive = true,
                                         onSuccess = {
-                                            val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} जुड़ गया!" else "${name.trim()} added!"
-                                            Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
                                             name = ""
                                             mrp = ""
                                             sp = ""
@@ -1176,6 +1216,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                                     )
                                 }
                             },
+                            enabled = !mutationInFlight,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -1288,9 +1329,12 @@ fun StockAdjustmentScreen(
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+    val mutationStatus by inventoryViewModel.mutationStatus.collectAsState()
+    val mutationInFlight by inventoryViewModel.mutationInFlight.collectAsState()
 
     var product by remember { mutableStateOf<Product?>(null) }
     var countedStock by remember { mutableStateOf("") }
+    var adjustmentInputError by remember { mutableStateOf<String?>(null) }
     var selectedReason by remember { mutableStateOf(if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक मिलान" else "Stock count correction") }
     var dropdownExpanded by remember { mutableStateOf(false) }
 
@@ -1330,6 +1374,16 @@ fun StockAdjustmentScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                AppMutationStatusCard(
+                    status = adjustmentInputError?.let { com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                    ) } ?: mutationStatus,
+                    strings = strings,
+                    onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
+                    onDismiss = if (!mutationInFlight) {
+                        { adjustmentInputError = null; inventoryViewModel.dismissMutationStatus() }
+                    } else null
+                )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     shape = RoundedCornerShape(16.dp),
@@ -1364,7 +1418,10 @@ fun StockAdjustmentScreen(
 
                         OutlinedTextField(
                             value = countedStock,
-                            onValueChange = { countedStock = it },
+                            onValueChange = {
+                                countedStock = it
+                                adjustmentInputError = null
+                            },
                             label = { Text(strings.currentStock) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_stock_input"),
@@ -1402,19 +1459,18 @@ fun StockAdjustmentScreen(
                             onClick = {
                                 val countVal = countedStock.toDoubleOrNull()
                                 if (countVal == null || countVal < 0.0) {
-                                    val err = if (settings.appLanguage == AppLanguage.HINDI) "वैध स्टॉक संख्या आवश्यक है!" else "Valid stock quantity required!"
-                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                    adjustmentInputError = strings.statusValidationError
                                 } else {
+                                    adjustmentInputError = null
                                     inventoryViewModel.adjustStock(
                                         productId = productId,
                                         actualStockCounted = countVal,
-                                        reason = selectedReason
+                                        reason = selectedReason,
+                                        onSuccess = { product = prod.copy(currentStock = countVal) }
                                     )
-                                    product = prod.copy(currentStock = countVal)
-                                    val success = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक सुधार सुरक्षित हो गया!" else "Stock adjustment saved!"
-                                    Toast.makeText(context, success, Toast.LENGTH_SHORT).show()
                                 }
                             },
+                            enabled = !mutationInFlight,
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().testTag("adjustment_save_button")
                         ) {
@@ -1491,9 +1547,11 @@ fun LowStockReorderDialog(
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+    val mutationStatus by viewModel.mutationStatus.collectAsState()
+    val mutationInFlight by viewModel.mutationInFlight.collectAsState()
     val categoryMap = remember(categories) { categories.associate { it.id to it.name } }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(onDismissRequest = { if (!mutationInFlight) onDismiss() }) {
         Card(
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
@@ -1508,6 +1566,12 @@ fun LowStockReorderDialog(
                     .fillMaxSize()
                     .padding(16.dp)
             ) {
+                AppMutationStatusCard(
+                    status = mutationStatus,
+                    strings = strings,
+                    onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                    onDismiss = if (!mutationInFlight) viewModel::clearMutationStatus else null
+                )
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1540,7 +1604,7 @@ fun LowStockReorderDialog(
                         )
                     }
 
-                    IconButton(onClick = onDismiss) {
+                    IconButton(onClick = { if (!mutationInFlight) onDismiss() }) {
                         Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMediumGray)
                     }
                 }
@@ -1701,10 +1765,9 @@ fun LowStockReorderDialog(
 
                                         listOf(5, 10, 25, 50).forEach { qty ->
                                             OutlinedButton(
+                                                enabled = !mutationInFlight,
                                                 onClick = {
                                                     viewModel.bulkRestockProduct(item, qty.toDouble())
-                                                    val toastMsg = if (settings.appLanguage == AppLanguage.HINDI) "+$qty स्टॉक जोड़ा गया (${item.name})" else "+$qty stock added (${item.name})"
-                                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                                 },
                                                 shape = RoundedCornerShape(8.dp),
                                                 contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),

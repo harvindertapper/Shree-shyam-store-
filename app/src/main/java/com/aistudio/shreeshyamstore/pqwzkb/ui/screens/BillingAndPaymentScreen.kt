@@ -33,12 +33,15 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
@@ -58,8 +61,11 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
     val categories by inventoryViewModel.categories.collectAsState()
     val cart by viewModel.cartState.collectAsState()
     val cartTotal by viewModel.cartTotal.collectAsState()
+    val mutationStatus by viewModel.mutationStatus.collectAsState()
+    val mutationInFlight by viewModel.mutationInFlight.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+    var quickAddInputError by remember { mutableStateOf<String?>(null) }
     var selectedCategoryId by remember { mutableStateOf<Long?>(null) }
     var showQuickAddDialog by remember { mutableStateOf(false) }
     var showBarcodeScanner by remember { mutableStateOf(false) }
@@ -107,7 +113,8 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                 },
                 actions = {
                     TextButton(
-                        onClick = { showQuickAddDialog = true },
+                        onClick = { if (!mutationInFlight) showQuickAddDialog = true },
+                        enabled = !mutationInFlight,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Icon(Icons.Default.Add, contentDescription = "Quick Add")
@@ -124,7 +131,17 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                 .padding(innerPadding)
                 .background(WarmCreamBg)
         ) {
-            // Search Input Block
+            AppMutationStatusCard(
+                status = quickAddInputError?.let {
+                    MutationStatus(MutationStage.VALIDATION_ERROR, it)
+                } ?: mutationStatus,
+                strings = strings,
+                onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                onDismiss = if (!mutationInFlight) {
+                    { quickAddInputError = null; viewModel.clearMutationStatus() }
+                } else null
+            )
+            // Search and filter controls
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
@@ -592,7 +609,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
 
         // 3. QUICK ADD PRODUCT DIALOG
         if (showQuickAddDialog) {
-            Dialog(onDismissRequest = { showQuickAddDialog = false }) {
+            Dialog(onDismissRequest = { if (!mutationInFlight) showQuickAddDialog = false }) {
                 var newName by remember { mutableStateOf("") }
                 var newMrp by remember { mutableStateOf("") }
                 var selectedCatId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
@@ -609,6 +626,14 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        AppMutationStatusCard(
+                            status = quickAddInputError?.let { MutationStatus(MutationStage.VALIDATION_ERROR, it) } ?: mutationStatus,
+                            strings = strings,
+                            onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                            onDismiss = if (!mutationInFlight) {
+                                { quickAddInputError = null; viewModel.clearMutationStatus() }
+                            } else null
+                        )
                         Text(
                             strings.quickAddProduct,
                             fontSize = 18.sp,
@@ -618,7 +643,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
 
                         OutlinedTextField(
                             value = newName,
-                            onValueChange = { newName = it },
+                            onValueChange = { newName = it; quickAddInputError = null },
                             label = { Text(strings.productName) },
                             modifier = Modifier.fillMaxWidth().testTag("quick_add_product_name")
                         )
@@ -626,7 +651,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
                                 value = newMrp,
-                                onValueChange = { newMrp = it },
+                                onValueChange = { newMrp = it; quickAddInputError = null },
                                 label = { Text(strings.mrpPrice) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f).testTag("quick_add_product_mrp")
@@ -634,7 +659,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
 
                             OutlinedTextField(
                                 value = initialStock,
-                                onValueChange = { initialStock = it },
+                                onValueChange = { initialStock = it; quickAddInputError = null },
                                 label = { Text(strings.currentStock) },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f).testTag("quick_add_product_stock"),
@@ -689,7 +714,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             TextButton(
-                                onClick = { showQuickAddDialog = false },
+                                onClick = { if (!mutationInFlight) showQuickAddDialog = false },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(strings.cancel)
@@ -697,23 +722,22 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
 
                             val saveAndAddText = if (settings.appLanguage == AppLanguage.HINDI) "सेव करें व बिल में जोड़ें" else "Save & Add to Bill"
                             Button(
+                                enabled = !mutationInFlight,
                                 onClick = {
                                     val mrpValue = MoneyUtils.parseMajorUnits(newMrp)
                                     val stockValue = initialStock.toDoubleOrNull() ?: 0.0
-                                    if (newName.trim().isEmpty() || mrpValue == null) {
-                                        val reqMsg = if (settings.appLanguage == AppLanguage.HINDI) "नाम और वैध कीमत आवश्यक है!" else "Name and valid price required!"
-                                        Toast.makeText(context, reqMsg, Toast.LENGTH_SHORT).show()
+                                    if (newName.trim().isEmpty() || mrpValue == null || mrpValue <= 0L) {
+                                        quickAddInputError = strings.statusValidationError
                                     } else {
+                                        quickAddInputError = null
                                         viewModel.quickAddProduct(
                                             name = newName,
                                             mrp = mrpValue,
                                             categoryId = selectedCatId,
                                             trackStock = trackStock,
-                                            currentStock = if (trackStock) stockValue else 0.0
+                                            currentStock = if (trackStock) stockValue else 0.0,
+                                            onSuccess = { showQuickAddDialog = false }
                                         )
-                                        showQuickAddDialog = false
-                                        val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${newName.trim()} जुड़ गया!" else "${newName.trim()} Added!"
-                                        Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier.weight(1.5f),
@@ -742,14 +766,8 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
     val customers by viewModel.customers.collectAsState()
     val allUdhaarTransactions by viewModel.allUdhaarTransactions.collectAsState()
     val checkoutInFlight by viewModel.checkoutInFlight.collectAsState()
-    val checkoutError by viewModel.checkoutError.collectAsState()
+    val checkoutStatus by viewModel.checkoutMutationStatus.collectAsState()
 
-    LaunchedEffect(checkoutError) {
-        checkoutError?.let { message ->
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-            viewModel.clearCheckoutError()
-        }
-    }
 
     val customerBalanceMap = remember(allUdhaarTransactions) {
         allUdhaarTransactions.groupBy { it.customerId }.mapValues { (_, list) ->
@@ -764,16 +782,16 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
     var receivedAmountText by remember(invoiceTotal) {
         mutableStateOf(MoneyUtils.toInputString(invoiceTotal))
     }
+    var checkoutInputError by remember { mutableStateOf<String?>(null) }
+    val visibleCheckoutStatus = checkoutInputError?.let {
+        MutationStatus(MutationStage.VALIDATION_ERROR, it)
+    } ?: checkoutStatus
     val submitImmediatePayment: (String) -> Unit = { mode ->
         val receivedAmount = MoneyUtils.parseMajorUnits(receivedAmountText)
         if (receivedAmount == null) {
-            val message = if (settings.appLanguage == AppLanguage.HINDI) {
-                "प्राप्त राशि सही दर्ज करें"
-            } else {
-                "Enter a valid received amount"
-            }
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            checkoutInputError = strings.statusValidationError
         } else {
+            checkoutInputError = null
             viewModel.completeBill(paymentMode = mode, receivedAmount = receivedAmount)
         }
     }
@@ -816,6 +834,14 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
             verticalArrangement = Arrangement.spacedBy(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            AppMutationStatusCard(
+                status = visibleCheckoutStatus,
+                strings = strings,
+                onRetry = if (visibleCheckoutStatus.canRetry) viewModel::retryCheckoutMutation else null,
+                onDismiss = if (!checkoutInFlight) {
+                    { checkoutInputError = null; viewModel.clearCheckoutMutationStatus() }
+                } else null
+            )
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 border = BorderStroke(1.2.dp, BorderStrong),
@@ -854,7 +880,10 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                     Text(receivedLabel, fontWeight = FontWeight.Bold, color = TextNearBlack)
                     OutlinedTextField(
                         value = receivedAmountText,
-                        onValueChange = { receivedAmountText = it },
+                        onValueChange = {
+                            receivedAmountText = it
+                            checkoutInputError = null
+                        },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         leadingIcon = { Text("₹", fontWeight = FontWeight.Bold) },
@@ -1024,7 +1053,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
 
         // --- CUSTOMER SELECTOR FOR UDHAAR DIALOG ---
         if (showUdhaarCustomerDialog) {
-            Dialog(onDismissRequest = { showUdhaarCustomerDialog = false }) {
+            Dialog(onDismissRequest = { if (!checkoutInFlight) showUdhaarCustomerDialog = false }) {
                 var searchCustName by remember { mutableStateOf("") }
                 var custPhone by remember { mutableStateOf("") }
                 var showAddNewCustomerBlock by remember { mutableStateOf(false) }
@@ -1044,6 +1073,14 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        AppMutationStatusCard(
+                            status = visibleCheckoutStatus,
+                            strings = strings,
+                            onRetry = if (visibleCheckoutStatus.canRetry) viewModel::retryCheckoutMutation else null,
+                            onDismiss = if (!checkoutInFlight) {
+                                { checkoutInputError = null; viewModel.clearCheckoutMutationStatus() }
+                            } else null
+                        )
                         val selectCustHeader = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक चुनें" else "Select Udhaar Customer"
                         Text(
                             selectCustHeader,
@@ -1091,7 +1128,6 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                                         paymentMode = "UDHAAR",
                                                         customerId = cust.id
                                                     )
-                                                    showUdhaarCustomerDialog = false
                                                 },
                                             shape = RoundedCornerShape(8.dp),
                                             border = BorderStroke(1.2.dp, BorderStrong),
@@ -1140,8 +1176,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                             Button(
                                 onClick = {
                                     if (searchCustName.trim().isEmpty()) {
-                                        val reqName = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक का नाम ज़रूरी है!" else "Customer name required!"
-                                        Toast.makeText(context, reqName, Toast.LENGTH_SHORT).show()
+                                        checkoutInputError = strings.checkoutCustomerError
                                     } else {
                                         viewModel.completeBill(
                                             paymentMode = "UDHAAR",
@@ -1149,7 +1184,6 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                             customerName = searchCustName,
                                             customerPhone = custPhone
                                         )
-                                        showUdhaarCustomerDialog = false
                                     }
                                 },
                                 enabled = !checkoutInFlight,
@@ -1161,7 +1195,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                         }
 
                         TextButton(
-                            onClick = { showUdhaarCustomerDialog = false },
+                            onClick = { if (!checkoutInFlight) showUdhaarCustomerDialog = false },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(strings.cancel, color = TextMediumGray, fontWeight = FontWeight.Bold)

@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.UdhaarTransaction
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
@@ -47,8 +48,11 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 
     val customers by viewModel.customers.collectAsState()
     val transactions by viewModel.allUdhaarTransactions.collectAsState()
+    val mutationStatus by viewModel.mutationStatus.collectAsState()
+    val mutationInFlight by viewModel.mutationInFlight.collectAsState()
 
     var searchQuery by remember { mutableStateOf("") }
+    var udhaarInputError by remember { mutableStateOf<String?>(null) }
     var showAddCustomerDialog by remember { mutableStateOf(false) }
 
     val customerBalances = remember(transactions) {
@@ -117,6 +121,18 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                 .padding(innerPadding)
                 .background(WarmCreamBg)
         ) {
+            AppMutationStatusCard(
+                status = udhaarInputError?.let {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                    )
+                } ?: mutationStatus,
+                strings = strings,
+                onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                onDismiss = if (!mutationInFlight) {
+                    { udhaarInputError = null; viewModel.clearMutationStatus() }
+                } else null
+            )
             // Search Input
             OutlinedTextField(
                 value = searchQuery,
@@ -378,9 +394,12 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
+    val mutationStatus by viewModel.mutationStatus.collectAsState()
+    val mutationInFlight by viewModel.mutationInFlight.collectAsState()
 
     var customer by remember { mutableStateOf<Customer?>(null) }
     var currentBalance by remember { mutableStateOf(0L) }
+    var udhaarInputError by remember { mutableStateOf<String?>(null) }
 
     var showReceivePaymentDialog by remember { mutableStateOf(false) }
     var selectedLedgerEvent by remember { mutableStateOf<UdhaarTransaction?>(null) }
@@ -410,7 +429,8 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showReceivePaymentDialog = true },
+                onClick = { if (!mutationInFlight) showReceivePaymentDialog = true },
+                expanded = !mutationInFlight,
                 containerColor = SuccessGreen,
                 text = { Text(strings.receivePayment, color = Color.White, fontWeight = FontWeight.Bold) },
                 icon = { Icon(Icons.Default.Add, contentDescription = strings.receivePayment, tint = Color.White) },
@@ -427,6 +447,18 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                AppMutationStatusCard(
+                    status = udhaarInputError?.let {
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                            com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                        )
+                    } ?: mutationStatus,
+                    strings = strings,
+                    onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                    onDismiss = if (!mutationInFlight) {
+                        { udhaarInputError = null; viewModel.clearMutationStatus() }
+                    } else null
+                )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
                     border = BorderStroke(2.dp, ErrorRed),
@@ -624,7 +656,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
 
         // --- DEPOSIT RECEIVED INPUT DIALOG PANEL ---
         if (showReceivePaymentDialog) {
-            Dialog(onDismissRequest = { showReceivePaymentDialog = false }) {
+            Dialog(onDismissRequest = { if (!mutationInFlight) showReceivePaymentDialog = false }) {
                 var amount by remember { mutableStateOf("") }
                 var note by remember { mutableStateOf("") }
 
@@ -638,6 +670,16 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        AppMutationStatusCard(
+                            status = udhaarInputError?.let { com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                            ) } ?: mutationStatus,
+                            strings = strings,
+                            onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                            onDismiss = if (!mutationInFlight) {
+                                { udhaarInputError = null; viewModel.clearMutationStatus() }
+                            } else null
+                        )
                         val depositTitle = if (settings.appLanguage == AppLanguage.HINDI) "जमा राशि दर्ज करें" else "Receive Payment"
                         Text(
                             depositTitle,
@@ -649,7 +691,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         val amountLabel = if (settings.appLanguage == AppLanguage.HINDI) "प्राप्त रकम *" else "Received Amount *"
                         OutlinedTextField(
                             value = amount,
-                            onValueChange = { amount = it },
+                            onValueChange = { amount = it; udhaarInputError = null },
                             label = { Text(amountLabel) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("payment_amount_input"),
@@ -667,7 +709,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         val notePlaceholder = if (settings.appLanguage == AppLanguage.HINDI) "उदा. नकद, UPI, Paytm..." else "e.g. Cash, Paytm, PhonePe..."
                         OutlinedTextField(
                             value = note,
-                            onValueChange = { note = it },
+                            onValueChange = { note = it; udhaarInputError = null },
                             label = { Text(noteLabel) },
                             placeholder = { Text(notePlaceholder, color = TextMutedGray) },
                             modifier = Modifier.fillMaxWidth().testTag("payment_note_input"),
@@ -686,7 +728,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             TextButton(
-                                onClick = { showReceivePaymentDialog = false },
+                                onClick = { if (!mutationInFlight) showReceivePaymentDialog = false },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(strings.cancel)
@@ -694,20 +736,19 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
 
                             val confirmDepositText = if (settings.appLanguage == AppLanguage.HINDI) "जमा सुरक्षित करें" else "Save Payment"
                             Button(
+                                enabled = !mutationInFlight,
                                 onClick = {
                                     val amtValue = MoneyUtils.parseMajorUnits(amount)
                                     if (amtValue == null || amtValue <= 0L) {
-                                        val validAmtMsg = if (settings.appLanguage == AppLanguage.HINDI) "वैध रकम आवश्यक है!" else "Valid positive amount required!"
-                                        Toast.makeText(context, validAmtMsg, Toast.LENGTH_SHORT).show()
+                                        udhaarInputError = strings.statusValidationError
                                     } else {
+                                        udhaarInputError = null
                                         viewModel.addUdhaarPayment(
                                             customerId = customerId,
                                             amountMinorUnits = amtValue,
-                                            note = note
+                                            note = note,
+                                            onSuccess = { showReceivePaymentDialog = false }
                                         )
-                                        showReceivePaymentDialog = false
-                                        val successMsg = if (settings.appLanguage == AppLanguage.HINDI) "जमा रकम दर्ज हो गई!" else "Payment logged successfully!"
-                                        Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen, contentColor = Color.White),
@@ -724,7 +765,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
         }
 
         selectedLedgerEvent?.let { record ->
-            Dialog(onDismissRequest = { selectedLedgerEvent = null }) {
+            Dialog(onDismissRequest = { if (!mutationInFlight) selectedLedgerEvent = null }) {
                 var correctedAmount by remember(record.eventId) { mutableStateOf(MoneyUtils.toInputString(record.amount)) }
                 var reason by remember(record.eventId) { mutableStateOf("") }
 
@@ -738,6 +779,16 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             .padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        AppMutationStatusCard(
+                            status = udhaarInputError?.let { com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus(
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage.VALIDATION_ERROR, it
+                            ) } ?: mutationStatus,
+                            strings = strings,
+                            onRetry = if (mutationStatus.canRetry) viewModel::retryLastMutation else null,
+                            onDismiss = if (!mutationInFlight) {
+                                { udhaarInputError = null; viewModel.clearMutationStatus() }
+                            } else null
+                        )
                         val title = if (settings.appLanguage == AppLanguage.HINDI) "लेजर सुधार" else "Correct Ledger Entry"
                         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PurpleAccent)
                         Text(
@@ -748,14 +799,14 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         )
                         OutlinedTextField(
                             value = correctedAmount,
-                            onValueChange = { correctedAmount = it },
+                            onValueChange = { correctedAmount = it; udhaarInputError = null },
                             label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "सही रकम *" else "Correct Amount *") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("ledger_correction_amount_input")
                         )
                         OutlinedTextField(
                             value = reason,
-                            onValueChange = { reason = it },
+                            onValueChange = { reason = it; udhaarInputError = null },
                             label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "कारण *" else "Reason *") },
                             modifier = Modifier.fillMaxWidth().testTag("ledger_correction_reason_input")
                         )
@@ -764,18 +815,23 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             TextButton(
-                                onClick = { selectedLedgerEvent = null },
+                                onClick = { if (!mutationInFlight) selectedLedgerEvent = null },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(strings.cancel)
                             }
                             OutlinedButton(
+                                enabled = !mutationInFlight,
                                 onClick = {
                                     if (reason.trim().isEmpty()) {
-                                        Toast.makeText(context, "Correction reason is required", Toast.LENGTH_SHORT).show()
+                                        udhaarInputError = strings.statusValidationError
                                     } else {
-                                        viewModel.reverseUdhaarTransaction(customerId, record.eventId, reason)
-                                        selectedLedgerEvent = null
+                                        viewModel.reverseUdhaarTransaction(
+                                            customerId,
+                                            record.eventId,
+                                            reason,
+                                            onSuccess = { selectedLedgerEvent = null }
+                                        )
                                     }
                                 },
                                 modifier = Modifier.weight(1f)
@@ -783,13 +839,19 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                 Text(if (settings.appLanguage == AppLanguage.HINDI) "रिवर्स" else "Reverse")
                             }
                             Button(
+                                enabled = !mutationInFlight,
                                 onClick = {
                                     val amountValue = MoneyUtils.parseMajorUnits(correctedAmount)
                                     if (amountValue == null || amountValue <= 0L || reason.trim().isEmpty()) {
-                                        Toast.makeText(context, "Valid amount and reason are required", Toast.LENGTH_SHORT).show()
+                                        udhaarInputError = strings.statusValidationError
                                     } else {
-                                        viewModel.correctUdhaarTransaction(customerId, record.eventId, amountValue, reason)
-                                        selectedLedgerEvent = null
+                                        viewModel.correctUdhaarTransaction(
+                                            customerId,
+                                            record.eventId,
+                                            amountValue,
+                                            reason,
+                                            onSuccess = { selectedLedgerEvent = null }
+                                        )
                                     }
                                 },
                                 modifier = Modifier.weight(1.2f)

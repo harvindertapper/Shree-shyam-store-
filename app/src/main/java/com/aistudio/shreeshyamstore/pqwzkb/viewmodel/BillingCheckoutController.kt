@@ -7,6 +7,11 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus
+import com.aistudio.shreeshyamstore.pqwzkb.utils.mutationStageFor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -91,7 +96,8 @@ class BillingCheckoutController(
     private val scope: CoroutineScope,
     private val onAutoSync: () -> Unit = {},
     private val onCheckoutSuccess: () -> Unit = {},
-    private val onGateError: (Throwable) -> String? = { null }
+    private val onGateError: (Throwable) -> String? = { null },
+    private val languageProvider: () -> AppLanguage = { AppLanguage.ENGLISH }
 ) {
     private val billingCart = BillingCartState()
     private val _cartTotal = MutableStateFlow(0L)
@@ -115,6 +121,62 @@ class BillingCheckoutController(
     private val _checkoutError = MutableStateFlow<String?>(null)
     val checkoutError: StateFlow<String?> = _checkoutError.asStateFlow()
 
+    private val _mutationStatus = MutableStateFlow(MutationStatus())
+    val mutationStatus: StateFlow<MutationStatus> = _mutationStatus.asStateFlow()
+
+    private data class CheckoutRequest(
+        val paymentMode: String,
+        val customerId: Long?,
+        val customerName: String,
+        val customerPhone: String,
+        val note: String?,
+        val receivedAmount: Long?
+    )
+
+    private var lastCheckoutRequest: CheckoutRequest? = null
+
+    private fun localizedFailureMessage(error: Throwable, fallback: String): String {
+        onGateError(error)?.takeIf { it.isNotBlank() }?.let { return it }
+        val strings = LocaleHelper.getStrings(languageProvider())
+        val message = error.message.orEmpty()
+        return when {
+            message.contains("credit limit", ignoreCase = true) -> strings.checkoutCreditLimitError
+            message.contains("stock", ignoreCase = true) -> strings.checkoutStockError
+            message.contains("customer", ignoreCase = true) -> strings.checkoutCustomerError
+            error is IllegalArgumentException -> strings.checkoutValidationError
+            else -> fallback
+        }
+    }
+
+    private fun setMutationFailure(error: Throwable, fallback: String) {
+        val gateMessage = onGateError(error)?.takeIf { it.isNotBlank() }
+        val stage = mutationStageFor(error, gateMessage)
+        val canRetry = stage == MutationStage.RETRYABLE_ERROR
+        val message = gateMessage ?: localizedFailureMessage(error, fallback)
+        _checkoutError.value = message
+        _mutationStatus.value = MutationStatus(stage, message, canRetry)
+    }
+
+    fun retryLastMutation() {
+        if (!_checkoutInFlight.value) lastCheckoutRequest?.let { request ->
+            completeBill(
+                paymentMode = request.paymentMode,
+                customerId = request.customerId,
+                customerName = request.customerName,
+                customerPhone = request.customerPhone,
+                note = request.note,
+                receivedAmount = request.receivedAmount
+            )
+        }
+    }
+
+    fun clearMutationStatus() {
+        if (!_checkoutInFlight.value) {
+            _mutationStatus.value = MutationStatus()
+            _checkoutError.value = null
+        }
+    }
+
     fun addProductToCart(product: Product, quantity: Double = 1.0) {
         billingCart.add(product, quantity)
         refreshCartTotal()
@@ -137,6 +199,7 @@ class BillingCheckoutController(
 
     fun clearCheckoutError() {
         _checkoutError.value = null
+        if (!_checkoutInFlight.value) _mutationStatus.value = MutationStatus()
     }
 
     fun reconcilePaymentState(
@@ -145,8 +208,13 @@ class BillingCheckoutController(
         receivedAmount: Long,
         onResult: (Boolean) -> Unit = {}
     ) {
+        if (_checkoutInFlight.value) return
+        _checkoutInFlight.value = true
+        _checkoutError.value = null
+        _mutationStatus.value = MutationStatus(MutationStage.VALIDATING)
         scope.launch {
             try {
+                _mutationStatus.value = MutationStatus(MutationStage.SAVING_LOCALLY)
                 val updatedSale = gateway.reconcilePaymentState(
                     saleId = saleId,
                     targetState = targetState,
@@ -157,15 +225,16 @@ class BillingCheckoutController(
                     _lastSale.value = updatedSale
                 }
                 onAutoSync()
+                _mutationStatus.value = MutationStatus(
+                    MutationStage.SAVED_LOCALLY,
+                    LocaleHelper.getStrings(languageProvider()).statusSavedLocallyDetail
+                )
                 onResult(true)
-            } catch (error: IllegalArgumentException) {
-                _checkoutError.value = onGateError(error)?.takeIf { it.isNotBlank() }
-                    ?: error.message
-                    ?: "Payment state could not be updated"
+            } catch (error: Exception) {
+                setMutationFailure(error, LocaleHelper.getStrings(languageProvider()).paymentUpdateError)
                 onResult(false)
-            } catch (_: Exception) {
-                _checkoutError.value = "Payment state could not be updated"
-                onResult(false)
+            } finally {
+                _checkoutInFlight.value = false
             }
         }
     }
@@ -182,8 +251,18 @@ class BillingCheckoutController(
         val cartItems = billingCart.items.value
         if (cartItems.isEmpty()) return
 
+        val request = CheckoutRequest(
+            paymentMode = paymentMode,
+            customerId = customerId,
+            customerName = customerName,
+            customerPhone = customerPhone,
+            note = note,
+            receivedAmount = receivedAmount
+        )
+        lastCheckoutRequest = request
         _checkoutInFlight.value = true
         _checkoutError.value = null
+        _mutationStatus.value = MutationStatus(MutationStage.VALIDATING)
         scope.launch {
             try {
                 val formatter = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ENGLISH)
@@ -215,6 +294,7 @@ class BillingCheckoutController(
                 }
 
                 val now = System.currentTimeMillis()
+                _mutationStatus.value = MutationStatus(MutationStage.SAVING_LOCALLY)
                 val saleItems = cartItems.map { (product, quantity) ->
                     val unitPrice = com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
                         .normalizeUnitPrice(product.getEffectivePrice())
@@ -255,19 +335,13 @@ class BillingCheckoutController(
 
                 clearCart()
                 onAutoSync()
+                _mutationStatus.value = MutationStatus(
+                    MutationStage.SAVED_LOCALLY,
+                    LocaleHelper.getStrings(languageProvider()).statusSavedLocallyDetail
+                )
                 onCheckoutSuccess()
-            } catch (error: IllegalArgumentException) {
-                _checkoutError.value = onGateError(error)?.takeIf { it.isNotBlank() } ?: when {
-                    error.message?.contains("credit limit", ignoreCase = true) == true ->
-                        "Udhaar credit limit exceeded. Bill was not saved."
-                    error.message?.contains("stock", ignoreCase = true) == true ->
-                        "Insufficient stock. Bill was not saved."
-                    error.message?.contains("customer", ignoreCase = true) == true ->
-                        "Valid customer details are required. Bill was not saved."
-                    else -> "Bill details are invalid. Bill was not saved."
-                }
-            } catch (_: Exception) {
-                _checkoutError.value = "Bill could not be saved. Please try again."
+            } catch (error: Exception) {
+                setMutationFailure(error, LocaleHelper.getStrings(languageProvider()).checkoutSaveError)
             } finally {
                 _checkoutInFlight.value = false
             }

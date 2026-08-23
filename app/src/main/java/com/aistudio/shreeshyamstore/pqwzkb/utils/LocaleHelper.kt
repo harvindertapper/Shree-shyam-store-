@@ -59,6 +59,29 @@ interface AppStrings {
     val actionPermissionDenied: String
     val actionRoleInvalid: String
 
+    // Durable mutation feedback
+    val statusValidating: String
+    val statusSavingLocally: String
+    val statusSavedLocally: String
+    val statusSavedLocallyDetail: String
+    val statusSyncing: String
+    val statusSuccess: String
+    val statusValidationError: String
+    val statusAuthError: String
+    val statusRetryableError: String
+    val statusConflict: String
+    val statusFailure: String
+    val retryAction: String
+    val dismissAction: String
+    val checkoutCreditLimitError: String
+    val checkoutStockError: String
+    val checkoutCustomerError: String
+    val checkoutValidationError: String
+    val checkoutSaveError: String
+    val paymentUpdateError: String
+    val backupSuccess: String
+    val restoreSuccess: String
+
     // Setup
     val shopSetupTitle: String
     val shopSetupDesc: String
@@ -239,6 +262,27 @@ object HindiStrings : AppStrings {
     override val cloudAccountRequired = "क्लाउड बैकअप या रिस्टोर के लिए Google खाते से साइन इन करें।"
     override val actionPermissionDenied = "इस खाते को यह काम करने की अनुमति नहीं है। मालिक से संपर्क करें।"
     override val actionRoleInvalid = "खाते की भूमिका मान्य नहीं है। मालिक से संपर्क करें।"
+    override val statusValidating = "जाँच हो रही है"
+    override val statusSavingLocally = "डिवाइस पर सुरक्षित हो रहा है"
+    override val statusSavedLocally = "डिवाइस पर सुरक्षित हो गया"
+    override val statusSavedLocallyDetail = "डेटा इस डिवाइस पर सुरक्षित है। इंटरनेट मिलने पर सिंक अपने आप जारी रहेगा।"
+    override val statusSyncing = "क्लाउड सिंक हो रहा है"
+    override val statusSuccess = "काम सफल रहा"
+    override val statusValidationError = "जानकारी जाँचें"
+    override val statusAuthError = "पहचान सत्यापित करें"
+    override val statusRetryableError = "अभी पूरा नहीं हुआ"
+    override val statusConflict = "डेटा में टकराव है"
+    override val statusFailure = "काम पूरा नहीं हो सका"
+    override val retryAction = "फिर प्रयास करें"
+    override val dismissAction = "बंद करें"
+    override val checkoutCreditLimitError = "उधार की सीमा पूरी हो गई। बिल सुरक्षित नहीं हुआ।"
+    override val checkoutStockError = "स्टॉक पर्याप्त नहीं है। बिल सुरक्षित नहीं हुआ।"
+    override val checkoutCustomerError = "ग्राहक की सही जानकारी जरूरी है। बिल सुरक्षित नहीं हुआ।"
+    override val checkoutValidationError = "बिल की जानकारी जाँचें। बिल सुरक्षित नहीं हुआ।"
+    override val checkoutSaveError = "बिल सुरक्षित नहीं हो सका। फिर प्रयास करें।"
+    override val paymentUpdateError = "भुगतान की स्थिति अपडेट नहीं हो सकी। फिर प्रयास करें।"
+    override val backupSuccess = "क्लाउड बैकअप सफल रहा।"
+    override val restoreSuccess = "क्लाउड से डेटा सफलतापूर्वक रिस्टोर हो गया।"
 
     override val shopSetupTitle = "दुकान प्रोफाइल सेटअप"
     override val shopSetupDesc = "अपनी दुकान का विवरण और 4-अंकों का सुरक्षित पिन सेट करें।"
@@ -411,6 +455,27 @@ object EnglishStrings : AppStrings {
     override val cloudAccountRequired = "Sign in with Google for cloud backup or restore."
     override val actionPermissionDenied = "This account is not allowed to perform this action. Contact the owner."
     override val actionRoleInvalid = "This account has an invalid role. Contact the owner."
+    override val statusValidating = "Checking details"
+    override val statusSavingLocally = "Saving on this device"
+    override val statusSavedLocally = "Saved on this device"
+    override val statusSavedLocallyDetail = "Your data is safe on this device. Sync will continue automatically when the internet is available."
+    override val statusSyncing = "Syncing to cloud"
+    override val statusSuccess = "Completed successfully"
+    override val statusValidationError = "Check the details"
+    override val statusAuthError = "Sign in to continue"
+    override val statusRetryableError = "Not completed yet"
+    override val statusConflict = "Data conflict needs attention"
+    override val statusFailure = "Could not complete"
+    override val retryAction = "Try again"
+    override val dismissAction = "Dismiss"
+    override val checkoutCreditLimitError = "Udhaar credit limit exceeded. Bill was not saved."
+    override val checkoutStockError = "Insufficient stock. Bill was not saved."
+    override val checkoutCustomerError = "Valid customer details are required. Bill was not saved."
+    override val checkoutValidationError = "Check the bill details. Bill was not saved."
+    override val checkoutSaveError = "Bill could not be saved. Please try again."
+    override val paymentUpdateError = "Payment state could not be updated. Please try again."
+    override val backupSuccess = "Cloud backup completed successfully."
+    override val restoreSuccess = "Data was restored from cloud successfully."
 
     override val shopSetupTitle = "Shop Profile Setup"
     override val shopSetupDesc = "Enter your store details and set a 4-digit security PIN."

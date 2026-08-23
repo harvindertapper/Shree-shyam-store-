@@ -10,7 +10,9 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.BillingCheckoutController
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.BillingCheckoutGateway
+import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
 import kotlinx.coroutines.CompletableDeferred
+import java.io.IOException
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -51,6 +53,8 @@ class BillingCheckoutControllerTest {
         assertEquals(41L, controller.lastSale.value?.id)
         assertTrue(autoSyncObserved)
         assertTrue(successObserved)
+        assertEquals(MutationStage.SAVED_LOCALLY, controller.mutationStatus.value.stage)
+        assertFalse(controller.mutationStatus.value.canRetry)
     }
 
     @Test
@@ -67,6 +71,32 @@ class BillingCheckoutControllerTest {
         assertFalse(controller.checkoutInFlight.value)
         assertEquals(1.0, controller.cartState.value[cartProduct] ?: -1.0, 0.0)
         assertEquals("Insufficient stock. Bill was not saved.", controller.checkoutError.value)
+        assertEquals(MutationStage.VALIDATION_ERROR, controller.mutationStatus.value.stage)
+        assertFalse(controller.mutationStatus.value.canRetry)
+    }
+
+    @Test
+    fun transientCheckoutFailureCanBeRetriedWithoutLosingCart() = runTest {
+        val gateway = FakeBillingGateway()
+        gateway.insertFailure = IOException("network unavailable")
+        val controller = BillingCheckoutController(gateway, this)
+        val cartProduct = product()
+        controller.addProductToCart(cartProduct)
+
+        controller.completeBill(paymentMode = "CASH", receivedAmount = 1000L)
+        advanceUntilIdle()
+
+        assertEquals(MutationStage.RETRYABLE_ERROR, controller.mutationStatus.value.stage)
+        assertTrue(controller.mutationStatus.value.canRetry)
+        assertEquals(1.0, controller.cartState.value[cartProduct] ?: -1.0, 0.0)
+
+        gateway.insertFailure = null
+        controller.retryLastMutation()
+        advanceUntilIdle()
+
+        assertEquals(2, gateway.insertCalls)
+        assertTrue(controller.cartState.value.isEmpty())
+        assertEquals(MutationStage.SAVED_LOCALLY, controller.mutationStatus.value.stage)
     }
 
     @Test
@@ -80,6 +110,7 @@ class BillingCheckoutControllerTest {
 
         assertEquals(0, gateway.insertCalls)
         assertEquals("Valid customer details are required. Bill was not saved.", controller.checkoutError.value)
+        assertEquals(MutationStage.VALIDATION_ERROR, controller.mutationStatus.value.stage)
         assertEquals(1.0, controller.cartState.value.values.single(), 0.0)
     }
 
@@ -95,7 +126,7 @@ class BillingCheckoutControllerTest {
     private class FakeBillingGateway : BillingCheckoutGateway {
         var insertCalls = 0
         var insertGate: CompletableDeferred<Unit>? = null
-        var insertFailure: IllegalArgumentException? = null
+        var insertFailure: Throwable? = null
         private val savedSale = Sale(
             id = 41L,
             billNumber = "BILL-TEST",
