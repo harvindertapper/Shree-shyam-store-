@@ -7,6 +7,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.Upsert
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerActor
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.LedgerAuditPolicy
@@ -47,6 +48,12 @@ interface CategoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(categories: List<Category>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllForRestore(categories: List<Category>)
+
+    @Upsert
+    suspend fun upsertAllForSync(categories: List<Category>)
+
     @Update
     suspend fun update(category: Category)
 
@@ -77,6 +84,9 @@ interface ProductDao {
     @Query("SELECT * FROM products WHERE categoryId = :categoryId AND isDeleted = 0 ORDER BY name ASC")
     fun getProductsByCategory(categoryId: Long): Flow<List<Product>>
 
+    @Query("SELECT COUNT(*) FROM products WHERE categoryId = :categoryId AND isDeleted = 0")
+    suspend fun countActiveByCategoryId(categoryId: Long): Int
+
     @Query("SELECT * FROM products WHERE isSynced = 0")
     suspend fun getUnsyncedProducts(): List<Product>
 
@@ -94,6 +104,12 @@ interface ProductDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(products: List<Product>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllForRestore(products: List<Product>)
+
+    @Upsert
+    suspend fun upsertAllForSync(products: List<Product>)
 
     @Update
     suspend fun update(product: Product)
@@ -176,8 +192,20 @@ abstract class SaleDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertAllSales(sales: List<Sale>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertAllSalesForRestore(sales: List<Sale>)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     abstract suspend fun insertAllSaleItems(items: List<SaleItem>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    abstract suspend fun insertAllSaleItemsForRestore(items: List<SaleItem>)
+
+    @Upsert
+    abstract suspend fun upsertAllSalesForSync(sales: List<Sale>)
+
+    @Upsert
+    abstract suspend fun upsertAllSaleItemsForSync(items: List<SaleItem>)
 
     @Query("DELETE FROM sales")
     abstract suspend fun clearAllSales()
@@ -426,6 +454,12 @@ interface CustomerDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(customers: List<Customer>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllForRestore(customers: List<Customer>)
+
+    @Upsert
+    suspend fun upsertAllForSync(customers: List<Customer>)
+
     @Update
     suspend fun updateCustomer(customer: Customer)
 
@@ -486,6 +520,12 @@ interface UdhaarDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<UdhaarTransaction>)
 
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllForRestore(transactions: List<UdhaarTransaction>)
+
+    @Upsert
+    suspend fun upsertAllForSync(transactions: List<UdhaarTransaction>)
+
     @Query("DELETE FROM udhaar_transactions")
     suspend fun clearAllTransactions()
 }
@@ -515,6 +555,12 @@ interface StockAdjustmentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(adjustments: List<StockAdjustment>)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAllForRestore(adjustments: List<StockAdjustment>)
+
+    @Upsert
+    suspend fun upsertAllForSync(adjustments: List<StockAdjustment>)
 
     @Query("SELECT * FROM stock_adjustments")
     suspend fun getAllAdjustmentsList(): List<StockAdjustment>

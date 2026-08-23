@@ -43,7 +43,8 @@ data class Category(
     tableName = "products",
     indices = [
         Index(value = ["globalId"], unique = true),
-        Index(value = ["barcodeKey"], unique = true)
+        Index(value = ["barcodeKey"], unique = true),
+        Index(value = ["categoryId"])
     ]
 )
 data class Product(
@@ -89,7 +90,8 @@ data class Product(
     tableName = "sales",
     indices = [
         Index(value = ["globalId"], unique = true),
-        Index(value = ["billNumber"], unique = true)
+        Index(value = ["billNumber"], unique = true),
+        Index(value = ["customerId"])
     ]
 )
 data class Sale(
@@ -113,7 +115,14 @@ data class Sale(
     @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "sale_items", indices = [Index(value = ["globalId"], unique = true)])
+@Entity(
+    tableName = "sale_items",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["saleId"]),
+        Index(value = ["productId"])
+    ]
+)
 data class SaleItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(defaultValue = "''") val globalId: String = "",
@@ -162,7 +171,14 @@ data class Customer(
     @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "udhaar_transactions", indices = [Index(value = ["globalId"], unique = true)])
+@Entity(
+    tableName = "udhaar_transactions",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["customerId"]),
+        Index(value = ["saleId"])
+    ]
+)
 data class UdhaarTransaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(defaultValue = "''") val globalId: String = "",
@@ -193,7 +209,13 @@ data class UdhaarTransaction(
     @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
 )
 
-@Entity(tableName = "stock_adjustments", indices = [Index(value = ["globalId"], unique = true)])
+@Entity(
+    tableName = "stock_adjustments",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["productId"])
+    ]
+)
 data class StockAdjustment(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(defaultValue = "''") val globalId: String = "",

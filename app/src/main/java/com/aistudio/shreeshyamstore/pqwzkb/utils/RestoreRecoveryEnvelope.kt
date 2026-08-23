@@ -188,6 +188,15 @@ object RestoreSnapshotValidator {
         validateUniqueIdentity("stock_adjustments", snapshot.stockAdjustments.map { it.globalId })
 
         validateRows(snapshot)
+        BusinessRelationshipPolicy.validateRestoreGraph(
+            categories = snapshot.categories,
+            products = snapshot.products,
+            sales = snapshot.sales,
+            saleItems = snapshot.saleItems,
+            customers = snapshot.customers,
+            udhaarTransactions = snapshot.udhaarTransactions,
+            stockAdjustments = snapshot.stockAdjustments
+        )
         return snapshot
     }
 

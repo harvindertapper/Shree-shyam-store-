@@ -12,6 +12,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantAuthorizationPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantCapability
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.TenantScope
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.UdhaarTransactionType
+import com.aistudio.shreeshyamstore.pqwzkb.utils.BusinessRelationshipPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -59,7 +60,12 @@ class ShopRepository(
 
     suspend fun deleteCategory(category: Category, command: CommandMetadata) {
         authorize(command, TenantCapability.CATALOG_WRITE)
-        categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
+        inCatalogTransaction {
+            require(productDao.countActiveByCategoryId(category.id) == 0) {
+                "Category cannot be deleted while active products use it"
+            }
+            categoryDao.update(category.stamped(mutationDeviceId(), isDeleted = true))
+        }
     }
 
     // Products
@@ -73,6 +79,7 @@ class ShopRepository(
         authorize(command, TenantCapability.CATALOG_WRITE)
         return inCatalogTransaction {
             val normalized = normalizeProduct(product)
+            requireActiveCategory(normalized.categoryId)
             requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
             productDao.insert(normalized.stamped(mutationDeviceId()))
         }
@@ -88,6 +95,7 @@ class ShopRepository(
         return inCatalogTransaction {
         val normalizedStock = InventoryValidation.validateQuantity(openingStock, "Opening stock")
         val normalized = normalizeProduct(product.copy(currentStock = normalizedStock))
+        requireActiveCategory(normalized.categoryId)
         requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
         val productId = productDao.insert(normalized.stamped(mutationDeviceId()))
         if (normalized.trackStock && normalizedStock > 0.0) {
@@ -112,6 +120,7 @@ class ShopRepository(
         authorize(command, TenantCapability.CATALOG_WRITE)
         inCatalogTransaction {
             val normalized = normalizeProduct(product)
+            requireActiveCategory(normalized.categoryId)
             requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
             productDao.update(normalized.stamped(mutationDeviceId()))
         }
@@ -130,6 +139,7 @@ class ShopRepository(
             val normalizedOldStock = InventoryValidation.validateQuantity(oldStock, "Old stock")
             val normalizedNewStock = InventoryValidation.validateQuantity(newStock, "New stock")
             val normalized = normalizeProduct(product.copy(currentStock = normalizedNewStock))
+            requireActiveCategory(normalized.categoryId)
             requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
             productDao.update(normalized.stamped(mutationDeviceId()))
             if (normalized.trackStock && normalizedOldStock != normalizedNewStock) {
@@ -153,6 +163,12 @@ class ShopRepository(
         val barcodeKey = InventoryValidation.normalizeBarcode(barcode) ?: return true
         return productDao.getActiveProductByBarcodeKey(barcodeKey, excludeId) == null &&
             productDao.getActiveProductByLegacyBarcode(barcodeKey, excludeId) == null
+    }
+
+    private suspend fun requireActiveCategory(categoryId: Long) {
+        require(categoryId > 0L && categoryDao.getCategoryById(categoryId)?.isDeleted == false) {
+            "Product requires an active category"
+        }
     }
 
     private suspend fun requireNoDuplicateBarcode(barcodeKey: String?, excludeId: Long) {
@@ -695,6 +711,15 @@ class ShopRepository(
         val normalizedCustomers = customersList.map { it.normalizeForRestore("customers") }
         val normalizedUdhaar = udhaarTxsList.map { it.normalizeForRestore("udhaar_transactions") }
         val normalizedAdjustments = adjustmentsList.map { it.normalizeForRestore("stock_adjustments") }
+        BusinessRelationshipPolicy.validateRestoreGraph(
+            categories = normalizedCategories,
+            products = normalizedProducts,
+            sales = normalizedSales,
+            saleItems = normalizedSaleItems,
+            customers = normalizedCustomers,
+            udhaarTransactions = normalizedUdhaar,
+            stockAdjustments = normalizedAdjustments
+        )
         val operation: suspend () -> Unit = {
             categoryDao.clearAllCategories()
             productDao.clearAllProducts()
@@ -705,13 +730,13 @@ class ShopRepository(
             stockAdjustmentDao.clearAllAdjustments()
             syncOutboxDao().clearAll()
 
-            if (normalizedCategories.isNotEmpty()) categoryDao.insertAll(normalizedCategories)
-            if (normalizedProducts.isNotEmpty()) productDao.insertAll(normalizedProducts)
-            if (normalizedSales.isNotEmpty()) saleDao.insertAllSales(normalizedSales)
-            if (normalizedSaleItems.isNotEmpty()) saleDao.insertAllSaleItems(normalizedSaleItems)
-            if (normalizedCustomers.isNotEmpty()) customerDao.insertAll(normalizedCustomers)
-            if (normalizedUdhaar.isNotEmpty()) udhaarDao.insertAll(normalizedUdhaar)
-            if (normalizedAdjustments.isNotEmpty()) stockAdjustmentDao.insertAll(normalizedAdjustments)
+            if (normalizedCategories.isNotEmpty()) categoryDao.insertAllForRestore(normalizedCategories)
+            if (normalizedProducts.isNotEmpty()) productDao.insertAllForRestore(normalizedProducts)
+            if (normalizedSales.isNotEmpty()) saleDao.insertAllSalesForRestore(normalizedSales)
+            if (normalizedSaleItems.isNotEmpty()) saleDao.insertAllSaleItemsForRestore(normalizedSaleItems)
+            if (normalizedCustomers.isNotEmpty()) customerDao.insertAllForRestore(normalizedCustomers)
+            if (normalizedUdhaar.isNotEmpty()) udhaarDao.insertAllForRestore(normalizedUdhaar)
+            if (normalizedAdjustments.isNotEmpty()) stockAdjustmentDao.insertAllForRestore(normalizedAdjustments)
         }
         if (database != null) database.withTransaction { operation() } else operation()
     }

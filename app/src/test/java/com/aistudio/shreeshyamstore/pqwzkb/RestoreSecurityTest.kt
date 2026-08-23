@@ -2,9 +2,11 @@ package com.aistudio.shreeshyamstore.pqwzkb
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.withTransaction
 import org.robolectric.RuntimeEnvironment
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
+import com.aistudio.shreeshyamstore.pqwzkb.data.Product
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopProfile
 import com.aistudio.shreeshyamstore.pqwzkb.data.ShopRepository
 import com.aistudio.shreeshyamstore.pqwzkb.data.User
@@ -12,6 +14,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudSyncPolicy
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertFalse
+import org.junit.Assert.fail
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -80,6 +83,89 @@ class RestoreSecurityTest {
         assertNotNull(database.categoryDao().getCategoryById(99L))
         assertNotNull(database.userDao().getUserByEmail("owner@example.com"))
         assertNotNull(database.shopProfileDao().getByUid("local-owner"))
+    }
+
+    @Test
+    fun restoreAppliesParentBeforeChildReferences() = runBlocking {
+        val categoryId = 41L
+        repository.replaceCloudRestorableTables(
+            categoriesList = listOf(Category(id = categoryId, globalId = "category-41", name = "Grocery")),
+            productsList = listOf(
+                Product(
+                    id = 42L,
+                    globalId = "product-42",
+                    name = "Rice",
+                    categoryId = categoryId,
+                    mrp = 100L
+                )
+            ),
+            salesList = emptyList(),
+            saleItemsList = emptyList(),
+            customersList = emptyList(),
+            udhaarTxsList = emptyList(),
+            adjustmentsList = emptyList()
+        )
+
+        assertNotNull(database.productDao().getProductById(42L))
+    }
+
+    @Test
+    fun orphanRestoreIsRejectedBeforeExistingDataIsCleared() = runBlocking {
+        val oldCategoryId = database.categoryDao().insert(Category(name = "Existing"))
+        try {
+            repository.replaceCloudRestorableTables(
+                categoriesList = emptyList(),
+                productsList = listOf(
+                    Product(
+                        id = 99L,
+                        globalId = "orphan-product",
+                        name = "Orphan",
+                        categoryId = 404L,
+                        mrp = 100L
+                    )
+                ),
+                salesList = emptyList(),
+                saleItemsList = emptyList(),
+                customersList = emptyList(),
+                udhaarTxsList = emptyList(),
+                adjustmentsList = emptyList()
+            )
+            fail("Expected orphan restore to be rejected")
+        } catch (_: IllegalArgumentException) {
+            // Expected: validation runs before any restore delete.
+        }
+        assertNotNull(database.categoryDao().getCategoryById(oldCategoryId))
+    }
+
+    @Test
+    fun abortConflictRollsBackRestoreTransaction() = runBlocking {
+        val category = Category(id = 1L, globalId = "category-1", name = "Grocery")
+        val existing = Product(
+            id = 2L,
+            globalId = "existing-product",
+            name = "Existing",
+            categoryId = category.id,
+            mrp = 100L
+        )
+        database.categoryDao().insert(category)
+        database.productDao().insert(existing)
+
+        try {
+            database.withTransaction {
+                database.productDao().clearAllProducts()
+                database.productDao().insertAllForRestore(
+                    listOf(
+                        existing.copy(id = 3L),
+                        existing.copy(id = 4L, name = "Conflicting global ID")
+                    )
+                )
+            }
+            fail("Expected ABORT conflict")
+        } catch (_: Exception) {
+            // Expected: Room transaction restores the pre-operation rows.
+        }
+
+        assertNotNull(database.productDao().getProductById(existing.id))
     }
 
     @Test
