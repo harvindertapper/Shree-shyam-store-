@@ -95,6 +95,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.TenantAuthorizationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockRecoveryPolicyTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.BusinessRelationshipPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AuthenticatedBackupProviderTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreRecoveryEnvelopeTest
@@ -107,6 +108,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncConflictPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncPullCoordinatorTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.OperationsReadinessTest
@@ -129,7 +131,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/10.json"
+          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/11.json"
           test -f "$schema_path"
 
           if [[ -n "${GITHUB_BASE_REF:-}" ]]; then

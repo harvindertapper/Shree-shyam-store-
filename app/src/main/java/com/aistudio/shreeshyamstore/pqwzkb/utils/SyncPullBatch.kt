@@ -55,13 +55,13 @@ data class SyncPullBatch(
 
     suspend fun applyAtomically(database: AppDatabase) {
         database.withTransaction {
-            if (categories.isNotEmpty()) database.categoryDao().insertAll(categories)
-            if (products.isNotEmpty()) database.productDao().insertAll(products)
-            if (customers.isNotEmpty()) database.customerDao().insertAll(customers)
-            if (sales.isNotEmpty()) database.saleDao().insertAllSales(sales)
-            if (saleItems.isNotEmpty()) database.saleDao().insertAllSaleItems(saleItems)
-            if (udhaarTransactions.isNotEmpty()) database.udhaarDao().insertAll(udhaarTransactions)
-            if (stockAdjustments.isNotEmpty()) database.stockAdjustmentDao().insertAll(stockAdjustments)
+            if (categories.isNotEmpty()) database.categoryDao().upsertAllForSync(categories)
+            if (products.isNotEmpty()) database.productDao().upsertAllForSync(products)
+            if (customers.isNotEmpty()) database.customerDao().upsertAllForSync(customers)
+            if (sales.isNotEmpty()) database.saleDao().upsertAllSalesForSync(sales)
+            if (saleItems.isNotEmpty()) database.saleDao().upsertAllSaleItemsForSync(saleItems)
+            if (udhaarTransactions.isNotEmpty()) database.udhaarDao().upsertAllForSync(udhaarTransactions)
+            if (stockAdjustments.isNotEmpty()) database.stockAdjustmentDao().upsertAllForSync(stockAdjustments)
         }
     }
 
