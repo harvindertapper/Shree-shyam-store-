@@ -29,7 +29,10 @@ class BusinessRelationshipPolicyTest {
         BusinessRelationshipPolicy.validateRestoreGraph(
             categories = emptyList(),
             products = emptyList(),
-            sales = listOf(sale(id = 1L), sale(id = 2L)),
+            sales = listOf(
+                sale(id = 1L, billNumber = "DUPLICATE-BILL"),
+                sale(id = 2L, billNumber = "DUPLICATE-BILL")
+            ),
             saleItems = emptyList(),
             customers = emptyList(),
             udhaarTransactions = emptyList(),
@@ -112,10 +115,10 @@ class BusinessRelationshipPolicyTest {
         barcodeKey = barcodeKey
     )
 
-    private fun sale(id: Long) = Sale(
+    private fun sale(id: Long, billNumber: String = "BILL-$id") = Sale(
         id = id,
         globalId = "sale-$id",
-        billNumber = "BILL-$id",
+        billNumber = billNumber,
         totalAmount = 100L,
         paymentMode = "CASH",
         updatedAt = 1L,
