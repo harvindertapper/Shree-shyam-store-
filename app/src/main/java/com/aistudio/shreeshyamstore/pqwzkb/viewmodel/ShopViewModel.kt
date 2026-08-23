@@ -39,7 +39,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.net.URI
-import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
@@ -1014,7 +1013,8 @@ class ShopViewModel(
         _syncHealthSnapshot.value = SyncHealthSnapshot.from(
             nowEpochMs = nowEpochMs,
             lastSyncEpochMs = SyncCursor.parse(settings.lastSyncTime),
-            outbox = summary
+            outbox = summary,
+            lastSyncStatus = settings.lastSyncStatus
         )
     }
 
@@ -1166,9 +1166,6 @@ class ShopViewModel(
                 RestoreSnapshotValidator.validate(envelope, tenant)
                 _syncMessage.value = "Uploading authenticated snapshot..."
                 backupClient.uploadSnapshot(envelope)
-                settingsDataStore.updateLastSyncTime(
-                    SimpleDateFormat("dd MMM yyyy, hh:mm:ss a", Locale.ENGLISH).format(Date())
-                )
                 _syncMessage.value = "Backup Completed!"
                 onResult(true, "Cloud Backup successful!")
             } catch (error: Exception) {

@@ -17,6 +17,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
@@ -59,6 +60,7 @@ data class StoreSettings(
     val firebaseUrl: String = "",
     val firebasePrefix: String = DEFAULT_FIREBASE_PREFIX,
     val lastSyncTime: String = "Never Synced",
+    val lastSyncStatus: SyncRunStatus = SyncRunStatus.UNKNOWN,
     val autoSyncEnabled: Boolean = true,
     val appLanguage: AppLanguage = AppLanguage.HINDI
 )
@@ -95,6 +97,7 @@ class SettingsDataStore(private val context: Context) {
         private val FIREBASE_URL = stringPreferencesKey("firebase_url")
         private val FIREBASE_PREFIX = stringPreferencesKey("firebase_prefix")
         private val LAST_SYNC_TIME = stringPreferencesKey("last_sync_time")
+        private val LAST_SYNC_STATUS = stringPreferencesKey("last_sync_status")
         private val AUTO_SYNC_ENABLED = booleanPreferencesKey("auto_sync_enabled")
         private val APP_LANGUAGE = stringPreferencesKey("app_language")
     }
@@ -155,6 +158,10 @@ class SettingsDataStore(private val context: Context) {
                     ?.trim()
                     ?.ifEmpty { "Never Synced" }
                     ?: "Never Synced",
+                lastSyncStatus = preferences[LAST_SYNC_STATUS]
+                    ?.trim()
+                    ?.let { value -> runCatching { SyncRunStatus.valueOf(value) }.getOrDefault(SyncRunStatus.UNKNOWN) }
+                    ?: SyncRunStatus.UNKNOWN,
                 autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: true,
                 appLanguage = language
             )
@@ -307,6 +314,10 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun updateLastSyncTime(timeStr: String) = context.dataStore.edit {
         it[LAST_SYNC_TIME] = timeStr.trim().ifEmpty { "Never Synced" }
+    }
+
+    suspend fun updateLastSyncStatus(status: SyncRunStatus) = context.dataStore.edit {
+        it[LAST_SYNC_STATUS] = status.name
     }
 
     suspend fun updateAutoSyncEnabled(enabled: Boolean) = context.dataStore.edit {
