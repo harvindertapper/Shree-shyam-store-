@@ -59,10 +59,6 @@ class StableSyncMigrationTest {
         assertEquals(500L, product.mutationVersion)
         assertEquals(SyncIdentity.LEGACY_DEVICE_ID, product.mutationDeviceId)
         assertEquals(0, migrated.syncOutboxDao().countByState("PENDING"))
-        assertTrue(
-            migrated.openHelper.writableDatabase.rawQuery("PRAGMA index_list(products)", null)
-                .use { it.count > 0 }
-        )
         val expectedIndexes = mapOf(
             "products" to "index_products_categoryId",
             "sales" to "index_sales_customerId",
