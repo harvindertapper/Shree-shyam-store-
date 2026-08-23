@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -475,8 +476,14 @@ fun LoginScreen(viewModel: ShopViewModel) {
         ForgotPinDialog(
             viewModel = viewModel,
             registeredEmail = settings.loggedInEmail,
+            provider = settings.identityProvider,
+            language = settings.appLanguage,
             strings = strings,
-            onDismiss = { showForgotPinDialog = false }
+            onDismiss = { showForgotPinDialog = false },
+            onSwitchAccount = {
+                showForgotPinDialog = false
+                viewModel.navigateTo(Screen.Welcome)
+            }
         )
     }
 
@@ -705,13 +712,39 @@ fun LoginScreen(viewModel: ShopViewModel) {
 fun ForgotPinDialog(
     viewModel: ShopViewModel,
     registeredEmail: String,
+    provider: com.aistudio.shreeshyamstore.pqwzkb.data.IdentityProvider?,
+    language: AppLanguage,
     strings: AppStrings,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onSwitchAccount: () -> Unit
 ) {
+    val recoveryMethod = com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryPolicy.method(provider)
+    val isHindi = language == AppLanguage.HINDI
     var emailInput by remember { mutableStateOf(registeredEmail) }
+    var identifierInput by remember { mutableStateOf(registeredEmail) }
+    var passwordInput by remember { mutableStateOf("") }
+    var newPinInput by remember { mutableStateOf("") }
     var isLoading by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
+
+    fun localTitle() = if (isHindi) "लोकल अकाउंट से पिन बदलें" else "Reset PIN with local account"
+    fun localHelp() = if (isHindi) {
+        "Firebase ईमेल रीसेट लोकल अकाउंट के डिवाइस PIN को नहीं बदलता। अपने लोकल अकाउंट का पासवर्ड और नया PIN दर्ज करें।"
+    } else {
+        "A Firebase email reset cannot change a local account's device PIN. Verify the local account password and choose a new PIN."
+    }
+    fun firebaseTitle() = if (isHindi) "Google से PIN सत्यापित करें" else "Verify with Google to reset PIN"
+    fun firebaseHelp() = if (isHindi) {
+        "आपका app-lock PIN डिवाइस पर रहता है। Google account को दोबारा verify करने के बाद नया PIN सेट होगा; कोई password-reset email नहीं भेजी जाएगी।"
+    } else {
+        "Your app-lock PIN stays on this device. Re-verify the same Google account, then choose a new PIN; no password-reset email will be sent."
+    }
+    fun switchHelp() = if (isHindi) {
+        "कोई active account उपलब्ध नहीं है। पहले सही account से sign in करें।"
+    } else {
+        "No active account is available. Sign in with the correct account first."
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -730,27 +763,71 @@ fun ForgotPinDialog(
                 Icon(Icons.Default.LockReset, contentDescription = null, tint = SaffronPrimary, modifier = Modifier.size(44.dp))
 
                 Text(
-                    text = strings.resetPin,
+                    text = when (recoveryMethod) {
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> localTitle()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> firebaseTitle()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> strings.resetPin
+                    },
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Black,
-                    color = TextNearBlack
+                    color = TextNearBlack,
+                    textAlign = TextAlign.Center
                 )
 
                 Text(
-                    text = strings.resetLinkSent,
+                    text = when (recoveryMethod) {
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> localHelp()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> firebaseHelp()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> switchHelp()
+                    },
                     fontSize = 13.sp,
                     color = TextMediumGray,
                     textAlign = TextAlign.Center
                 )
 
-                OutlinedTextField(
-                    value = emailInput,
-                    onValueChange = { emailInput = it },
-                    label = { Text(strings.registeredEmail) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    modifier = Modifier.fillMaxWidth()
-                )
+                when (recoveryMethod) {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> {
+                        OutlinedTextField(
+                            value = identifierInput,
+                            onValueChange = { identifierInput = it },
+                            label = { Text(if (isHindi) "Username या Email" else "Username or Email") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        OutlinedTextField(
+                            value = passwordInput,
+                            onValueChange = { passwordInput = it },
+                            label = { Text(if (isHindi) "लोकल पासवर्ड" else "Local account password") },
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> {
+                        Text(
+                            text = if (isHindi) "Account: ${emailInput.ifBlank { "Google account" }}" else "Account: ${emailInput.ifBlank { "Google account" }}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextMediumGray,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> Unit
+                }
+
+                if (recoveryMethod != com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT) {
+                    OutlinedTextField(
+                        value = newPinInput,
+                        onValueChange = { value ->
+                            if (value.length <= 4 && value.all(Char::isDigit)) newPinInput = value
+                        },
+                        label = { Text(if (isHindi) "नया 4-अंकों का PIN" else "New 4-digit app PIN") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 if (statusMessage != null) {
                     Text(
@@ -768,36 +845,80 @@ fun ForgotPinDialog(
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        enabled = !isLoading
                     ) {
                         Text(strings.cancel)
                     }
 
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            statusMessage = null
-                            viewModel.sendForgotPinEmail(
-                                email = emailInput,
-                                onSuccess = {
-                                    isLoading = false
-                                    isSuccess = true
-                                    statusMessage = strings.resetLinkSent
+                    when (recoveryMethod) {
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> {
+                            Button(
+                                onClick = {
+                                    isLoading = true
+                                    statusMessage = null
+                                    viewModel.recoverAppLockWithLocalCredentials(
+                                        identifier = identifierInput,
+                                        password = passwordInput,
+                                        newPin = newPinInput,
+                                        onSuccess = {
+                                            isLoading = false
+                                            isSuccess = true
+                                            statusMessage = if (isHindi) "PIN बदल गया।" else "PIN changed successfully."
+                                            onDismiss()
+                                        },
+                                        onError = { error ->
+                                            isLoading = false
+                                            isSuccess = false
+                                            statusMessage = error
+                                        }
+                                    )
                                 },
-                                onError = { err ->
-                                    isLoading = false
-                                    isSuccess = false
-                                    statusMessage = err
-                                }
-                            )
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
-                        modifier = Modifier.weight(1.4f)
-                    ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Text(strings.sendLink, fontWeight = FontWeight.Bold)
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
+                                modifier = Modifier.weight(1.4f)
+                            ) {
+                                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                else Text(if (isHindi) "PIN बदलें" else "Change PIN", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> {
+                            Button(
+                                onClick = {
+                                    isLoading = true
+                                    statusMessage = null
+                                    viewModel.recoverAppLockWithFirebase(
+                                        newPin = newPinInput,
+                                        onSuccess = {
+                                            isLoading = false
+                                            isSuccess = true
+                                            statusMessage = if (isHindi) "PIN बदल गया।" else "PIN changed successfully."
+                                            onDismiss()
+                                        },
+                                        onError = { error ->
+                                            isLoading = false
+                                            isSuccess = false
+                                            statusMessage = error
+                                        }
+                                    )
+                                },
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
+                                modifier = Modifier.weight(1.4f)
+                            ) {
+                                if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                                else Text(if (isHindi) "Google से सत्यापित करें" else "Verify with Google", fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> {
+                            Button(
+                                onClick = onSwitchAccount,
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
+                                modifier = Modifier.weight(1.4f)
+                            ) {
+                                Text(if (isHindi) "Sign in करें" else "Sign in", fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
