@@ -33,6 +33,8 @@ import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuItem
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuSurface
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
@@ -656,19 +658,27 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                 Text("${strings.category}: $selectedCatName")
                                 Icon(Icons.Default.ArrowDropDown, null)
                             }
-                            DropdownMenu(
+                            AppDropdownMenuSurface(
                                 expanded = dropdownExpanded,
                                 onDismissRequest = { dropdownExpanded = false }
                             ) {
-                                categories.forEach { cat ->
-                                    DropdownMenuItem(
-                                        text = { Text(cat.name) },
-                                        onClick = {
-                                            selectedCatId = cat.id
-                                            selectedCatName = cat.name
-                                            dropdownExpanded = false
-                                        }
+                                if (categories.isEmpty()) {
+                                    AppDropdownMenuItem(
+                                        text = strings.noCategories,
+                                        onClick = {},
+                                        enabled = false
                                     )
+                                } else {
+                                    categories.forEach { cat ->
+                                        AppDropdownMenuItem(
+                                            text = cat.name,
+                                            onClick = {
+                                                selectedCatId = cat.id
+                                                selectedCatName = cat.name
+                                                dropdownExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
