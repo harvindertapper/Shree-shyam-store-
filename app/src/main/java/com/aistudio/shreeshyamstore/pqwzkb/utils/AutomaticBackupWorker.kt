@@ -90,7 +90,6 @@ class AutomaticBackupWorker(
                 allowedHosts = setOf(trustedHost)
             )
             AuthenticatedBackupTableClient(provider).uploadSnapshot(envelope)
-            settingsStore.updateLastSyncTime(SyncCursor.format(System.currentTimeMillis()))
             Log.i(TAG, "Automatic tenant snapshot backup completed")
             Result.success()
         } catch (error: BackupProviderException) {

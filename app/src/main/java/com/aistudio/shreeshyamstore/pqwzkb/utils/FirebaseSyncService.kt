@@ -173,36 +173,68 @@ class FirebaseSyncService(
         val payload: Map<String, Any?>
     )
 
-    /** Pulls all changed cloud collections and returns the new high-water mark. */
-    suspend fun pullDownstream(shopUid: String, lastSyncTime: Long): Long = withContext(Dispatchers.IO) {
+    /**
+     * Downloads and validates every changed collection before applying anything
+     * to Room. An inclusive timestamp boundary deliberately replays equal-time
+     * records; global IDs and mutation comparison make that replay idempotent.
+     */
+    suspend fun pullDownstream(shopUid: String, lastSyncTime: Long): SyncPullResult = withContext(Dispatchers.IO) {
         val uid = shopUid.trim()
-        if (uid.isEmpty()) return@withContext lastSyncTime
-        val now = System.currentTimeMillis()
-
-        try {
-            val shop = firestore.collection("shops").document(uid)
-            pullCategories(shop, lastSyncTime, now)
-            pullProducts(shop, lastSyncTime, now)
-            pullCustomers(shop, lastSyncTime, now)
-            pullSales(shop, lastSyncTime, now)
-            pullSaleItems(shop, lastSyncTime, now)
-            pullUdhaar(shop, lastSyncTime, now)
-            pullAdjustments(shop, lastSyncTime, now)
-            now
-        } catch (_: Exception) {
-            // Keep the previous cursor so a transient failure is retried rather
-            // than silently skipping records.
-            lastSyncTime
+        if (uid.isEmpty()) {
+            return@withContext SyncPullResult(SyncPullStatus.FAILED, lastSyncTime)
         }
+        val coordinator = SyncPullCoordinator(
+            fetchBatch = { previousCursor -> downloadBatch(uid, previousCursor) },
+            applyBatch = { batch -> batch.applyAtomically(database) }
+        )
+        return@withContext coordinator.run(lastSyncTime)
+    }
+
+    private suspend fun downloadBatch(shopUid: String, previousCursor: Long): SyncPullBatch {
+        val shop = firestore.collection("shops").document(shopUid)
+        val fallbackTime = System.currentTimeMillis()
+        val categoryBatch = pullCategories(shop, previousCursor, fallbackTime)
+        val productBatch = pullProducts(shop, previousCursor, fallbackTime)
+        val customerBatch = pullCustomers(shop, previousCursor, fallbackTime)
+        val salesBatch = pullSales(shop, previousCursor, fallbackTime)
+        val saleItemBatch = pullSaleItems(shop, previousCursor, fallbackTime)
+        val udhaarBatch = pullUdhaar(shop, previousCursor, fallbackTime)
+        val adjustmentBatch = pullAdjustments(shop, previousCursor, fallbackTime)
+        return SyncPullBatch(
+            categories = categoryBatch.records,
+            products = productBatch.records,
+            customers = customerBatch.records,
+            sales = salesBatch.records,
+            saleItems = saleItemBatch.records,
+            udhaarTransactions = udhaarBatch.records,
+            stockAdjustments = adjustmentBatch.records,
+            highWaterMark = listOf(
+                categoryBatch.highWaterMark,
+                productBatch.highWaterMark,
+                customerBatch.highWaterMark,
+                salesBatch.highWaterMark,
+                saleItemBatch.highWaterMark,
+                udhaarBatch.highWaterMark,
+                adjustmentBatch.highWaterMark
+            ).maxOrNull() ?: previousCursor,
+            receivedCount = listOf(
+                categoryBatch.receivedCount,
+                productBatch.receivedCount,
+                customerBatch.receivedCount,
+                salesBatch.receivedCount,
+                saleItemBatch.receivedCount,
+                udhaarBatch.receivedCount,
+                adjustmentBatch.receivedCount
+            ).sum()
+        )
     }
 
     private suspend fun localIdForDocument(
         tableName: String,
-        document: DocumentSnapshot,
-        fallbackTime: Long
+        document: DocumentSnapshot
     ): Long {
-        val remoteId = document.long("id") ?: document.id.toLongOrNull() ?: 0L
-        val globalId = document.syncGlobalId(tableName, remoteId)
+        val remoteId = document.long("id") ?: document.id.toLongOrNull()
+        val globalId = document.syncGlobalId(tableName, remoteId ?: 0L)
         return when (tableName) {
             "categories" -> database.categoryDao().getSyncStamp(globalId)?.id
             "products" -> database.productDao().getSyncStamp(globalId)?.id
@@ -212,14 +244,16 @@ class FirebaseSyncService(
             "udhaar_transactions" -> database.udhaarDao().getSyncStamp(globalId)?.id
             "stock_adjustments" -> database.stockAdjustmentDao().getSyncStamp(globalId)?.id
             else -> null
-        } ?: if (remoteId > 0L) remoteId else fallbackTime
+        } ?: remoteId ?: 0L
     }
 
     private suspend fun eligibleDocuments(
         documents: List<DocumentSnapshot>,
         tableName: String,
         fallbackTime: Long
-    ): List<DocumentSnapshot> = documents.filter { document ->
+    ): List<DocumentSnapshot> = documents.onEach { document ->
+        validateRemoteDocument(document, tableName, fallbackTime)
+    }.filter { document ->
         val localId = document.long("id") ?: document.id.toLongOrNull() ?: 0L
         val globalId = document.syncGlobalId(tableName, localId)
         val remoteVersion = document.syncMutationVersion(fallbackTime)
@@ -242,246 +276,250 @@ class FirebaseSyncService(
         ) >= 0
     }
 
-    private suspend fun pullCategories(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("categories").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "categories",
-            fallbackTime
-        )
-        database.categoryDao().insertAll(docs.mapNotNull { doc ->
-            val id = localIdForDocument("categories", doc, fallbackTime)
-            val name = doc.getString("name") ?: return@mapNotNull null
-            Category(
-                id = id,
-                globalId = doc.syncGlobalId("categories", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                name = name,
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
+    private fun validateRemoteDocument(
+        document: DocumentSnapshot,
+        tableName: String,
+        fallbackTime: Long
+    ) {
+        val remoteId = document.long("id") ?: document.id.toLongOrNull()
+        require(remoteId == null || remoteId > 0L) { "$tableName contains an invalid record ID" }
+        val explicitGlobalId = document.getString("globalId")?.trim()
+        require(!explicitGlobalId.isNullOrEmpty() || remoteId != null) {
+            "$tableName contains no stable record identity"
+        }
+        val globalId = document.syncGlobalId(tableName, remoteId ?: 0L)
+        require(globalId.isNotBlank()) { "$tableName contains a blank global ID" }
+        val updatedAt = document.long("updatedAt")
+        require(updatedAt != null && updatedAt > 0L) { "$tableName contains an invalid update timestamp" }
+        require(document.syncMutationVersion(fallbackTime) > 0L) {
+            "$tableName contains invalid mutation metadata"
+        }
     }
 
-    private suspend fun pullProducts(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("products").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "products",
-            fallbackTime
+    private suspend fun <T> pullCollection(
+        shop: DocumentReference,
+        collectionName: String,
+        tableName: String,
+        since: Long,
+        fallbackTime: Long,
+        mapper: suspend (DocumentSnapshot) -> T
+    ): SyncPullCollection<T> {
+        val snapshot = Tasks.await(
+            shop.collection(collectionName).whereGreaterThanOrEqualTo("updatedAt", since).get(),
+            FIRESTORE_TIMEOUT_SECONDS,
+            TimeUnit.SECONDS
         )
-        database.productDao().insertAll(docs.mapNotNull { doc ->
-            val id = localIdForDocument("products", doc, fallbackTime)
-            val name = doc.getString("name") ?: return@mapNotNull null
-            Product(
-                id = id,
-                globalId = doc.syncGlobalId("products", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                name = name,
-                categoryId = doc.long("categoryId") ?: 0L,
-                mrp = doc.moneyMinor("mrp"),
-                sellingPrice = doc.optionalMoneyMinor("sellingPrice"),
-                purchasePrice = doc.optionalMoneyMinor("purchasePrice"),
-                currentStock = doc.number("currentStock"),
-                unit = doc.getString("unit") ?: "pcs",
-                trackStock = doc.getBoolean("trackStock") ?: true,
-                lowStockAlertQty = doc.number("lowStockAlertQty", 5.0),
-                barcode = doc.getString("barcode").orEmpty(),
-                barcodeKey = doc.getString("barcodeKey")?.takeIf { it.isNotBlank() }
-                    ?: InventoryValidation.normalizeBarcode(doc.getString("barcode").orEmpty()),
-                isActive = doc.getBoolean("isActive") ?: true,
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
+        val documents = snapshot.documents
+        val eligible = eligibleDocuments(documents, tableName, fallbackTime)
+        val records = mutableListOf<T>()
+        for (document in eligible) {
+            records += mapper(document)
+        }
+        return SyncPullCollection(
+            records = records,
+            receivedCount = documents.size,
+            highWaterMark = documents.maxOfOrNull { document ->
+                requireNotNull(document.long("updatedAt")) { "$tableName contains an invalid update timestamp" }
+            } ?: since
+        )
     }
 
-    private suspend fun pullCustomers(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("customers").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "customers",
-            fallbackTime
+    private suspend fun pullCategories(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<Category> = pullCollection(shop, "categories", "categories", since, fallbackTime) { doc ->
+        val id = localIdForDocument("categories", doc)
+        Category(
+            id = id,
+            globalId = doc.syncGlobalId("categories", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            name = requireNotNull(doc.getString("name")) { "Malformed downstream document" },
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
         )
-        database.customerDao().insertAll(docs.mapNotNull { doc ->
-            val id = localIdForDocument("customers", doc, fallbackTime)
-            val name = doc.getString("name") ?: return@mapNotNull null
-            Customer(
-                id = id,
-                globalId = doc.syncGlobalId("customers", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                name = name,
-                phone = doc.getString("phone"),
-                creditLimit = doc.moneyMinor("creditLimit", 500_000L),
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
     }
 
-    private suspend fun pullSales(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("bills").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "sales",
-            fallbackTime
+    private suspend fun pullProducts(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<Product> = pullCollection(shop, "products", "products", since, fallbackTime) { doc ->
+        val id = localIdForDocument("products", doc)
+        Product(
+            id = id,
+            globalId = doc.syncGlobalId("products", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            name = requireNotNull(doc.getString("name")) { "Malformed downstream document" },
+            categoryId = doc.long("categoryId") ?: 0L,
+            mrp = doc.moneyMinor("mrp"),
+            sellingPrice = doc.optionalMoneyMinor("sellingPrice"),
+            purchasePrice = doc.optionalMoneyMinor("purchasePrice"),
+            currentStock = doc.number("currentStock"),
+            unit = doc.getString("unit") ?: "pcs",
+            trackStock = doc.getBoolean("trackStock") ?: true,
+            lowStockAlertQty = doc.number("lowStockAlertQty", 5.0),
+            barcode = doc.getString("barcode").orEmpty(),
+            barcodeKey = doc.getString("barcodeKey")?.takeIf { it.isNotBlank() }
+                ?: InventoryValidation.normalizeBarcode(doc.getString("barcode").orEmpty()),
+            isActive = doc.getBoolean("isActive") ?: true,
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
         )
-        database.saleDao().insertAllSales(docs.mapNotNull { doc ->
-            val id = localIdForDocument("sales", doc, fallbackTime)
-            val number = doc.getString("billNumber") ?: return@mapNotNull null
-            val totalAmount = doc.moneyMinor("totalAmount")
-            val paymentMode = doc.getString("paymentMode") ?: "CASH"
-            val paymentState = doc.getString("paymentState")
-                ?.let { runCatching { PaymentState.fromWireValue(it).wireValue }.getOrNull() }
-                ?: legacyPaymentState(paymentMode)
-            Sale(
-                id = id,
-                globalId = doc.syncGlobalId("sales", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                billNumber = number,
-                totalAmount = totalAmount,
-                paymentMode = paymentMode,
-                paymentState = paymentState,
-                receivedAmount = doc.long("receivedAmount")
-                    ?: if (paymentState == PaymentState.RECEIVED.wireValue) totalAmount else null,
-                customerId = doc.long("customerId"),
-                note = doc.getString("note"),
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
     }
 
-    private suspend fun pullSaleItems(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("sale_items").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "sale_items",
-            fallbackTime
+    private suspend fun pullCustomers(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<Customer> = pullCollection(shop, "customers", "customers", since, fallbackTime) { doc ->
+        val id = localIdForDocument("customers", doc)
+        Customer(
+            id = id,
+            globalId = doc.syncGlobalId("customers", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            name = requireNotNull(doc.getString("name")) { "Malformed downstream document" },
+            phone = doc.getString("phone"),
+            creditLimit = doc.moneyMinor("creditLimit", 500_000L),
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
         )
-        database.saleDao().insertAllSaleItems(docs.mapNotNull { doc ->
-            val id = localIdForDocument("sale_items", doc, fallbackTime)
-            val productName = doc.getString("productNameSnapshot") ?: return@mapNotNull null
-            SaleItem(
-                id = id,
-                globalId = doc.syncGlobalId("sale_items", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                saleId = doc.long("saleId") ?: return@mapNotNull null,
-                productId = doc.long("productId") ?: return@mapNotNull null,
-                productNameSnapshot = productName,
-                quantity = doc.number("quantity", 1.0),
-                unit = doc.getString("unit") ?: "pcs",
-                unitPrice = doc.moneyMinor("unitPrice"),
-                lineTotal = doc.moneyMinor("lineTotal"),
-                isSynced = true,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
     }
 
-    private suspend fun pullUdhaar(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("udhaar_transactions").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "udhaar_transactions",
-            fallbackTime
+    private suspend fun pullSales(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<Sale> = pullCollection(shop, "bills", "sales", since, fallbackTime) { doc ->
+        val id = localIdForDocument("sales", doc)
+        val paymentMode = doc.getString("paymentMode") ?: "CASH"
+        val paymentState = doc.getString("paymentState")
+            ?.let { runCatching { PaymentState.fromWireValue(it).wireValue }.getOrNull() }
+            ?: legacyPaymentState(paymentMode)
+        Sale(
+            id = id,
+            globalId = doc.syncGlobalId("sales", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            billNumber = requireNotNull(doc.getString("billNumber")) { "Malformed downstream document" },
+            totalAmount = doc.moneyMinor("totalAmount"),
+            paymentMode = paymentMode,
+            paymentState = paymentState,
+            receivedAmount = doc.long("receivedAmount")
+                ?: if (paymentState == PaymentState.RECEIVED.wireValue) doc.moneyMinor("totalAmount") else null,
+            customerId = doc.long("customerId"),
+            note = doc.getString("note"),
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
         )
-        database.udhaarDao().insertAll(docs.mapNotNull { doc ->
-            val id = localIdForDocument("udhaar_transactions", doc, fallbackTime)
-            val type = doc.getString("type") ?: "CREDIT"
-            val amount = doc.moneyMinor("amount")
-            val eventId = doc.getString("eventId")?.trim()?.ifEmpty { "legacy-$id" } ?: "legacy-$id"
-            val globalId = doc.syncGlobalId("udhaar_transactions", doc.long("id") ?: doc.id.toLongOrNull() ?: id)
-            val balanceEffect = doc.long("balanceEffect") ?: when (type) {
-                "CREDIT" -> amount
-                "PAYMENT" -> -amount
-                else -> 0L
-            }
-            UdhaarTransaction(
-                id = id,
-                eventId = eventId,
-                customerId = doc.long("customerId") ?: return@mapNotNull null,
-                saleId = doc.long("saleId"),
-                type = type,
-                amount = amount,
-                balanceEffect = balanceEffect,
-                note = doc.getString("note"),
-                correctsEventId = doc.getString("correctsEventId"),
-                correctionReason = doc.getString("correctionReason"),
-                actorUid = doc.getString("actorUid")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
-                actorName = doc.getString("actorName")?.trim()?.ifEmpty { "Legacy cloud record" } ?: "Legacy cloud record",
-                actorRole = doc.getString("actorRole")?.trim()?.ifEmpty { "OWNER" } ?: "OWNER",
-                actorDeviceId = doc.getString("actorDeviceId")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
     }
 
-    private suspend fun pullAdjustments(shop: DocumentReference, since: Long, fallbackTime: Long) {
-        val docs = eligibleDocuments(
-            Tasks.await(
-                shop.collection("stock_adjustments").whereGreaterThan("updatedAt", since).get(),
-                FIRESTORE_TIMEOUT_SECONDS,
-                TimeUnit.SECONDS
-            ).documents,
-            "stock_adjustments",
-            fallbackTime
+    private suspend fun pullSaleItems(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<SaleItem> = pullCollection(shop, "sale_items", "sale_items", since, fallbackTime) { doc ->
+        val id = localIdForDocument("sale_items", doc)
+        SaleItem(
+            id = id,
+            globalId = doc.syncGlobalId("sale_items", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            saleId = requireNotNull(doc.long("saleId")) { "Malformed downstream document" },
+            productId = requireNotNull(doc.long("productId")) { "Malformed downstream document" },
+            productNameSnapshot = requireNotNull(doc.getString("productNameSnapshot")) { "Malformed downstream document" },
+            quantity = doc.number("quantity", 1.0),
+            unit = doc.getString("unit") ?: "pcs",
+            unitPrice = doc.moneyMinor("unitPrice"),
+            lineTotal = doc.moneyMinor("lineTotal"),
+            isSynced = true,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
         )
-        database.stockAdjustmentDao().insertAll(docs.mapNotNull { doc ->
-            val id = localIdForDocument("stock_adjustments", doc, fallbackTime)
-            StockAdjustment(
-                id = id,
-                globalId = doc.syncGlobalId("stock_adjustments", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
-                productId = doc.long("productId") ?: return@mapNotNull null,
-                oldStock = doc.number("oldStock"),
-                newStock = doc.number("newStock"),
-                difference = doc.number("difference"),
-                reason = doc.getString("reason") ?: "Cloud adjustment",
-                isSynced = true,
-                createdAt = doc.long("createdAt") ?: fallbackTime,
-                updatedAt = doc.long("updatedAt") ?: fallbackTime,
-                isDeleted = doc.getBoolean("isDeleted") ?: false,
-                mutationVersion = doc.syncMutationVersion(fallbackTime),
-                mutationDeviceId = doc.syncMutationDeviceId()
-            )
-        })
+    }
+
+    private suspend fun pullUdhaar(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<UdhaarTransaction> = pullCollection(
+        shop,
+        "udhaar_transactions",
+        "udhaar_transactions",
+        since,
+        fallbackTime
+    ) { doc ->
+        val id = localIdForDocument("udhaar_transactions", doc)
+        val type = doc.getString("type") ?: "CREDIT"
+        val amount = doc.moneyMinor("amount")
+        val eventId = doc.getString("eventId")?.trim()?.ifEmpty { "legacy-$id" } ?: "legacy-$id"
+        val balanceEffect = doc.long("balanceEffect") ?: when (type) {
+            "CREDIT" -> amount
+            "PAYMENT" -> -amount
+            else -> 0L
+        }
+        UdhaarTransaction(
+            id = id,
+            eventId = eventId,
+            customerId = requireNotNull(doc.long("customerId")) { "Malformed downstream document" },
+            saleId = doc.long("saleId"),
+            type = type,
+            amount = amount,
+            balanceEffect = balanceEffect,
+            note = doc.getString("note"),
+            correctsEventId = doc.getString("correctsEventId"),
+            correctionReason = doc.getString("correctionReason"),
+            actorUid = doc.getString("actorUid")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
+            actorName = doc.getString("actorName")?.trim()?.ifEmpty { "Legacy cloud record" } ?: "Legacy cloud record",
+            actorRole = doc.getString("actorRole")?.trim()?.ifEmpty { "OWNER" } ?: "OWNER",
+            actorDeviceId = doc.getString("actorDeviceId")?.trim()?.ifEmpty { "legacy-cloud" } ?: "legacy-cloud",
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
+        )
+    }
+
+    private suspend fun pullAdjustments(
+        shop: DocumentReference,
+        since: Long,
+        fallbackTime: Long
+    ): SyncPullCollection<StockAdjustment> = pullCollection(
+        shop,
+        "stock_adjustments",
+        "stock_adjustments",
+        since,
+        fallbackTime
+    ) { doc ->
+        val id = localIdForDocument("stock_adjustments", doc)
+        StockAdjustment(
+            id = id,
+            globalId = doc.syncGlobalId("stock_adjustments", doc.long("id") ?: doc.id.toLongOrNull() ?: id),
+            productId = requireNotNull(doc.long("productId")) { "Malformed downstream document" },
+            oldStock = doc.number("oldStock"),
+            newStock = doc.number("newStock"),
+            difference = doc.number("difference"),
+            reason = doc.getString("reason") ?: "Cloud adjustment",
+            isSynced = true,
+            createdAt = doc.long("createdAt") ?: doc.long("updatedAt")!!,
+            updatedAt = doc.long("updatedAt")!!,
+            isDeleted = doc.getBoolean("isDeleted") ?: false,
+            mutationVersion = doc.syncMutationVersion(fallbackTime),
+            mutationDeviceId = doc.syncMutationDeviceId()
+        )
     }
 
     private fun Product.toCloudMap(): Map<String, Any?> = mapOf(

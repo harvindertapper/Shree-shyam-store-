@@ -40,22 +40,27 @@ data class SyncHealthSnapshot(
         fun from(
             nowEpochMs: Long,
             lastSyncEpochMs: Long,
-            outbox: SyncOutboxSummary
+            outbox: SyncOutboxSummary,
+            lastSyncStatus: SyncRunStatus = SyncRunStatus.UNKNOWN
         ): SyncHealthSnapshot {
             val health = when {
                 outbox.deadLetterCount > 0 -> SyncHealth.BLOCKED
+                lastSyncStatus == SyncRunStatus.FAILED -> SyncHealth.RETRYING
                 outbox.retryableCount > 0 -> SyncHealth.RETRYING
                 outbox.pendingCount > 0 || outbox.inFlightCount > 0 -> SyncHealth.PENDING
-                lastSyncEpochMs <= 0L -> SyncHealth.NEVER_SYNCED
-                nowEpochMs - lastSyncEpochMs > STALE_AFTER_MS -> SyncHealth.NEVER_SYNCED
+                lastSyncEpochMs <= 0L && lastSyncStatus !in setOf(SyncRunStatus.SUCCESS, SyncRunStatus.NO_CHANGES) -> SyncHealth.NEVER_SYNCED
+                nowEpochMs - lastSyncEpochMs > STALE_AFTER_MS && lastSyncStatus != SyncRunStatus.NO_CHANGES -> SyncHealth.NEVER_SYNCED
                 else -> SyncHealth.HEALTHY
             }
-            val message = when (health) {
-                SyncHealth.BLOCKED -> "Sync needs operator review. Some changes are in the dead-letter queue."
-                SyncHealth.RETRYING -> "Sync is retrying after a temporary failure."
-                SyncHealth.PENDING -> "Local changes are waiting to sync."
-                SyncHealth.NEVER_SYNCED -> "No recent completed sync is available."
-                SyncHealth.HEALTHY -> "Sync is healthy."
+            val message = when {
+                lastSyncStatus == SyncRunStatus.FAILED -> "Sync received only part of the batch or could not complete. Nothing was advanced; retrying is required."
+                else -> when (health) {
+                    SyncHealth.BLOCKED -> "Sync needs operator review. Some changes are in the dead-letter queue."
+                    SyncHealth.RETRYING -> "Sync is retrying after a temporary failure."
+                    SyncHealth.PENDING -> "Local changes are waiting to sync."
+                    SyncHealth.NEVER_SYNCED -> "No recent completed sync is available."
+                    SyncHealth.HEALTHY -> "Sync is healthy."
+                }
             }
             return SyncHealthSnapshot(
                 health = health,

@@ -4,6 +4,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.SyncOutboxSummary
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncCursor
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncHealth
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncHealthSnapshot
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus
 import java.text.SimpleDateFormat
 import java.util.Locale
 import org.junit.Assert.assertEquals
@@ -35,6 +36,31 @@ class SyncObservabilityTest {
         )
 
         assertEquals(SyncHealth.NEVER_SYNCED, snapshot.health)
+    }
+
+    @Test
+    fun successfulNoChangeRunIsHealthyEvenBeforeFirstCursor() {
+        val snapshot = SyncHealthSnapshot.from(
+            nowEpochMs = 1_700_000_000_000L,
+            lastSyncEpochMs = 0L,
+            outbox = SyncOutboxSummary(),
+            lastSyncStatus = SyncRunStatus.NO_CHANGES
+        )
+
+        assertEquals(SyncHealth.HEALTHY, snapshot.health)
+    }
+
+    @Test
+    fun failedPullIsRetryingEvenWhenOutboxIsEmpty() {
+        val snapshot = SyncHealthSnapshot.from(
+            nowEpochMs = 1_700_000_000_000L,
+            lastSyncEpochMs = 1_699_999_900_000L,
+            outbox = SyncOutboxSummary(),
+            lastSyncStatus = SyncRunStatus.FAILED
+        )
+
+        assertEquals(SyncHealth.RETRYING, snapshot.health)
+        assertTrue(snapshot.redactedMessage.contains("Nothing was advanced"))
     }
 
     @Test

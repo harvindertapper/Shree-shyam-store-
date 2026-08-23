@@ -715,6 +715,26 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 fontWeight = FontWeight.Black,
                                 color = SaffronDark
                             )
+                            val syncStatusText = when (settings.lastSyncStatus) {
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.SUCCESS ->
+                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: सिंक सफल" else "Status: Sync completed"
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.NO_CHANGES ->
+                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: कोई नया बदलाव नहीं" else "Status: No new changes"
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.FAILED ->
+                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: सिंक अधूरा है; फिर प्रयास होगा" else "Status: Sync incomplete; retry will continue"
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.UNKNOWN ->
+                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: अभी उपलब्ध नहीं" else "Status: Not available yet"
+                            }
+                            Text(
+                                text = syncStatusText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (settings.lastSyncStatus == com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.FAILED) {
+                                    Color(0xFFB3261E)
+                                } else {
+                                    TextMediumGray
+                                }
+                            )
                         }
                     }
 

@@ -42,27 +42,39 @@ class SyncWorker(
             val database = AppDatabase.getDatabase(applicationContext)
             val service = FirebaseSyncService(database, settingsStore)
             if (!service.pushUpstream(session.shopUid)) {
+                settingsStore.updateLastSyncStatus(SyncRunStatus.FAILED)
                 return retryOrFailure("upstream push failed")
             }
 
             val previousCursor = SyncCursor.parse(settings.lastSyncTime)
-            val newCursor = service.pullDownstream(session.shopUid, previousCursor)
-            if (newCursor <= previousCursor) {
-                // A successful pull always returns a fresh high-water mark. Do
-                // not advance the stored cursor when the service kept it after
-                // a transient failure.
-                return retryOrFailure("downstream pull failed")
+            val pullResult = service.pullDownstream(session.shopUid, previousCursor)
+            when (pullResult.status) {
+                SyncPullStatus.APPLIED -> {
+                    check(pullResult.nextCursor >= previousCursor) {
+                        "Downstream pull returned a regressed cursor"
+                    }
+                    settingsStore.updateLastSyncTime(SyncCursor.format(pullResult.nextCursor))
+                    settingsStore.updateLastSyncStatus(SyncRunStatus.SUCCESS)
+                    Log.i(TAG, "Background sync completed with ${pullResult.appliedCount} applied records")
+                    Result.success()
+                }
+                SyncPullStatus.NO_CHANGES -> {
+                    settingsStore.updateLastSyncStatus(SyncRunStatus.NO_CHANGES)
+                    Log.i(TAG, "Background sync completed with no downstream changes")
+                    Result.success()
+                }
+                SyncPullStatus.FAILED -> {
+                    settingsStore.updateLastSyncStatus(SyncRunStatus.FAILED)
+                    retryOrFailure("downstream pull failed before atomic commit")
+                }
             }
-
-            val formatted = SyncCursor.format(newCursor.coerceAtLeast(System.currentTimeMillis()))
-            settingsStore.updateLastSyncTime(formatted)
-            Log.i(TAG, "Background sync completed at $formatted")
-            Result.success()
         } catch (error: IOException) {
             Log.w(TAG, "Network error during sync: ${error.message}")
+            settingsStore.updateLastSyncStatus(SyncRunStatus.FAILED)
             retryOrFailure("network error")
         } catch (error: Exception) {
             Log.e(TAG, "Sync worker failed: ${error.message}", error)
+            settingsStore.updateLastSyncStatus(SyncRunStatus.FAILED)
             retryOrFailure("unexpected error")
         }
     }
