@@ -23,6 +23,10 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.BackupUnauthorizedException
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginPolicy
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalLoginResult
+import com.aistudio.shreeshyamstore.pqwzkb.utils.OperatorAction
+import com.aistudio.shreeshyamstore.pqwzkb.utils.OperatorActionPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.utils.OperatorGateException
+import com.aistudio.shreeshyamstore.pqwzkb.utils.localizedOperatorGateMessage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.PinUnlockResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocalRecoveryPointStore
@@ -68,9 +72,10 @@ class ShopViewModel(
     private val context: Context? = null
 ) : ViewModel() {
 
-    suspend fun currentCommandMetadata(): CommandMetadata {
-        val session = reconcileIdentitySession()
-            ?: error("Authenticated actor is required")
+    suspend fun currentCommandMetadata(
+        action: OperatorAction = OperatorAction.CHECKOUT
+    ): CommandMetadata {
+        val session = OperatorActionPolicy.requireAllowed(action, reconcileIdentitySession())
         val tenantContext = settingsDataStore.getOrCreateTenantDeviceContext(session)
         val actor = PlatformActor(
             actorId = session.uid,
@@ -136,6 +141,24 @@ class ShopViewModel(
             }
         }
         return null
+    }
+
+    private fun operatorGateMessage(error: Throwable): String =
+        localizedOperatorGateMessage(error, storeSettings.value.appLanguage).orEmpty()
+
+    private fun safeMutationMessage(fallback: String, error: Throwable): String {
+        val gateMessage = operatorGateMessage(error)
+        if (gateMessage.isNotBlank()) return gateMessage
+        val message = error.message?.trim().orEmpty()
+        val strings = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
+        return when {
+            message.contains("Authenticated actor is required", ignoreCase = true) ->
+                strings.actionSignInRequired
+            message.contains("not authorized", ignoreCase = true) ->
+                strings.actionPermissionDenied
+            else -> fallback
+        }
     }
 
     private suspend fun clearFirebaseAuthorityForLocalSession() {
@@ -614,10 +637,11 @@ class ShopViewModel(
 
     // --- Billing State (Cart) ---
     private val billingCheckout = BillingCheckoutController(
-        gateway = ShopRepositoryBillingGateway(repository) { currentCommandMetadata() },
+        gateway = ShopRepositoryBillingGateway(repository) { currentCommandMetadata(OperatorAction.CHECKOUT) },
         scope = viewModelScope,
         onAutoSync = ::triggerAutoSync,
-        onCheckoutSuccess = { navigateTo(Screen.BillSuccess) }
+        onCheckoutSuccess = { navigateTo(Screen.BillSuccess) },
+        onGateError = { error -> operatorGateMessage(error).takeIf { it.isNotBlank() } }
     )
 
     val cartState: StateFlow<Map<Product, Double>> = billingCheckout.cartState
@@ -671,14 +695,14 @@ class ShopViewModel(
                     product = prod,
                     openingStock = normalizedStock,
                     createdAt = now,
-                    command = currentCommandMetadata()
+                    command = currentCommandMetadata(OperatorAction.CATALOG_WRITE)
                 )
 
                 // Add the inserted product directly to our cart.
                 addProductToCart(prod.copy(id = newId), 1.0)
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, error.message ?: "Product could not be added", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, safeMutationMessage("Product could not be added", error), Toast.LENGTH_LONG).show()
             } catch (_: Exception) {
                 Toast.makeText(context, "Product could not be added", Toast.LENGTH_LONG).show()
             }
@@ -760,13 +784,13 @@ class ShopViewModel(
                     customerId = customerId,
                     amountMinorUnits = amountMinorUnits,
                     note = note,
-                    command = currentCommandMetadata()
+                    command = currentCommandMetadata(OperatorAction.LEDGER_RECORD)
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
                 Toast.makeText(
                     context,
-                    error.message ?: "Payment was not saved",
+                    safeMutationMessage("Payment was not saved", error),
                     Toast.LENGTH_LONG
                 ).show()
             } catch (_: Exception) {
@@ -782,11 +806,11 @@ class ShopViewModel(
                     customerId = customerId,
                     eventId = eventId,
                     reason = reason,
-                    command = currentCommandMetadata()
+                    command = currentCommandMetadata(OperatorAction.LEDGER_CORRECTION)
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, error.message ?: "Ledger reversal was not saved", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, safeMutationMessage("Ledger reversal was not saved", error), Toast.LENGTH_LONG).show()
             } catch (_: Exception) {
                 Toast.makeText(context, "Ledger reversal could not be saved", Toast.LENGTH_LONG).show()
             }
@@ -806,11 +830,11 @@ class ShopViewModel(
                     eventId = eventId,
                     correctedAmountMinorUnits = correctedAmountMinorUnits,
                     reason = reason,
-                    command = currentCommandMetadata()
+                    command = currentCommandMetadata(OperatorAction.LEDGER_CORRECTION)
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, error.message ?: "Ledger correction was not saved", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, safeMutationMessage("Ledger correction was not saved", error), Toast.LENGTH_LONG).show()
             } catch (_: Exception) {
                 Toast.makeText(context, "Ledger correction could not be saved", Toast.LENGTH_LONG).show()
             }
@@ -828,7 +852,7 @@ class ShopViewModel(
                             name = trimmedName,
                             phone = phone.trim().ifEmpty { null }
                         ),
-                        command = currentCommandMetadata()
+                        command = currentCommandMetadata(OperatorAction.CATALOG_WRITE)
                     )
                     triggerAutoSync()
                 }
@@ -979,11 +1003,11 @@ class ShopViewModel(
                     productId = product.id,
                     actualStockCounted = newStock,
                     reason = "Bulk Wholesale Restock",
-                    command = currentCommandMetadata()
+                    command = currentCommandMetadata(OperatorAction.INVENTORY_ADJUSTMENT)
                 )
                 triggerAutoSync()
             } catch (error: IllegalArgumentException) {
-                Toast.makeText(context, error.message ?: "Restock could not be saved", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, safeMutationMessage("Restock could not be saved", error), Toast.LENGTH_LONG).show()
             } catch (_: Exception) {
                 Toast.makeText(context, "Restock could not be saved", Toast.LENGTH_LONG).show()
             }
@@ -1147,7 +1171,14 @@ class ShopViewModel(
             val settings = settingsDataStore.settingsFlow.first()
             val identitySession = reconcileIdentitySession()
             if (identitySession == null) {
-                onResult(false, "No valid authenticated store session is available for backup.")
+                onResult(false, com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                    .getStrings(settings.appLanguage).actionSignInRequired)
+                return@launch
+            }
+            try {
+                OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_BACKUP, identitySession)
+            } catch (error: OperatorGateException) {
+                onResult(false, operatorGateMessage(error))
                 return@launch
             }
             val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
@@ -1186,7 +1217,14 @@ class ShopViewModel(
             val settings = settingsDataStore.settingsFlow.first()
             val identitySession = reconcileIdentitySession()
             if (identitySession == null) {
-                onResult(false, "No valid authenticated store session is available for restore.")
+                onResult(false, com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                    .getStrings(settings.appLanguage).actionSignInRequired)
+                return@launch
+            }
+            try {
+                OperatorActionPolicy.requireAllowed(OperatorAction.CLOUD_RESTORE, identitySession)
+            } catch (error: OperatorGateException) {
+                onResult(false, operatorGateMessage(error))
                 return@launch
             }
             val tenant = settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()

@@ -80,7 +80,9 @@ class MainActivity : FragmentActivity() {
             this,
             InventoryViewModelFactory(
                 repository = repo,
-                commandProvider = viewModel::currentCommandMetadata,
+                commandProvider = { viewModel.currentCommandMetadata() },
+                actionCommandProvider = viewModel::currentCommandMetadata,
+                languageProvider = { viewModel.storeSettings.value.appLanguage },
                 onMutation = { viewModel.triggerAutoSync() },
                 onError = { message ->
                     Toast.makeText(applicationContext, message, Toast.LENGTH_LONG).show()
