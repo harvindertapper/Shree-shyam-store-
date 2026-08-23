@@ -3,6 +3,7 @@ package com.aistudio.shreeshyamstore.pqwzkb
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncIdentity
 import kotlinx.coroutines.runBlocking
@@ -47,7 +48,8 @@ class StableSyncMigrationTest {
                 AppDatabase.MIGRATION_6_7,
                 AppDatabase.MIGRATION_7_8,
                 AppDatabase.MIGRATION_8_9,
-                AppDatabase.MIGRATION_9_10
+                AppDatabase.MIGRATION_9_10,
+                AppDatabase.MIGRATION_10_11
             )
             .allowMainThreadQueries()
             .build()
@@ -57,13 +59,30 @@ class StableSyncMigrationTest {
         assertEquals(500L, product.mutationVersion)
         assertEquals(SyncIdentity.LEGACY_DEVICE_ID, product.mutationDeviceId)
         assertEquals(0, migrated.syncOutboxDao().countByState("PENDING"))
-        assertTrue(migrated.openHelper.writableDatabase.query("PRAGMA index_list(products)").use { it.count > 0 })
+        val expectedIndexes = mapOf(
+            "products" to "index_products_categoryId",
+            "sales" to "index_sales_customerId",
+            "sale_items" to "index_sale_items_saleId",
+            "udhaar_transactions" to "index_udhaar_transactions_customerId",
+            "stock_adjustments" to "index_stock_adjustments_productId"
+        )
+        expectedIndexes.forEach { (table, index) ->
+            assertTrue("Missing $index", index in indexNames(migrated.openHelper.writableDatabase, table))
+        }
 
         migrated.close()
     }
 
 
 }
+
+internal fun indexNames(database: SupportSQLiteDatabase, table: String): Set<String> =
+    database.query("PRAGMA index_list($table)").use { cursor ->
+        val nameColumn = cursor.getColumnIndexOrThrow("name")
+        buildSet {
+            while (cursor.moveToNext()) add(cursor.getString(nameColumn))
+        }
+    }
 
 internal fun createV5Schema(database: SQLiteDatabase) {
     database.execSQL("CREATE TABLE categories (id INTEGER NOT NULL PRIMARY KEY, name TEXT NOT NULL, isSynced INTEGER NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, isDeleted INTEGER NOT NULL)")
