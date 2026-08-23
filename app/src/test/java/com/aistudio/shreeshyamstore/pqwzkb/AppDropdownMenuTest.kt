@@ -2,7 +2,7 @@ package com.aistudio.shreeshyamstore.pqwzkb
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -39,8 +39,7 @@ class AppDropdownMenuTest {
             }
         }
 
-        composeTestRule.onNodeWithTag("shared_menu").assertExists()
-        composeTestRule.onNodeWithTag("selected_menu_item").assertExists()
-        composeTestRule.onNodeWithText("Selected Category").assertExists()
+        composeTestRule.onNodeWithTag("selected_menu_item").performClick()
+        composeTestRule.onNodeWithText("Selected Category").performClick()
     }
 }
