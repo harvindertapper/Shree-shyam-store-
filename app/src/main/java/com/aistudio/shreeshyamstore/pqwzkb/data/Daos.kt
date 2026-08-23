@@ -140,7 +140,13 @@ abstract class SaleDao {
         mutationDeviceId: String
     ): Int
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Local checkout must never replace an existing sale when a bill-number
+     * collision occurs. The unique bill-number index is the final concurrency
+     * boundary, so surface the constraint failure and let the transaction roll
+     * back instead of silently overwriting an audited bill.
+     */
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     abstract suspend fun insertSale(sale: Sale): Long
 
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId AND isDeleted = 0")
