@@ -85,7 +85,13 @@ data class Product(
     }
 }
 
-@Entity(tableName = "sales", indices = [Index(value = ["globalId"], unique = true)])
+@Entity(
+    tableName = "sales",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["billNumber"], unique = true)
+    ]
+)
 data class Sale(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(defaultValue = "''") val globalId: String = "",

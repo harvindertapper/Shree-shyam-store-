@@ -1,6 +1,7 @@
 package com.aistudio.shreeshyamstore.pqwzkb
 
 import android.content.Context
+import android.database.sqlite.SQLiteConstraintException
 import androidx.room.Room
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommandMetadata
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.PlatformActor
@@ -205,6 +206,23 @@ class CheckoutInvariantsTest {
 
         assertEquals(1, database.saleDao().countAllSales())
         assertEquals(2.0, database.productDao().getProductById(productId)!!.currentStock, 0.0)
+    }
+
+    @Test
+    fun databaseRejectsDuplicateBillNumberWhenPreflightIsBypassed() = runBlocking {
+        val first = sale(total = 1000L).copy(globalId = "sale-global-1", billNumber = "DUPLICATE-BILL")
+        val second = sale(total = 1000L).copy(globalId = "sale-global-2", billNumber = "DUPLICATE-BILL")
+
+        database.saleDao().insertSale(first)
+
+        try {
+            database.saleDao().insertSale(second)
+            fail("Expected the unique bill-number index to reject the duplicate")
+        } catch (_: SQLiteConstraintException) {
+            // The database boundary must reject duplicates independently of preflight checks.
+        }
+
+        assertEquals(1, database.saleDao().countAllSales())
     }
 
     @Test
