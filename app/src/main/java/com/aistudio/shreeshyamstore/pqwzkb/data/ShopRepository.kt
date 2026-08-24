@@ -93,8 +93,12 @@ class ShopRepository(
     ): Long {
         authorize(command, TenantCapability.CATALOG_WRITE)
         return inCatalogTransaction {
-        val normalizedStock = InventoryValidation.validateQuantity(openingStock, "Opening stock")
-        val normalized = normalizeProduct(product.copy(currentStock = normalizedStock))
+        val normalized = normalizeProduct(product.copy(currentStock = openingStock))
+        val normalizedStock = if (normalized.trackStock) {
+            InventoryValidation.validateQuantityForUnit(openingStock, "Opening stock", normalized.unit)
+        } else {
+            InventoryValidation.validateQuantity(openingStock, "Opening stock")
+        }
         requireActiveCategory(normalized.categoryId)
         requireNoDuplicateBarcode(normalized.barcodeKey, 0L)
         val productId = productDao.insert(normalized.stamped(mutationDeviceId()))
@@ -136,9 +140,13 @@ class ShopRepository(
     ) {
         authorize(command, TenantCapability.CATALOG_WRITE)
         inCatalogTransaction {
-            val normalizedOldStock = InventoryValidation.validateQuantity(oldStock, "Old stock")
-            val normalizedNewStock = InventoryValidation.validateQuantity(newStock, "New stock")
-            val normalized = normalizeProduct(product.copy(currentStock = normalizedNewStock))
+            val normalized = normalizeProduct(product.copy(currentStock = newStock))
+            val normalizedOldStock = if (normalized.trackStock) {
+                InventoryValidation.validateQuantityForUnit(oldStock, "Old stock", normalized.unit)
+            } else {
+                InventoryValidation.validateQuantity(oldStock, "Old stock")
+            }
+            val normalizedNewStock = normalized.currentStock
             requireActiveCategory(normalized.categoryId)
             requireNoDuplicateBarcode(normalized.barcodeKey, product.id)
             productDao.update(normalized.stamped(mutationDeviceId()))
@@ -182,15 +190,24 @@ class ShopRepository(
     )
 
     private fun normalizeProduct(product: Product): Product {
-        val normalizedBarcode = InventoryValidation.normalizeBarcode(product.barcode)
+        val normalizedUnit = InventoryValidation.validateRequiredUnit(product.unit)
+        val normalizedBarcode = InventoryValidation.validateOptionalBarcode(product.barcode)
         return product.copy(
             name = InventoryValidation.validateProductName(product.name),
-            mrp = InventoryValidation.validateProductMoney(product.mrp, "MRP"),
+            mrp = InventoryValidation.validateRequiredProductMoney(product.mrp, "MRP"),
             sellingPrice = InventoryValidation.validateOptionalMoney(product.sellingPrice, "Selling price"),
             purchasePrice = InventoryValidation.validateOptionalMoney(product.purchasePrice, "Purchase price"),
-            currentStock = InventoryValidation.validateQuantity(product.currentStock, "Current stock"),
-            lowStockAlertQty = InventoryValidation.validateQuantity(product.lowStockAlertQty, "Low-stock alert quantity"),
-            unit = InventoryValidation.validateUnit(product.unit),
+            currentStock = if (product.trackStock) {
+                InventoryValidation.validateQuantityForUnit(product.currentStock, "Current stock", normalizedUnit)
+            } else {
+                InventoryValidation.validateQuantity(product.currentStock, "Current stock")
+            },
+            lowStockAlertQty = if (product.trackStock) {
+                InventoryValidation.validateQuantityForUnit(product.lowStockAlertQty, "Low-stock alert quantity", normalizedUnit)
+            } else {
+                InventoryValidation.validateQuantity(product.lowStockAlertQty, "Low-stock alert quantity")
+            },
+            unit = normalizedUnit,
             barcode = product.barcode.trim(),
             barcodeKey = normalizedBarcode
         )
@@ -605,12 +622,16 @@ class ShopRepository(
         command: CommandMetadata
     ) {
         val authorizedCommand = authorize(command, TenantCapability.INVENTORY_ADJUSTMENT)
-        val validatedStock = InventoryValidation.validateQuantity(actualStockCounted, "Stock")
         val validatedReason = InventoryValidation.validateReason(reason)
         val operation: suspend () -> Unit = {
             val product = productDao.getProductById(productId)
             require(product != null && product.isActive && !product.isDeleted) {
                 "Stock adjustment requires an active product"
+            }
+            val validatedStock = if (product.trackStock) {
+                InventoryValidation.validateQuantityForUnit(actualStockCounted, "Stock", product.unit)
+            } else {
+                InventoryValidation.validateQuantity(actualStockCounted, "Stock")
             }
             val oldStock = product.currentStock
             val now = System.currentTimeMillis()

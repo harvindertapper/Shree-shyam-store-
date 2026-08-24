@@ -183,13 +183,21 @@ class InventoryViewModel(
         viewModelScope.launch {
             try {
                 val normalizedName = InventoryValidation.validateProductName(name)
-                val normalizedMrp = InventoryValidation.validateProductMoney(mrp, "MRP")
+                val normalizedMrp = InventoryValidation.validateRequiredProductMoney(mrp, "MRP")
                 val normalizedSellingPrice = InventoryValidation.validateOptionalMoney(sellingPrice, "Selling price")
                 val normalizedPurchasePrice = InventoryValidation.validateOptionalMoney(purchasePrice, "Purchase price")
-                val normalizedStock = InventoryValidation.validateQuantity(currentStock, "Current stock")
-                val normalizedAlertQty = InventoryValidation.validateQuantity(lowStockAlertQty, "Low-stock alert quantity")
-                val normalizedUnit = InventoryValidation.validateUnit(unit)
-                val normalizedBarcode = InventoryValidation.normalizeBarcode(barcode)
+                val normalizedUnit = InventoryValidation.validateRequiredUnit(unit)
+                val normalizedStock = if (trackStock) {
+                    InventoryValidation.validateQuantityForUnit(currentStock, "Current stock", normalizedUnit)
+                } else {
+                    InventoryValidation.validateQuantity(currentStock, "Current stock")
+                }
+                val normalizedAlertQty = if (trackStock) {
+                    InventoryValidation.validateQuantityForUnit(lowStockAlertQty, "Low-stock alert quantity", normalizedUnit)
+                } else {
+                    InventoryValidation.validateQuantity(lowStockAlertQty, "Low-stock alert quantity")
+                }
+                val normalizedBarcode = InventoryValidation.validateOptionalBarcode(barcode)
                 require(repository.isBarcodeAvailable(normalizedBarcode.orEmpty(), id)) {
                     "Barcode already belongs to another active product"
                 }
@@ -207,7 +215,7 @@ class InventoryViewModel(
                         unit = normalizedUnit,
                         trackStock = trackStock,
                         lowStockAlertQty = normalizedAlertQty,
-                        barcode = barcode.trim(),
+                        barcode = normalizedBarcode.orEmpty(),
                         barcodeKey = normalizedBarcode,
                         isActive = isActive,
                         createdAt = now,
@@ -234,7 +242,7 @@ class InventoryViewModel(
                             unit = normalizedUnit,
                             trackStock = trackStock,
                             lowStockAlertQty = normalizedAlertQty,
-                            barcode = barcode.trim(),
+                            barcode = normalizedBarcode.orEmpty(),
                             barcodeKey = normalizedBarcode,
                             isActive = isActive,
                             updatedAt = now

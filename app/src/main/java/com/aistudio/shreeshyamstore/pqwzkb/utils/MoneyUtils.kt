@@ -16,12 +16,15 @@ object MoneyUtils {
     const val MINOR_UNITS_PER_RUPEE = 100L
     private const val CURRENCY_SCALE = 2
     private val INDIA_LOCALE = Locale.Builder().setLanguage("en").setRegion("IN").build()
+    private val DECIMAL_INPUT_PATTERN = Regex("^[+]?(?:\\d+(?:[.,]\\d*)?|[.,]\\d+)$")
 
     fun parseMajorUnits(input: String): Long? {
         val normalized = input.trim()
-        if (normalized.isEmpty()) return null
+        if (normalized.isEmpty() || !DECIMAL_INPUT_PATTERN.matches(normalized)) return null
+        if (normalized.contains(',') && normalized.contains('.')) return null
+        val canonical = normalized.replace(',', '.')
         return runCatching {
-            BigDecimal(normalized)
+            BigDecimal(canonical)
                 .setScale(CURRENCY_SCALE, RoundingMode.HALF_UP)
                 .movePointRight(CURRENCY_SCALE)
                 .longValueExact()

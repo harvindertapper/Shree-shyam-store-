@@ -45,6 +45,7 @@ import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ProductFormValidation
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
@@ -614,9 +615,18 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
             Dialog(onDismissRequest = { if (!mutationInFlight) showQuickAddDialog = false }) {
                 var newName by remember { mutableStateOf("") }
                 var newMrp by remember { mutableStateOf("") }
-                var selectedCatId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
+                var newUnit by remember { mutableStateOf("pcs") }
+                var selectedCatId by remember { mutableStateOf<Long?>(null) }
                 var trackStock by remember { mutableStateOf(true) }
-                var initialStock by remember { mutableStateOf("10") }
+                var initialStock by remember { mutableStateOf("") }
+
+                LaunchedEffect(categories) {
+                    if (selectedCatId == null && categories.isNotEmpty()) {
+                        selectedCatId = categories.first().id
+                    } else if (selectedCatId != null && categories.none { it.id == selectedCatId }) {
+                        selectedCatId = categories.firstOrNull()?.id
+                    }
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -669,19 +679,27 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                             )
                         }
 
+                        OutlinedTextField(
+                            value = newUnit,
+                            onValueChange = { newUnit = it; quickAddInputError = null },
+                            label = { Text(strings.productFormUnitLabel) },
+                            placeholder = { Text(strings.productFormUnitHint) },
+                            modifier = Modifier.fillMaxWidth().testTag("quick_add_product_unit")
+                        )
+
                         // Category Dropdown
                         var dropdownExpanded by remember { mutableStateOf(false) }
-                        var selectedCatName by remember(selectedCatId) {
-                            mutableStateOf(categories.find { it.id == selectedCatId }?.name ?: "General")
-                        }
+                        val selectedCatName = categories.firstOrNull { it.id == selectedCatId }?.name
+                            ?: strings.productFormChooseCategory
 
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedButton(
-                                onClick = { dropdownExpanded = true },
+                                onClick = { if (categories.isNotEmpty()) dropdownExpanded = true },
+                                enabled = categories.isNotEmpty(),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("${strings.category}: $selectedCatName")
-                                Icon(Icons.Default.ArrowDropDown, null)
+                                Icon(Icons.Default.ArrowDropDown, strings.productFormChooseCategory)
                             }
                             AppDropdownMenuSurface(
                                 expanded = dropdownExpanded,
@@ -699,7 +717,6 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                             text = cat.name,
                                             onClick = {
                                                 selectedCatId = cat.id
-                                                selectedCatName = cat.name
                                                 dropdownExpanded = false
                                             }
                                         )
@@ -730,22 +747,32 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                 Text(strings.cancel)
                             }
 
-                            val saveAndAddText = if (settings.appLanguage == AppLanguage.HINDI) "सेव करें व बिल में जोड़ें" else "Save & Add to Bill"
                             Button(
                                 enabled = !mutationInFlight,
                                 onClick = {
-                                    val mrpValue = MoneyUtils.parseMajorUnits(newMrp)
-                                    val stockValue = initialStock.toDoubleOrNull() ?: 0.0
-                                    if (newName.trim().isEmpty() || mrpValue == null || mrpValue <= 0L) {
+                                    val validation = ProductFormValidation.validate(
+                                        name = newName,
+                                        categoryId = selectedCatId,
+                                        mrp = newMrp,
+                                        sellingPrice = "",
+                                        purchasePrice = "",
+                                        unit = newUnit,
+                                        stock = initialStock,
+                                        lowStockAlert = "5",
+                                        barcode = "",
+                                        trackStock = trackStock
+                                    )
+                                    if (!validation.isValid) {
                                         quickAddInputError = strings.statusValidationError
                                     } else {
                                         quickAddInputError = null
                                         viewModel.quickAddProduct(
-                                            name = newName,
-                                            mrp = mrpValue,
-                                            categoryId = selectedCatId,
+                                            name = validation.normalizedName,
+                                            mrp = validation.normalizedMrp!!,
+                                            categoryId = validation.normalizedCategoryId!!,
                                             trackStock = trackStock,
-                                            currentStock = if (trackStock) stockValue else 0.0,
+                                            currentStock = validation.normalizedStock ?: 0.0,
+                                            unit = validation.normalizedUnit,
                                             onSuccess = { showQuickAddDialog = false }
                                         )
                                     }
@@ -753,7 +780,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                 modifier = Modifier.weight(1.5f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text(saveAndAddText)
+                                Text(strings.productFormSaveAndAdd)
                             }
                         }
                     }
