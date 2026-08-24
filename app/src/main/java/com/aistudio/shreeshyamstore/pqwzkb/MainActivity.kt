@@ -27,6 +27,8 @@ import com.aistudio.shreeshyamstore.pqwzkb.ui.screens.*
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.MyApplicationTheme
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.SaffronPrimary
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.SlateSecondary
+import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.TextMediumGray
+import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.TextNearBlack
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModelFactory
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
@@ -132,11 +134,11 @@ class MainActivity : FragmentActivity() {
                         // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
                         if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
                             val navItemColors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color.White,
+                                selectedIconColor = TextNearBlack,
+                                selectedTextColor = SaffronPrimary,
                                 indicatorColor = SaffronPrimary,
-                                unselectedIconColor = Color(0xFFE2E8F0),
-                                unselectedTextColor = Color(0xFFE2E8F0)
+                                unselectedIconColor = TextMediumGray,
+                                unselectedTextColor = TextMediumGray
                             )
                             NavigationBar(
                                 containerColor = SlateSecondary,
@@ -146,48 +148,54 @@ class MainActivity : FragmentActivity() {
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Home,
                                     onClick = { viewModel.navigateTo(Screen.Home) },
-                                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
+                                    icon = { Icon(Icons.Default.Home, contentDescription = strings.navHome) },
                                     label = { Text(strings.navHome, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_home")
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Billing || currentScreen is Screen.Payment || currentScreen is Screen.BillSuccess,
                                     onClick = { viewModel.navigateTo(Screen.Billing) },
-                                    icon = { Icon(Icons.Default.AddShoppingCart, contentDescription = "Billing") },
+                                    icon = { Icon(Icons.Default.AddShoppingCart, contentDescription = strings.navBilling) },
                                     label = { Text(strings.navBilling, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_billing")
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Products || currentScreen is Screen.AddEditProduct || currentScreen is Screen.OpeningStock || currentScreen is Screen.StockAdjustment,
                                     onClick = { viewModel.navigateTo(Screen.Products) },
-                                    icon = { Icon(Icons.Default.Store, contentDescription = "Products") },
+                                    icon = { Icon(Icons.Default.Store, contentDescription = strings.navProducts) },
                                     label = { Text(strings.navProducts, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_products")
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Udhaar || currentScreen is Screen.CustomerDetail,
                                     onClick = { viewModel.navigateTo(Screen.Udhaar) },
-                                    icon = { Icon(Icons.Default.ImportContacts, contentDescription = "Udhaar") },
+                                    icon = { Icon(Icons.Default.ImportContacts, contentDescription = strings.navUdhaar) },
                                     label = { Text(strings.navUdhaar, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_udhaar")
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Reports,
                                     onClick = { viewModel.navigateTo(Screen.Reports) },
-                                    icon = { Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = "Reports") },
+                                    icon = { Icon(Icons.AutoMirrored.Filled.TrendingUp, contentDescription = strings.navReports) },
                                     label = { Text(strings.navReports, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_reports")
                                 )
                                 NavigationBarItem(
                                     selected = currentScreen is Screen.Settings,
                                     onClick = { viewModel.navigateTo(Screen.Settings) },
-                                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                                    icon = { Icon(Icons.Default.Settings, contentDescription = strings.navSettings) },
                                     label = { Text(strings.navSettings, style = MaterialTheme.typography.labelSmall) },
+                                    alwaysShowLabel = true,
                                     colors = navItemColors,
                                     modifier = Modifier.testTag("nav_settings")
                                 )

@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.aistudio.shreeshyamstore.pqwzkb.data.Category
 import com.aistudio.shreeshyamstore.pqwzkb.data.Product
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuItem
+import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuSurface
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
@@ -766,36 +768,36 @@ fun AddEditProductScreen(
                         unfocusedBorderColor = MaterialTheme.colorScheme.outline
                     )
                 )
-                DropdownMenu(
+                AppDropdownMenuSurface(
                     expanded = catDropdownExpanded,
-                    onDismissRequest = { catDropdownExpanded = false },
-                    containerColor = Color.White
+                    onDismissRequest = { catDropdownExpanded = false }
                 ) {
-                    categories.forEach { cat ->
-                        DropdownMenuItem(
-                            text = { Text(cat.name, fontWeight = FontWeight.Bold, color = TextNearBlack) },
-                            onClick = {
-                                categoryId = cat.id
-                                catDropdownExpanded = false
-                            },
-                            colors = MenuDefaults.itemColors(textColor = TextNearBlack)
+                    if (categories.isEmpty()) {
+                        AppDropdownMenuItem(
+                            text = strings.noCategories,
+                            onClick = {},
+                            enabled = false
                         )
+                    } else {
+                        categories.forEach { cat ->
+                            AppDropdownMenuItem(
+                                text = cat.name,
+                                onClick = {
+                                    categoryId = cat.id
+                                    catDropdownExpanded = false
+                                }
+                            )
+                        }
                     }
                     HorizontalDivider(color = BorderStrong)
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = if (settings.appLanguage == AppLanguage.HINDI) "＋ नई कैटेगरी" else "＋ New Category",
-                                fontWeight = FontWeight.Black,
-                                color = SaffronPrimary
-                            )
-                        },
+                    AppDropdownMenuItem(
+                        text = strings.addNewCategory,
                         onClick = {
                             catDropdownExpanded = false
                             newCategoryName = ""
                             showNewCategoryDialog = true
                         },
-                        colors = MenuDefaults.itemColors(textColor = SaffronPrimary)
+                        emphasized = true
                     )
                 }
             }
@@ -1438,18 +1440,26 @@ fun StockAdjustmentScreen(
                                 Text("$reasonLabel: $selectedReason")
                                 Icon(Icons.Default.ArrowDropDown, null)
                             }
-                            DropdownMenu(
+                            AppDropdownMenuSurface(
                                 expanded = dropdownExpanded,
                                 onDismissRequest = { dropdownExpanded = false }
                             ) {
-                                reasons.forEach { reas ->
-                                    DropdownMenuItem(
-                                        text = { Text(reas) },
-                                        onClick = {
-                                            selectedReason = reas
-                                            dropdownExpanded = false
-                                        }
+                                if (reasons.isEmpty()) {
+                                    AppDropdownMenuItem(
+                                        text = strings.noReasonsAvailable,
+                                        onClick = {},
+                                        enabled = false
                                     )
+                                } else {
+                                    reasons.forEach { reas ->
+                                        AppDropdownMenuItem(
+                                            text = reas,
+                                            onClick = {
+                                                selectedReason = reas
+                                                dropdownExpanded = false
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }

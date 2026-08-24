@@ -96,6 +96,7 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockRecoveryPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.OperatorActionPolicyTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.AppDropdownMenuTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.BusinessRelationshipPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.AuthenticatedBackupProviderTest
