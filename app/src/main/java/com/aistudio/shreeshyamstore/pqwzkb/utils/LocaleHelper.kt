@@ -140,6 +140,9 @@ interface AppStrings {
     val stockAdjustmentTitle: String
     val productName: String
     val category: String
+    val addNewCategory: String
+    val noCategories: String
+    val noReasonsAvailable: String
     val mrpPrice: String
     val sellingPrice: String
     val purchasePrice: String
@@ -315,6 +318,9 @@ object HindiStrings : AppStrings {
     override val stockAdjustmentTitle = "स्टॉक सुधार"
     override val productName = "सामान का नाम"
     override val category = "कैटेगरी"
+    override val addNewCategory = "＋ नई कैटेगरी"
+    override val noCategories = "कोई कैटेगरी नहीं"
+    override val noReasonsAvailable = "कोई कारण उपलब्ध नहीं"
     override val mrpPrice = "MRP कीमत"
     override val sellingPrice = "बिक्री कीमत"
     override val purchasePrice = "खरीद कीमत"
@@ -487,6 +493,9 @@ object EnglishStrings : AppStrings {
     override val stockAdjustmentTitle = "Stock Adjustment"
     override val productName = "Product Name"
     override val category = "Category"
+    override val addNewCategory = "＋ New Category"
+    override val noCategories = "No categories yet"
+    override val noReasonsAvailable = "No reasons available"
     override val mrpPrice = "MRP Price"
     override val sellingPrice = "Selling Price"
     override val purchasePrice = "Purchase Price"
