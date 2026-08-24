@@ -298,14 +298,94 @@ class ShopViewModel(
         }
     }
 
-    fun updateSettings(shopName: String, ownerPhone: String, welcomeChantEnabled: Boolean, qrImageUri: String, securityPin: String = "") {
+    fun updateSettings(
+        shopName: String,
+        ownerPhone: String,
+        welcomeChantEnabled: Boolean,
+        qrImageUri: String,
+        securityPin: String = ""
+    ) {
+        val current = storeSettings.value
+        saveMerchantSettings(
+            shopName = shopName,
+            ownerName = current.ownerName,
+            ownerPhone = ownerPhone,
+            welcomeChantEnabled = welcomeChantEnabled,
+            qrImageUri = qrImageUri,
+            autoSyncEnabled = current.autoSyncEnabled,
+            appLockEnabled = current.appLockEnabled,
+            biometricEnabled = current.biometricEnabled,
+            newSecurityPin = securityPin.trim().takeIf { it.isNotEmpty() }
+        )
+    }
+
+    fun saveMerchantSettings(
+        shopName: String,
+        ownerName: String,
+        ownerPhone: String,
+        welcomeChantEnabled: Boolean,
+        qrImageUri: String,
+        autoSyncEnabled: Boolean,
+        appLockEnabled: Boolean,
+        biometricEnabled: Boolean,
+        newSecurityPin: String? = null,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        if (!beginMutation {
+                saveMerchantSettings(
+                    shopName = shopName,
+                    ownerName = ownerName,
+                    ownerPhone = ownerPhone,
+                    welcomeChantEnabled = welcomeChantEnabled,
+                    qrImageUri = qrImageUri,
+                    autoSyncEnabled = autoSyncEnabled,
+                    appLockEnabled = appLockEnabled,
+                    biometricEnabled = biometricEnabled,
+                    newSecurityPin = newSecurityPin,
+                    onSuccess = onSuccess,
+                    onError = onError
+                )
+            }) return
+
         viewModelScope.launch {
-            settingsDataStore.updateShopName(shopName)
-            settingsDataStore.updateOwnerPhone(ownerPhone)
-            settingsDataStore.updateWelcomeChantEnabled(welcomeChantEnabled)
-            settingsDataStore.updateStaticPaytmQrImageUri(qrImageUri)
-            settingsDataStore.updateSecurityPin(securityPin)
-            settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
+            try {
+                require(shopName.trim().isNotEmpty()) { "Shop name is required" }
+                newSecurityPin?.let { pin ->
+                    require(SecurityUtils.isAcceptableNewPin(pin)) {
+                        "New PIN does not satisfy the local security policy"
+                    }
+                }
+                markMutationSavingLocally()
+                settingsDataStore.updateMerchantSettings(
+                    shopName = shopName,
+                    ownerName = ownerName,
+                    ownerPhone = ownerPhone,
+                    welcomeChantEnabled = welcomeChantEnabled,
+                    staticPaytmQrImageUri = qrImageUri,
+                    autoSyncEnabled = autoSyncEnabled,
+                    appLockEnabled = appLockEnabled,
+                    biometricEnabled = biometricEnabled,
+                    newSecurityPin = newSecurityPin
+                )
+                val savedSettings = settingsDataStore.settingsFlow.first()
+                context?.let { appContext ->
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.configureAutomaticSync(
+                        context = appContext,
+                        enabled = savedSettings.isUserLoggedIn && savedSettings.autoSyncEnabled
+                    )
+                }
+                markMutationSavedLocally()
+                if (savedSettings.isUserLoggedIn && savedSettings.autoSyncEnabled) {
+                    triggerAutoSync()
+                }
+                onSuccess()
+            } catch (error: Exception) {
+                val message = com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+                    .getStrings(storeSettings.value.appLanguage).statusFailure
+                markMutationFailure(error, message)
+                onError(message)
+            }
         }
     }
 
