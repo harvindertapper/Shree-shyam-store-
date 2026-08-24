@@ -221,6 +221,91 @@ interface AppStrings {
     val saveSettings: String
     val logout: String
     val activeOwner: String
+
+    // Settings control center
+    val settingsAccountSection: String
+    val settingsAccountProvider: String
+    val settingsProviderFirebase: String
+    val settingsProviderLocal: String
+    val settingsNotAssigned: String
+    val settingsStoreIdentity: String
+    val settingsTenantIdentity: String
+    val settingsSignedIn: String
+    val settingsSignedOut: String
+    val settingsCloudSignInRequired: String
+    val settingsShopProfileHint: String
+    val settingsSecurityHint: String
+    val settingsAppLockOnHint: String
+    val settingsAppLockOffHint: String
+    val settingsSetPinHint: String
+    val settingsPinConfirmLabel: String
+    val settingsPinMismatch: String
+    val settingsBiometricAvailable: String
+    val settingsBiometricUnavailable: String
+    val settingsLanguageHint: String
+    val settingsAppearanceSection: String
+    val settingsAppearanceHint: String
+    val settingsAutomaticSync: String
+    val settingsAutomaticSyncHint: String
+    val settingsManualSync: String
+    val settingsCloudBackupTitle: String
+    val settingsCloudBackupHint: String
+    val settingsBackupNow: String
+    val settingsRestore: String
+    val settingsRestoreWarningTitle: String
+    val settingsRestoreWarningMessage: String
+    val settingsRestoreConfirmAction: String
+    val settingsBillingSection: String
+    val settingsManualUpiSettlement: String
+    val settingsManualUpiSettlementHint: String
+    val settingsInventorySection: String
+    val settingsInventoryHint: String
+    val settingsCustomersSection: String
+    val settingsCustomersHint: String
+    val settingsSyncSection: String
+    val settingsSyncHealth: String
+    val settingsLastAttempt: String
+    val settingsLastSuccess: String
+    val settingsLastAttemptUnavailable: String
+    val settingsHealthHealthy: String
+    val settingsHealthNever: String
+    val settingsHealthPending: String
+    val settingsHealthRetrying: String
+    val settingsHealthBlocked: String
+    val settingsPending: String
+    val settingsRetryable: String
+    val settingsDeadLetter: String
+    val settingsConflicts: String
+    val settingsDataPrivacySection: String
+    val settingsDataPrivacyHint: String
+    val settingsSupportSection: String
+    val settingsVersion: String
+    val settingsSupportHint: String
+    val settingsSaveHint: String
+    val settingsSavedLocally: String
+    val settingsSaveValidationShopName: String
+    val settingsSaveValidationPin: String
+    val settingsSaveValidationPinConfirm: String
+    val settingsDisableLockTitle: String
+    val settingsDisableLockMessage: String
+    val settingsConfirmDisable: String
+    val settingsKeepLock: String
+    val settingsLockDraftNotice: String
+    val settingsOwnerPhonePlaceholder: String
+    val settingsPinPlaceholder: String
+    val settingsBack: String
+    val settingsUserAvatar: String
+    val settingsSignIn: String
+    val settingsWelcomeChantHint: String
+    val settingsQrPreview: String
+    val settingsChangeQr: String
+    val settingsNoQrSelected: String
+    val settingsSyncNote: String
+    val settingsLastSyncLabel: String
+    val settingsSyncStatusSuccess: String
+    val settingsSyncStatusNoChanges: String
+    val settingsSyncStatusFailed: String
+    val settingsSyncStatusUnavailable: String
 }
 
 object HindiStrings : AppStrings {
@@ -417,6 +502,90 @@ object HindiStrings : AppStrings {
     override val saveSettings = "सेटिंग्स सुरक्षित करें"
     override val logout = "लॉगआउट"
     override val activeOwner = "सक्रिय दुकानदार"
+
+    override val settingsAccountSection = "खाता और स्टोर पहचान"
+    override val settingsAccountProvider = "खाता प्रदाता"
+    override val settingsProviderFirebase = "Google / Firebase"
+    override val settingsProviderLocal = "स्थानीय डिवाइस खाता"
+    override val settingsNotAssigned = "अभी निर्धारित नहीं"
+    override val settingsStoreIdentity = "स्टोर पहचान"
+    override val settingsTenantIdentity = "स्टोर कार्यक्षेत्र"
+    override val settingsSignedIn = "साइन इन है"
+    override val settingsSignedOut = "साइन इन नहीं है"
+    override val settingsCloudSignInRequired = "सुरक्षित क्लाउड सिंक और बैकअप के लिए Google से साइन इन करें।"
+    override val settingsShopProfileHint = "यह जानकारी बिल, रसीद और स्टोर पहचान में उपयोग होती है।"
+    override val settingsSecurityHint = "ऐप लॉक डिवाइस पर ही सुरक्षित रहता है। PIN या बायोमेट्रिक जानकारी क्लाउड पर नहीं भेजी जाती।"
+    override val settingsAppLockOnHint = "ऐप बंद होने या कुछ समय निष्क्रिय रहने पर PIN माँगा जाएगा।"
+    override val settingsAppLockOffHint = "ऐप लॉक बंद है। दुकान साझा डिवाइस पर हो तो इसे चालू रखें।"
+    override val settingsSetPinHint = "PIN बदलने के लिए नया सुरक्षित 4-अंकों का PIN और पुष्टि दर्ज करें।"
+    override val settingsPinConfirmLabel = "PIN की पुष्टि करें"
+    override val settingsPinMismatch = "दोनों PIN एक जैसे होने चाहिए।"
+    override val settingsBiometricAvailable = "इस डिवाइस पर बायोमेट्रिक उपलब्ध है।"
+    override val settingsBiometricUnavailable = "इस डिवाइस पर बायोमेट्रिक उपलब्ध नहीं है; PIN का उपयोग करें।"
+    override val settingsLanguageHint = "बिल, स्टॉक, उधार और रिपोर्ट की भाषा चुनें।"
+    override val settingsAppearanceSection = "दिखावट और पहुँच"
+    override val settingsAppearanceHint = "भाषा नियंत्रण उपलब्ध है। अलग theme, font-size या accessibility presets अभी उपलब्ध नहीं हैं।"
+    override val settingsAutomaticSync = "स्वचालित सिंक और बैकअप"
+    override val settingsAutomaticSyncHint = "इंटरनेट मिलते ही लोकल बदलाव सिंक होंगे और सुरक्षित snapshot बैकअप बनेगा।"
+    override val settingsManualSync = "अभी सिंक करें"
+    override val settingsCloudBackupTitle = "क्लाउड बैकअप और रिस्टोर"
+    override val settingsCloudBackupHint = "साइन इन खाते के साथ सुरक्षित डेटा कॉपी और रिकवरी।"
+    override val settingsBackupNow = "अभी बैकअप लें"
+    override val settingsRestore = "रिस्टोर करें"
+    override val settingsRestoreWarningTitle = "डेटा बदलने की चेतावनी"
+    override val settingsRestoreWarningMessage = "क्लाउड snapshot आपके डिवाइस के cloud-owned डेटा को बदलेगा। पहले snapshot जाँचा जाएगा और recovery point बनाया जाएगा।"
+    override val settingsRestoreConfirmAction = "हाँ, रिस्टोर करें"
+    override val settingsBillingSection = "बिलिंग और भुगतान"
+    override val settingsManualUpiSettlement = "UPI भुगतान की पुष्टि"
+    override val settingsManualUpiSettlementHint = "UPI भुगतान को बिल में दर्ज करें और वास्तविक settlement अपने बैंक/UPI ऐप में मैन्युअली जाँचें।"
+    override val settingsInventorySection = "स्टॉक और सामान"
+    override val settingsInventoryHint = "स्टॉक ट्रैकिंग, कम-स्टॉक सीमा और इकाई अभी सामान के स्तर पर सेट होती है। ग्लोबल डिफॉल्ट उपलब्ध नहीं है।"
+    override val settingsCustomersSection = "ग्राहक और उधार"
+    override val settingsCustomersHint = "उधार सीमा और भुगतान ग्राहक खाते के अनुसार लागू होती है। ग्लोबल रिमाइंडर डिफॉल्ट अभी उपलब्ध नहीं है।"
+    override val settingsSyncSection = "सिंक और बैकअप"
+    override val settingsSyncHealth = "सिंक स्वास्थ्य"
+    override val settingsLastAttempt = "अंतिम प्रयास"
+    override val settingsLastSuccess = "अंतिम सफल पुष्टि"
+    override val settingsLastAttemptUnavailable = "अलग अंतिम प्रयास समय अभी दर्ज नहीं है।"
+    override val settingsHealthHealthy = "सिंक ठीक है"
+    override val settingsHealthNever = "हाल की सफल सिंक उपलब्ध नहीं"
+    override val settingsHealthPending = "स्थानीय बदलाव सिंक की प्रतीक्षा में हैं"
+    override val settingsHealthRetrying = "सिंक फिर प्रयास कर रहा है"
+    override val settingsHealthBlocked = "कुछ बदलावों की समीक्षा जरूरी है"
+    override val settingsPending = "बाकी बदलाव"
+    override val settingsRetryable = "फिर प्रयास योग्य"
+    override val settingsDeadLetter = "समीक्षा जरूरी"
+    override val settingsConflicts = "टकराव"
+    override val settingsDataPrivacySection = "डेटा और गोपनीयता"
+    override val settingsDataPrivacyHint = "पासवर्ड, PIN verifier और session secrets डिवाइस से बाहर नहीं जाते। Restore से पहले snapshot जाँच और recovery point बनाया जाता है।"
+    override val settingsSupportSection = "सहायता और जानकारी"
+    override val settingsVersion = "ऐप संस्करण"
+    override val settingsSupportHint = "समस्या होने पर ऐप संस्करण और बिना संवेदनशील डेटा के स्थिति साझा करें।"
+    override val settingsSaveHint = "स्थानीय सेटिंग्स पहले डिवाइस पर सुरक्षित होंगी। क्लाउड बैकअप अलग कार्रवाई है।"
+    override val settingsSavedLocally = "सेटिंग्स इस डिवाइस पर सुरक्षित हो गईं।"
+    override val settingsSaveValidationShopName = "दुकान का नाम आवश्यक है।"
+    override val settingsSaveValidationPin = "नया PIN सुरक्षित 4-अंकों का होना चाहिए।"
+    override val settingsSaveValidationPinConfirm = "PIN की पुष्टि करें।"
+    override val settingsDisableLockTitle = "ऐप लॉक बंद करें?"
+    override val settingsDisableLockMessage = "ऐप लॉक बंद करने पर इस डिवाइस पर दुकान खोलने के लिए PIN नहीं माँगा जाएगा। क्या आप जारी रखना चाहते हैं?"
+    override val settingsConfirmDisable = "लॉक बंद करें"
+    override val settingsKeepLock = "लॉक चालू रखें"
+    override val settingsLockDraftNotice = "ऐप लॉक बंद करने का विकल्प चुना गया है। बदलाव लागू करने के लिए नीचे 'सेटिंग्स सेव करें' दबाएं।"
+    override val settingsOwnerPhonePlaceholder = "9876543210"
+    override val settingsPinPlaceholder = "4 अंकों का PIN"
+    override val settingsBack = "वापस"
+    override val settingsUserAvatar = "यूज़र प्रोफ़ाइल"
+    override val settingsSignIn = "साइन इन करें"
+    override val settingsWelcomeChantHint = "ऐप शुरू होने पर 'जय श्री श्याम' भजन बजाएं।"
+    override val settingsQrPreview = "अपलोड किए गए QR का प्रीव्यू"
+    override val settingsChangeQr = "QR फोटो बदलें"
+    override val settingsNoQrSelected = "कोई QR नहीं चुना गया"
+    override val settingsSyncNote = "क्लाउड बैकअप आपके स्टोर खाते के साथ सुरक्षित डेटा कॉपी रखता है।"
+    override val settingsLastSyncLabel = "अंतिम सिंक"
+    override val settingsSyncStatusSuccess = "स्थिति: सिंक सफल"
+    override val settingsSyncStatusNoChanges = "स्थिति: कोई नया बदलाव नहीं"
+    override val settingsSyncStatusFailed = "स्थिति: सिंक अधूरा है; फिर प्रयास होगा"
+    override val settingsSyncStatusUnavailable = "स्थिति: अभी उपलब्ध नहीं"
 }
 
 object EnglishStrings : AppStrings {
@@ -613,4 +782,88 @@ object EnglishStrings : AppStrings {
     override val saveSettings = "Save Settings"
     override val logout = "Logout"
     override val activeOwner = "Active Owner"
+
+    override val settingsAccountSection = "Account & store identity"
+    override val settingsAccountProvider = "Account provider"
+    override val settingsProviderFirebase = "Google / Firebase"
+    override val settingsProviderLocal = "Local device account"
+    override val settingsNotAssigned = "Not assigned yet"
+    override val settingsStoreIdentity = "Store identity"
+    override val settingsTenantIdentity = "Store workspace"
+    override val settingsSignedIn = "Signed in"
+    override val settingsSignedOut = "Not signed in"
+    override val settingsCloudSignInRequired = "Sign in with Google for secure cloud sync and backup."
+    override val settingsShopProfileHint = "This information is used on bills, receipts, and store identity."
+    override val settingsSecurityHint = "App-lock data stays on this device. PIN and biometric information are never sent to the cloud."
+    override val settingsAppLockOnHint = "The app will ask for your PIN after it is closed or inactive."
+    override val settingsAppLockOffHint = "App lock is off. Keep it on when the shop uses a shared device."
+    override val settingsSetPinHint = "To change the PIN, enter a new safe 4-digit PIN and confirm it."
+    override val settingsPinConfirmLabel = "Confirm PIN"
+    override val settingsPinMismatch = "Both PIN entries must match."
+    override val settingsBiometricAvailable = "Biometric unlock is available on this device."
+    override val settingsBiometricUnavailable = "Biometric unlock is unavailable on this device; use the PIN."
+    override val settingsLanguageHint = "Choose the language for billing, stock, udhaar, and reports."
+    override val settingsAppearanceSection = "Appearance & accessibility"
+    override val settingsAppearanceHint = "Language control is available. Separate theme, font-size, or accessibility presets are not available yet."
+    override val settingsAutomaticSync = "Automatic sync & backup"
+    override val settingsAutomaticSyncHint = "When online, local changes sync and a protected snapshot backup is created."
+    override val settingsManualSync = "Sync now"
+    override val settingsCloudBackupTitle = "Cloud backup & restore"
+    override val settingsCloudBackupHint = "Secure data copy and recovery with the signed-in account."
+    override val settingsBackupNow = "Back up now"
+    override val settingsRestore = "Restore"
+    override val settingsRestoreWarningTitle = "Data replacement warning"
+    override val settingsRestoreWarningMessage = "The cloud snapshot will replace cloud-owned data on this device. The snapshot will be validated and a recovery point will be created first."
+    override val settingsRestoreConfirmAction = "Yes, restore"
+    override val settingsBillingSection = "Billing & payments"
+    override val settingsManualUpiSettlement = "UPI payment confirmation"
+    override val settingsManualUpiSettlementHint = "Record UPI payment in the bill and verify actual settlement manually in your bank or UPI app."
+    override val settingsInventorySection = "Stock & products"
+    override val settingsInventoryHint = "Stock tracking, low-stock limits, and units are set per product. Global defaults are not available yet."
+    override val settingsCustomersSection = "Customers & udhaar"
+    override val settingsCustomersHint = "Credit limits and payments are enforced per customer. A global reminder default is not available yet."
+    override val settingsSyncSection = "Sync & backup"
+    override val settingsSyncHealth = "Sync health"
+    override val settingsLastAttempt = "Last attempt"
+    override val settingsLastSuccess = "Last successful acknowledgement"
+    override val settingsLastAttemptUnavailable = "A separate last-attempt time is not recorded yet."
+    override val settingsHealthHealthy = "Sync is healthy"
+    override val settingsHealthNever = "No recent successful sync"
+    override val settingsHealthPending = "Local changes are waiting to sync"
+    override val settingsHealthRetrying = "Sync is retrying"
+    override val settingsHealthBlocked = "Some changes need review"
+    override val settingsPending = "Pending changes"
+    override val settingsRetryable = "Retryable"
+    override val settingsDeadLetter = "Needs review"
+    override val settingsConflicts = "Conflicts"
+    override val settingsDataPrivacySection = "Data & privacy"
+    override val settingsDataPrivacyHint = "Passwords, PIN verifiers, and session secrets stay on the device. Restore validates the snapshot and creates a recovery point first."
+    override val settingsSupportSection = "Support & information"
+    override val settingsVersion = "App version"
+    override val settingsSupportHint = "When reporting a problem, share the app version and redacted status only."
+    override val settingsSaveHint = "Settings are saved on this device first. Cloud backup is a separate action."
+    override val settingsSavedLocally = "Settings saved on this device."
+    override val settingsSaveValidationShopName = "Shop name is required."
+    override val settingsSaveValidationPin = "The new PIN must be a safe 4-digit PIN."
+    override val settingsSaveValidationPinConfirm = "Confirm the new PIN."
+    override val settingsDisableLockTitle = "Turn off app lock?"
+    override val settingsDisableLockMessage = "With app lock off, this device will not ask for a PIN before opening the shop. Continue?"
+    override val settingsConfirmDisable = "Turn off lock"
+    override val settingsKeepLock = "Keep lock on"
+    override val settingsLockDraftNotice = "Turning off app lock is selected. Tap 'Save settings' below to apply this change."
+    override val settingsOwnerPhonePlaceholder = "9876543210"
+    override val settingsPinPlaceholder = "4-digit PIN"
+    override val settingsBack = "Back"
+    override val settingsUserAvatar = "User profile"
+    override val settingsSignIn = "Sign in"
+    override val settingsWelcomeChantHint = "Play devotional greeting on app launch."
+    override val settingsQrPreview = "Uploaded QR preview"
+    override val settingsChangeQr = "Change QR photo"
+    override val settingsNoQrSelected = "No QR selected"
+    override val settingsSyncNote = "Cloud backup keeps a protected copy with your store account."
+    override val settingsLastSyncLabel = "Last sync"
+    override val settingsSyncStatusSuccess = "Status: Sync completed"
+    override val settingsSyncStatusNoChanges = "Status: No new changes"
+    override val settingsSyncStatusFailed = "Status: Sync incomplete; retry will continue"
+    override val settingsSyncStatusUnavailable = "Status: Not available yet"
 }

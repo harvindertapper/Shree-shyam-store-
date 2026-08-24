@@ -2,6 +2,7 @@ package com.aistudio.shreeshyamstore.pqwzkb.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -172,41 +173,69 @@ class SettingsDataStore(private val context: Context) {
     }
 
     suspend fun updateSecurityPin(pin: String) = context.dataStore.edit {
+        writeSecurityPin(it, pin)
+    }
+
+    private fun writeSecurityPin(preferences: MutablePreferences, pin: String) {
         val normalized = pin.trim()
         when {
             normalized.isEmpty() -> {
                 // Keep the legacy marker explicitly so a future release can
                 // remove the default-PIN fallback without ambiguity.
-                it.remove(SECURITY_PIN)
-                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
+                preferences.remove(SECURITY_PIN)
+                preferences[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
             }
             SecurityUtils.isVersionedCredential(
                 normalized,
                 SecurityUtils.CredentialScope.APP_LOCK
             ) -> {
-                it[SECURITY_PIN] = normalized
-                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
+                preferences[SECURITY_PIN] = normalized
+                preferences[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
             }
             SecurityUtils.isSha256Hash(normalized) -> {
                 // Compatibility only: existing SHA-256 values migrate on the
                 // next successful unlock, never on a new PIN entry.
-                it[SECURITY_PIN] = normalized.lowercase()
-                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
+                preferences[SECURITY_PIN] = normalized.lowercase()
+                preferences[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.LEGACY_CREDENTIAL_VERSION
             }
             else -> {
                 require(SecurityUtils.isAcceptableNewPin(normalized)) {
                     "App-lock PIN does not satisfy the local security policy"
                 }
-                it[SECURITY_PIN] = SecurityUtils.createCredential(
+                preferences[SECURITY_PIN] = SecurityUtils.createCredential(
                     normalized,
                     SecurityUtils.CredentialScope.APP_LOCK
                 )
-                it[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
+                preferences[SECURITY_PIN_FORMAT_VERSION] = SecurityUtils.CURRENT_CREDENTIAL_VERSION
             }
         }
-        it[FAILED_PIN_ATTEMPTS] = 0
-        it[PIN_LOCKED_UNTIL_EPOCH_MS] = 0L
-        it[LAST_UNLOCK_AT_EPOCH_MS] = 0L
+        preferences[FAILED_PIN_ATTEMPTS] = 0
+        preferences[PIN_LOCKED_UNTIL_EPOCH_MS] = 0L
+        preferences[LAST_UNLOCK_AT_EPOCH_MS] = 0L
+    }
+
+    suspend fun updateMerchantSettings(
+        shopName: String,
+        ownerName: String,
+        ownerPhone: String,
+        welcomeChantEnabled: Boolean,
+        staticPaytmQrImageUri: String,
+        autoSyncEnabled: Boolean,
+        appLockEnabled: Boolean,
+        biometricEnabled: Boolean,
+        newSecurityPin: String? = null
+    ) = context.dataStore.edit { preferences ->
+        preferences[SHOP_NAME] = shopName.trim()
+        preferences[OWNER_NAME] = ownerName.trim()
+        preferences[OWNER_PHONE] = ownerPhone.trim()
+        preferences[WELCOME_CHANT_ENABLED] = welcomeChantEnabled
+        preferences[STATIC_PAYTM_QR_IMAGE_URI] = staticPaytmQrImageUri.trim()
+        preferences[AUTO_SYNC_ENABLED] = autoSyncEnabled
+        preferences[APP_LOCK_ENABLED] = appLockEnabled
+        preferences[BIOMETRIC_ENABLED] = biometricEnabled && appLockEnabled
+        if (newSecurityPin != null) {
+            writeSecurityPin(preferences, newSecurityPin)
+        }
     }
 
     suspend fun updateAppLockState(state: AppLockState) = context.dataStore.edit {

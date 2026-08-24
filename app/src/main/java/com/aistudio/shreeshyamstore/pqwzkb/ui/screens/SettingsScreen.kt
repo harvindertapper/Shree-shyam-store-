@@ -1,6 +1,5 @@
 package com.aistudio.shreeshyamstore.pqwzkb.ui.screens
 
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,13 +28,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.aistudio.shreeshyamstore.pqwzkb.BuildConfig
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppOutlinedTextField
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppPrimaryButton
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
 import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
-import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SettingsValidation
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SettingsValidationError
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncHealth
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
@@ -48,22 +50,40 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
     var shopName by remember { mutableStateOf("") }
+    var ownerName by remember { mutableStateOf("") }
     var ownerPhone by remember { mutableStateOf("") }
     var securityPin by remember { mutableStateOf("") }
+    var securityPinConfirm by remember { mutableStateOf("") }
     var welcomeChantEnabled by remember { mutableStateOf(true) }
     var qrUriString by remember { mutableStateOf("") }
     var autoSyncEnabled by remember { mutableStateOf(true) }
+    var appLockEnabled by remember { mutableStateOf(true) }
+    var biometricEnabled by remember { mutableStateOf(false) }
+    var settingsNotice by remember { mutableStateOf<String?>(null) }
+    var settingsNoticeIsError by remember { mutableStateOf(false) }
+    var hasUnsavedChanges by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var showDisableLockConfirm by remember { mutableStateOf(false) }
 
     val mutationStatus by viewModel.mutationStatus.collectAsState()
     val mutationInFlight by viewModel.mutationInFlight.collectAsState()
+    val syncHealth by viewModel.syncHealthSnapshot.collectAsState()
+    val biometricAvailable = remember(context) { viewModel.isBiometricAvailable() }
 
     LaunchedEffect(settings) {
+        if (hasUnsavedChanges) return@LaunchedEffect
         shopName = settings.shopName
+        ownerName = settings.ownerName
         ownerPhone = settings.ownerPhone
         welcomeChantEnabled = settings.welcomeChantEnabled
         qrUriString = settings.staticPaytmQrImageUri
         autoSyncEnabled = settings.autoSyncEnabled
+        appLockEnabled = settings.appLockEnabled
+        biometricEnabled = settings.biometricEnabled
+    }
+
+    LaunchedEffect(settings.lastSyncTime, settings.lastSyncStatus, settings.isUserLoggedIn) {
+        viewModel.refreshSyncHealth()
     }
 
     // Modern Secure Gallery Photo Picker launcher
@@ -72,8 +92,9 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     ) { uri ->
         if (uri != null) {
             qrUriString = uri.toString()
-            val toastMsg = if (settings.appLanguage == AppLanguage.HINDI) "QR कोड फोटो चुन ली गई! सुरक्षित करें पर टैप करें।" else "QR code selected! Tap Save Settings."
-            Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
+            hasUnsavedChanges = true
+            settingsNotice = strings.settingsSaveHint
+            settingsNoticeIsError = false
         }
     }
 
@@ -83,7 +104,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 title = { Text(strings.settingsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.settingsBack)
                     }
                 }
             )
@@ -129,6 +150,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             color = SaffronDark
                         )
                     }
+                    Text(
+                        text = strings.settingsLanguageHint,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedGray,
+                        lineHeight = 17.sp
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -159,7 +187,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "हिंदी",
+                                    text = strings.languageHindi,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = if (settings.appLanguage == AppLanguage.HINDI) SaffronDark else TextNearBlack
@@ -192,7 +220,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "English",
+                                    text = strings.languageEnglish,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp,
                                     color = if (settings.appLanguage == AppLanguage.ENGLISH) SaffronDark else TextNearBlack
@@ -202,6 +230,14 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     }
                 }
             }
+
+            SettingsInfoCard(
+                title = strings.settingsAppearanceSection,
+                detail = strings.settingsAppearanceHint,
+                testTag = "settings_appearance_summary_card"
+            )
+
+            SettingsSectionHeading(strings.settingsAccountSection)
 
             // Session Profile display card
             if (settings.isUserLoggedIn) {
@@ -224,7 +260,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                                 Icon(
                                     imageVector = Icons.Default.AccountCircle,
-                                    contentDescription = "User avatar",
+                                    contentDescription = strings.settingsUserAvatar,
                                     tint = SaffronDark,
                                     modifier = Modifier.size(32.dp)
                                 )
@@ -248,6 +284,28 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                         fontWeight = FontWeight.Bold,
                                         color = TextMediumGray
                                     )
+                                    Text(
+                                        text = "${strings.settingsAccountProvider}: ${when (settings.identityProvider) {
+                                            com.aistudio.shreeshyamstore.pqwzkb.data.IdentityProvider.FIREBASE -> strings.settingsProviderFirebase
+                                            com.aistudio.shreeshyamstore.pqwzkb.data.IdentityProvider.LOCAL -> strings.settingsProviderLocal
+                                            null -> strings.settingsNotAssigned
+                                        }}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextMediumGray
+                                    )
+                                    Text(
+                                        text = "${strings.settingsStoreIdentity}: ${maskedIdentity(settings.storeId, strings.settingsNotAssigned)}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextMediumGray
+                                    )
+                                    Text(
+                                        text = "${strings.settingsTenantIdentity}: ${maskedIdentity(settings.organizationId, strings.settingsNotAssigned)}",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = TextMediumGray
+                                    )
                                 }
                             }
                             Button(
@@ -256,10 +314,22 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.testTag("logout_button").heightIn(min = 40.dp)
                             ) {
-                                Icon(Icons.Default.Logout, contentDescription = "Log out", modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Logout, contentDescription = strings.logout, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(strings.logout, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
+                        }
+                        TextButton(
+                            onClick = { viewModel.logoutUser() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("switch_account_button")
+                        ) {
+                            Text(
+                                text = strings.switchAccount,
+                                fontWeight = FontWeight.Bold,
+                                color = SaffronDark
+                            )
                         }
                     }
                 }
@@ -280,19 +350,16 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         Icon(Icons.Default.AccountCircle, null, tint = ErrorRed, modifier = Modifier.size(32.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (settings.appLanguage == AppLanguage.HINDI) "क्लाउड सत्र सक्रिय नहीं है" else "Cloud session is not active",
+                                text = strings.settingsSignedOut,
                                 fontWeight = FontWeight.Black,
                                 color = ErrorRed
                             )
                             Text(
-                                text = if (settings.appLanguage == AppLanguage.HINDI) {
-                                    "साइन इन करने पर सुरक्षित सिंक और बैकअप उपलब्ध होंगे।"
-                                } else {
-                                    "Sign in to enable secure sync and automatic backups."
-                                },
+                                text = strings.settingsCloudSignInRequired,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TextNearBlack
+                                color = TextNearBlack,
+                                lineHeight = 17.sp
                             )
                         }
                         Button(
@@ -300,11 +367,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
                             modifier = Modifier.testTag("settings_sign_in_button")
                         ) {
-                            Text(if (settings.appLanguage == AppLanguage.HINDI) "साइन इन" else "Sign in")
+                            Text(strings.settingsSignIn)
                         }
                     }
                 }
             }
+
+            SettingsSectionHeading(strings.shopProfile)
 
             // Card 1: Shop details info
             Card(
@@ -324,10 +393,20 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         fontWeight = FontWeight.Black,
                         color = SaffronDark
                     )
+                    Text(
+                        text = strings.settingsShopProfileHint,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedGray,
+                        lineHeight = 17.sp
+                    )
 
                     AppOutlinedTextField(
                         value = shopName,
-                        onValueChange = { shopName = it },
+                        onValueChange = {
+                            shopName = it
+                            hasUnsavedChanges = true
+                        },
                         label = strings.shopNameLabel,
                         leadingIcon = { 
                             Icon(
@@ -342,8 +421,30 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     )
 
                     AppOutlinedTextField(
+                        value = ownerName,
+                        onValueChange = {
+                            ownerName = it
+                            hasUnsavedChanges = true
+                        },
+                        label = strings.ownerNameLabel,
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_owner_name_field")
+                    )
+
+                    AppOutlinedTextField(
                         value = ownerPhone,
-                        onValueChange = { ownerPhone = it },
+                        onValueChange = {
+                            ownerPhone = it
+                            hasUnsavedChanges = true
+                        },
                         label = strings.ownerPhoneLabel,
                         leadingIcon = { 
                             Icon(
@@ -352,7 +453,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 tint = MaterialTheme.colorScheme.primary
                             ) 
                         },
-                        placeholder = "9876543210",
+                        placeholder = strings.settingsOwnerPhonePlaceholder,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -360,6 +461,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     )
                 }
             }
+
+            SettingsSectionHeading(strings.securityPinSection)
 
             // Card: Owner 4-Digit Security PIN
             Card(
@@ -393,23 +496,33 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 color = SaffronDark
                             )
                             Text(
-                                text = if (settings.appLanguage == AppLanguage.HINDI) "ऐप में तुरंत लॉगिन करने के लिए अपना PIN सेट करें" else "Set PIN for quick store access",
+                                text = strings.settingsSecurityHint,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TextMutedGray
+                                color = TextMutedGray,
+                                lineHeight = 17.sp
                             )
                         }
                     }
+
+                    Text(
+                        text = strings.settingsSetPinHint,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedGray,
+                        lineHeight = 17.sp
+                    )
 
                     AppOutlinedTextField(
                         value = securityPin,
                         onValueChange = {
                             if (it.length <= 4 && it.all { char -> char.isDigit() }) {
                                 securityPin = it
+                                hasUnsavedChanges = true
                             }
                         },
                         label = strings.securityPinLabel,
-                        placeholder = "1234",
+                        placeholder = strings.settingsPinPlaceholder,
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Lock,
@@ -423,6 +536,76 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             .testTag("settings_security_pin_field")
                     )
 
+                    AppOutlinedTextField(
+                        value = securityPinConfirm,
+                        onValueChange = {
+                            if (it.length <= 4 && it.all { char -> char.isDigit() }) {
+                                securityPinConfirm = it
+                                hasUnsavedChanges = true
+                                settingsNotice = null
+                                settingsNoticeIsError = false
+                            }
+                        },
+                        label = strings.settingsPinConfirmLabel,
+                        placeholder = strings.settingsPinPlaceholder,
+                        enabled = securityPin.isNotEmpty(),
+                        isError = securityPinConfirm.isNotEmpty() && securityPin != securityPinConfirm,
+                        supportingText = if (securityPinConfirm.isNotEmpty() && securityPin != securityPinConfirm) {
+                            { Text(strings.settingsPinMismatch) }
+                        } else {
+                            null
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.VerifiedUser,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_security_pin_confirm_field")
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strings.enableAppLock,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextNearBlack
+                            )
+                            Text(
+                                text = if (appLockEnabled) strings.settingsAppLockOnHint else strings.settingsAppLockOffHint,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMutedGray,
+                                lineHeight = 17.sp
+                            )
+                        }
+                        Switch(
+                            checked = appLockEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    appLockEnabled = true
+                                    hasUnsavedChanges = true
+                                } else {
+                                    showDisableLockConfirm = true
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = SaffronPrimary,
+                                checkedTrackColor = SaffronLight
+                            ),
+                            modifier = Modifier.testTag("settings_app_lock_switch")
+                        )
+                    }
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -435,10 +618,21 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 fontWeight = FontWeight.Bold,
                                 color = TextNearBlack
                             )
+                            Text(
+                                text = if (biometricAvailable) strings.settingsBiometricAvailable else strings.settingsBiometricUnavailable,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMutedGray,
+                                lineHeight = 17.sp
+                            )
                         }
                         Switch(
-                            checked = settings.biometricEnabled,
-                            onCheckedChange = { viewModel.toggleBiometric(it) },
+                            checked = biometricEnabled,
+                            onCheckedChange = {
+                                biometricEnabled = it && biometricAvailable
+                                hasUnsavedChanges = true
+                            },
+                            enabled = biometricAvailable && appLockEnabled,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = SaffronPrimary,
                                 checkedTrackColor = SaffronLight
@@ -472,7 +666,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             color = TextNearBlack
                         )
                         Text(
-                            text = if (settings.appLanguage == AppLanguage.HINDI) "ऐप शुरू होने पर 'जय श्री श्याम' भजन बजाएं।" else "Play devotional greeting on app launch.",
+                            text = strings.settingsWelcomeChantHint,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = TextMutedGray,
@@ -480,7 +674,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     }
                     Switch(
                         checked = welcomeChantEnabled,
-                        onCheckedChange = { welcomeChantEnabled = it },
+                        onCheckedChange = {
+                            welcomeChantEnabled = it
+                            hasUnsavedChanges = true
+                        },
                         modifier = Modifier.testTag("settings_welcome_sound_switch"),
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = SaffronPrimary,
@@ -491,6 +688,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     )
                 }
             }
+
+            SettingsSectionHeading(strings.settingsBillingSection)
 
             // Card 3: Static QR upload
             Card(
@@ -533,7 +732,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             AsyncImage(
                                 model = qrUriString,
-                                contentDescription = "Uploaded QR Preview",
+                                contentDescription = strings.settingsQrPreview,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
@@ -551,8 +750,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null)
                             Spacer(modifier = Modifier.width(6.dp))
-                            val changeText = if (settings.appLanguage == AppLanguage.HINDI) "QR फोटो बदलें" else "Change QR Photo"
-                            Text(changeText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Text(strings.settingsChangeQr, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
                         // Empty QR state
@@ -566,8 +764,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.QrCode, null, modifier = Modifier.size(56.dp), tint = BorderStrong)
                                 Spacer(modifier = Modifier.height(4.dp))
-                                val noQrText = if (settings.appLanguage == AppLanguage.HINDI) "कोई QR नहीं चुना गया" else "No QR Selected"
-                                Text(noQrText, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                                Text(strings.settingsNoQrSelected, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                             }
                         }
 
@@ -591,6 +788,26 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 }
             }
 
+            SettingsInfoCard(
+                title = strings.settingsManualUpiSettlement,
+                detail = strings.settingsManualUpiSettlementHint,
+                testTag = "settings_upi_policy_card"
+            )
+
+            SettingsSectionHeading(strings.settingsInventorySection)
+            SettingsInfoCard(
+                title = strings.settingsInventorySection,
+                detail = strings.settingsInventoryHint,
+                testTag = "settings_inventory_summary_card"
+            )
+
+            SettingsSectionHeading(strings.settingsCustomersSection)
+            SettingsInfoCard(
+                title = strings.settingsCustomersSection,
+                detail = strings.settingsCustomersHint,
+                testTag = "settings_customers_summary_card"
+            )
+
             // Automatic sync and backup policy
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -612,17 +829,13 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (settings.appLanguage == AppLanguage.HINDI) "स्वचालित सिंक और बैकअप" else "Automatic sync & backup",
+                            text = strings.settingsAutomaticSync,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Black,
                             color = SaffronDark
                         )
                         Text(
-                            text = if (settings.appLanguage == AppLanguage.HINDI) {
-                                "इंटरनेट मिलते ही डेटा सिंक होगा और सुरक्षित snapshot बैकअप बनेगा।"
-                            } else {
-                                "Sync when online and create protected snapshot backups automatically."
-                            },
+                            text = strings.settingsAutomaticSyncHint,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextMutedGray
@@ -630,7 +843,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     }
                     Switch(
                         checked = autoSyncEnabled,
-                        onCheckedChange = { autoSyncEnabled = it },
+                        onCheckedChange = {
+                            autoSyncEnabled = it
+                            hasUnsavedChanges = true
+                        },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
                             checkedTrackColor = SuccessGreen
@@ -639,6 +855,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     )
                 }
             }
+
+            SettingsSectionHeading(strings.settingsSyncSection)
 
             // Card 4: Firebase Cloud Sync
             Card(
@@ -665,8 +883,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             Icon(Icons.Default.CloudUpload, null, tint = Color(0xFFE65100), modifier = Modifier.size(20.dp))
                         }
                         Column {
-                            val backupTitle = if (settings.appLanguage == AppLanguage.HINDI) "क्लाउड बैकअप" else "Cloud Backup"
-                            val backupSubtitle = if (settings.appLanguage == AppLanguage.HINDI) "सुरक्षित रियल-टाइम डेटा सिंक और रिकवरी" else "Real-time data sync and recovery"
+                            val backupTitle = strings.settingsCloudBackupTitle
+                            val backupSubtitle = strings.settingsCloudBackupHint
                             Text(
                                 text = backupTitle,
                                 fontSize = 16.sp,
@@ -684,11 +902,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
 
                     HorizontalDivider(color = BorderStrong)
 
-                    val syncNote = if (settings.appLanguage == AppLanguage.HINDI) {
-                        "क्लाउड बैकअप आपके स्टोर अकाउंट के साथ स्वचालित रूप से आपके सुरक्षित स्टोर डेटाबेस पर सिंक होता है।"
-                    } else {
-                        "Cloud backup automatically syncs your local database with your secure store account."
-                    }
+                    val syncNote = strings.settingsSyncNote
                     Text(
                         text = syncNote,
                         fontSize = 13.sp,
@@ -710,7 +924,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            val lastSyncLabel = if (settings.appLanguage == AppLanguage.HINDI) "अंतिम सिंक समय:" else "Last Synced:"
+                            val lastSyncLabel = strings.settingsLastSyncLabel
                             Text(
                                 text = lastSyncLabel,
                                 fontSize = 13.sp,
@@ -724,14 +938,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 color = SaffronDark
                             )
                             val syncStatusText = when (settings.lastSyncStatus) {
-                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.SUCCESS ->
-                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: सिंक सफल" else "Status: Sync completed"
-                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.NO_CHANGES ->
-                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: कोई नया बदलाव नहीं" else "Status: No new changes"
-                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.FAILED ->
-                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: सिंक अधूरा है; फिर प्रयास होगा" else "Status: Sync incomplete; retry will continue"
-                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.UNKNOWN ->
-                                    if (settings.appLanguage == AppLanguage.HINDI) "स्थिति: अभी उपलब्ध नहीं" else "Status: Not available yet"
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.SUCCESS -> strings.settingsSyncStatusSuccess
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.NO_CHANGES -> strings.settingsSyncStatusNoChanges
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.FAILED -> strings.settingsSyncStatusFailed
+                                com.aistudio.shreeshyamstore.pqwzkb.utils.SyncRunStatus.UNKNOWN -> strings.settingsSyncStatusUnavailable
                             }
                             Text(
                                 text = syncStatusText,
@@ -743,6 +953,82 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                     TextMediumGray
                                 }
                             )
+                        }
+                    }
+
+                    Text(
+                        text = strings.settingsSyncHealth,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = SaffronDark
+                    )
+                    val syncHealthLabel = when (syncHealth.health) {
+                        SyncHealth.HEALTHY -> strings.settingsHealthHealthy
+                        SyncHealth.NEVER_SYNCED -> strings.settingsHealthNever
+                        SyncHealth.PENDING -> strings.settingsHealthPending
+                        SyncHealth.RETRYING -> strings.settingsHealthRetrying
+                        SyncHealth.BLOCKED -> strings.settingsHealthBlocked
+                    }
+                    val syncHealthColor = when (syncHealth.health) {
+                        SyncHealth.HEALTHY -> SuccessGreen
+                        SyncHealth.NEVER_SYNCED -> TextMediumGray
+                        SyncHealth.PENDING -> SaffronDark
+                        SyncHealth.RETRYING, SyncHealth.BLOCKED -> ErrorRed
+                    }
+                    Surface(
+                        color = syncHealthColor.copy(alpha = 0.08f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, syncHealthColor.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth().testTag("settings_sync_health_card")
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = syncHealthLabel,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                                color = syncHealthColor
+                            )
+                            Text(
+                                text = "${strings.settingsLastSuccess}: ${settings.lastSyncTime}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextNearBlack
+                            )
+                            Text(
+                                text = "${strings.settingsLastAttempt}: ${strings.settingsLastAttemptUnavailable}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextMutedGray,
+                                lineHeight = 16.sp
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SettingsHealthMetric(
+                                    label = strings.settingsPending,
+                                    value = syncHealth.pendingCount + syncHealth.inFlightCount,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                SettingsHealthMetric(
+                                    label = strings.settingsRetryable,
+                                    value = syncHealth.retryableCount,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                SettingsHealthMetric(
+                                    label = strings.settingsDeadLetter,
+                                    value = syncHealth.deadLetterCount,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                SettingsHealthMetric(
+                                    label = strings.settingsConflicts,
+                                    value = syncHealth.conflictCount,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
 
@@ -759,9 +1045,8 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     ) {
                         Icon(Icons.Default.Sync, null, modifier = Modifier.size(20.dp), tint = Color.White)
                         Spacer(modifier = Modifier.width(8.dp))
-                        val syncBtnLabel = if (settings.appLanguage == AppLanguage.HINDI) "🔄 सिंक करें (Sync Now)" else "🔄 Sync Now"
                         Text(
-                            text = syncBtnLabel,
+                            text = strings.settingsManualSync,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Black,
                             color = Color.White
@@ -774,7 +1059,6 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                     ) {
                         Button(
                             onClick = {
-                                viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
                                 viewModel.syncAllToCloud { _, _ -> }
                             },
                             enabled = !mutationInFlight,
@@ -784,13 +1068,11 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            val backupBtn = if (settings.appLanguage == AppLanguage.HINDI) "बैकअप लें" else "Backup Now"
-                            Text(backupBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(strings.settingsBackupNow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
                             onClick = {
-                                viewModel.updateFirebaseSettings("", "", autoSyncEnabled)
                                 showRestoreConfirmDialog = true
                             },
                             enabled = !mutationInFlight,
@@ -800,22 +1082,57 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            val restoreBtn = if (settings.appLanguage == AppLanguage.HINDI) "रीस्टोर करें" else "Restore"
-                            Text(restoreBtn, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text(strings.settingsRestore, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
             }
 
+            SettingsSectionHeading(strings.settingsDataPrivacySection)
+            SettingsInfoCard(
+                title = strings.settingsDataPrivacySection,
+                detail = strings.settingsDataPrivacyHint,
+                testTag = "settings_data_privacy_card"
+            )
+
+            SettingsSectionHeading(strings.settingsSupportSection)
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                modifier = Modifier.fillMaxWidth().testTag("settings_support_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = strings.settingsVersion,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black,
+                        color = SaffronDark
+                    )
+                    Text(
+                        text = BuildConfig.VERSION_NAME,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextNearBlack
+                    )
+                    Text(
+                        text = strings.settingsSupportHint,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextMutedGray,
+                        lineHeight = 17.sp
+                    )
+                }
+            }
+
             // CONFIRMATION DIALOG FOR DATA RESTORATIVE OVERWRITE
             if (showRestoreConfirmDialog) {
-                val dialogTitle = if (settings.appLanguage == AppLanguage.HINDI) "डेटा मिटाने की चेतावनी! ⚠️" else "Data Overwrite Warning! ⚠️"
-                val dialogText = if (settings.appLanguage == AppLanguage.HINDI) {
-                    "क्या आप निश्चित रूप से क्लाउड बैकअप से डेटा रीस्टोर करना चाहते हैं? इससे आपके फोन का वर्तमान लोकल डेटा पूरी तरह मिट जाएगा और क्लाउड बैकअप डेटा डाला जाएगा!"
-                } else {
-                    "Are you sure you want to restore from cloud backup? This will replace your local data with the cloud backup."
-                }
-                val confirmBtn = if (settings.appLanguage == AppLanguage.HINDI) "हाँ, रीस्टोर करें" else "Yes, Restore"
+                val dialogTitle = strings.settingsRestoreWarningTitle
+                val dialogText = strings.settingsRestoreWarningMessage
+                val confirmBtn = strings.settingsRestoreConfirmAction
 
                 AlertDialog(
                     onDismissRequest = { showRestoreConfirmDialog = false },
@@ -855,39 +1172,126 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            if (showDisableLockConfirm) {
+                AlertDialog(
+                    onDismissRequest = { showDisableLockConfirm = false },
+                    title = {
+                        Text(
+                            text = strings.settingsDisableLockTitle,
+                            fontWeight = FontWeight.Black,
+                            color = ErrorRed
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = strings.settingsDisableLockMessage,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextNearBlack,
+                            lineHeight = 20.sp
+                        )
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                appLockEnabled = false
+                                biometricEnabled = false
+                                hasUnsavedChanges = true
+                                settingsNotice = strings.settingsLockDraftNotice
+                                settingsNoticeIsError = false
+                                showDisableLockConfirm = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                            modifier = Modifier.testTag("settings_confirm_disable_lock")
+                        ) {
+                            Text(strings.settingsConfirmDisable, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showDisableLockConfirm = false },
+                            modifier = Modifier.testTag("settings_keep_lock_button")
+                        ) {
+                            Text(strings.settingsKeepLock, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                        }
+                    }
+                )
+            }
+
+            settingsNotice?.let { notice ->
+                Surface(
+                    color = if (settingsNoticeIsError) ErrorRedLight else SuccessGreenLight,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (settingsNoticeIsError) ErrorRed.copy(alpha = 0.35f) else SuccessGreen.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.fillMaxWidth().testTag("settings_save_notice")
+                ) {
+                    Text(
+                        text = notice,
+                        color = if (settingsNoticeIsError) ErrorRed else SuccessGreen,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = strings.settingsSaveHint,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextMutedGray,
+                lineHeight = 17.sp
+            )
 
             // Save configuration button
             AppPrimaryButton(
                 text = strings.saveSettings,
+                enabled = !mutationInFlight,
                 onClick = {
-                    if (shopName.trim().isEmpty()) {
-                        val nameReq = if (settings.appLanguage == AppLanguage.HINDI) "दुकान का नाम आवश्यक है!" else "Shop name is required!"
-                        Toast.makeText(context, nameReq, Toast.LENGTH_SHORT).show()
-                    } else if (securityPin.isNotEmpty() && !SecurityUtils.isAcceptableNewPin(securityPin)) {
-                        val pinReq = if (settings.appLanguage == AppLanguage.HINDI) {
-                            "नया पिन 4 अंकों का हो और default, दोहराए गए या लगातार अंक न हों"
-                        } else {
-                            "New PIN must be 4 digits and cannot be default, repeated, or sequential"
+                    settingsNotice = null
+                    settingsNoticeIsError = false
+                    when (SettingsValidation.errorFor(shopName, securityPin, securityPinConfirm)) {
+                        SettingsValidationError.SHOP_NAME_REQUIRED -> {
+                            settingsNotice = strings.settingsSaveValidationShopName
+                            settingsNoticeIsError = true
                         }
-                        Toast.makeText(context, pinReq, Toast.LENGTH_SHORT).show()
-                    } else {
-                        val pinToSave = if (securityPin.length == 4) securityPin else settings.securityPin
-                        viewModel.updateSettings(
-                            shopName = shopName.trim(),
-                            ownerPhone = ownerPhone.trim(),
-                            welcomeChantEnabled = welcomeChantEnabled,
-                            qrImageUri = qrUriString,
-                            securityPin = pinToSave
-                        )
-                        viewModel.updateFirebaseSettings(
-                            url = "",
-                            prefix = "",
-                            autoSync = autoSyncEnabled
-                        )
-                        val savedMsg = if (settings.appLanguage == AppLanguage.HINDI) "सेटिंग्स सुरक्षित हो गईं! 👍" else "Settings saved successfully! 👍"
-                        Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
-                        viewModel.navigateTo(Screen.Home)
+                        SettingsValidationError.INVALID_PIN -> {
+                            settingsNotice = strings.settingsSaveValidationPin
+                            settingsNoticeIsError = true
+                        }
+                        SettingsValidationError.PIN_CONFIRMATION_REQUIRED -> {
+                            settingsNotice = strings.settingsSaveValidationPinConfirm
+                            settingsNoticeIsError = true
+                        }
+                        null -> {
+                            viewModel.saveMerchantSettings(
+                                shopName = shopName.trim(),
+                                ownerName = ownerName.trim(),
+                                ownerPhone = ownerPhone.trim(),
+                                welcomeChantEnabled = welcomeChantEnabled,
+                                qrImageUri = qrUriString,
+                                autoSyncEnabled = autoSyncEnabled,
+                                appLockEnabled = appLockEnabled,
+                                biometricEnabled = biometricEnabled,
+                                newSecurityPin = securityPin.trim().takeIf { it.isNotEmpty() },
+                                onSuccess = {
+                                    securityPin = ""
+                                    securityPinConfirm = ""
+                                    hasUnsavedChanges = false
+                                    settingsNotice = strings.settingsSavedLocally
+                                    settingsNoticeIsError = false
+                                },
+                                onError = { message ->
+                                    settingsNotice = message
+                                    settingsNoticeIsError = true
+                                }
+                            )
+                        }
                     }
                 },
                 modifier = Modifier
@@ -905,7 +1309,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "Version 1.0.0 • Powered by 7zen Labs",
+                    text = "${strings.settingsVersion}: ${BuildConfig.VERSION_NAME}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = TextMutedGray,
@@ -916,4 +1320,83 @@ fun SettingsScreen(viewModel: ShopViewModel) {
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
+}
+
+
+@Composable
+internal fun SettingsSectionHeading(title: String) {
+    Text(
+        text = title,
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Black,
+        color = SaffronDark,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp, start = 4.dp, end = 4.dp)
+    )
+}
+
+@Composable
+internal fun SettingsInfoCard(
+    title: String,
+    detail: String,
+    testTag: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.5.dp, BorderStrong),
+        modifier = Modifier.fillMaxWidth().testTag(testTag)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Black,
+                color = TextNearBlack
+            )
+            Text(
+                text = detail,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextMutedGray,
+                lineHeight = 17.sp
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SettingsHealthMetric(
+    label: String,
+    value: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = value.toString(),
+            fontSize = 17.sp,
+            fontWeight = FontWeight.Black,
+            color = TextNearBlack
+        )
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = TextMutedGray,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            lineHeight = 13.sp
+        )
+    }
+}
+
+private fun maskedIdentity(value: String, fallback: String): String {
+    val normalized = value.trim()
+    return if (normalized.isEmpty()) fallback else "••••${normalized.takeLast(8)}"
 }
