@@ -1342,7 +1342,7 @@ fun OpeningStockScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryVi
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Add, null)
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text(addNextBtn)
+                                Text(strings.productFormAddItem)
                             }
                         }
                     }
@@ -1511,7 +1511,7 @@ fun StockAdjustmentScreen(
                     status = mutationStatus,
                     strings = strings,
                     onRetry = if (mutationStatus.canRetry) inventoryViewModel::retryLastMutation else null,
-                    onDismiss = if (!mutationInFlight) inventoryViewModel.dismissMutationStatus else null
+                    onDismiss = if (!mutationInFlight) inventoryViewModel::dismissMutationStatus else null
                 )
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color.White),
