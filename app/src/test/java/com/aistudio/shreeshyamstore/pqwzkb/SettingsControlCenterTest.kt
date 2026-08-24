@@ -86,9 +86,9 @@ class SettingsControlCenterTest {
             }
         }
 
-        composeTestRule.onNodeWithTag("settings_owner_name_test_field")
-            .performTextInput("Owner")
-            .assertTextContains("Owner")
+        val ownerNameField = composeTestRule.onNodeWithTag("settings_owner_name_test_field")
+        ownerNameField.performTextInput("Owner")
+        ownerNameField.assertTextContains("Owner")
     }
 
     @Test
