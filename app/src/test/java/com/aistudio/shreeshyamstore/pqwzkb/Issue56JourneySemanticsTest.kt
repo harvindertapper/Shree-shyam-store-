@@ -16,7 +16,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDate
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDateRange
@@ -166,6 +166,7 @@ class Issue56JourneySemanticsTest {
             .assertTextContains(strings.shopSetupTitle)
         composeTestRule.onNodeWithTag("shop_name_input")
             .performTextInput("Shree Shyam Store")
+        composeTestRule.onNodeWithTag("shop_name_input")
             .assertTextContains("Shree Shyam Store")
         composeTestRule.onNodeWithTag("product_name_input")
             .performScrollTo()
@@ -174,12 +175,16 @@ class Issue56JourneySemanticsTest {
         composeTestRule.onNodeWithTag("customer_search_input")
             .performScrollTo()
             .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("customer_search_input")
             .performTextInput("Customer")
+        composeTestRule.onNodeWithTag("customer_search_input")
             .assertTextContains("Customer")
         composeTestRule.onNodeWithTag("received_amount_field")
             .performScrollTo()
             .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("received_amount_field")
             .performTextInput("125.00")
+        composeTestRule.onNodeWithTag("received_amount_field")
             .assertTextContains("125.00")
         composeTestRule.onNodeWithTag("save_product_button")
             .performScrollTo()

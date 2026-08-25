@@ -15,7 +15,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDate
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDateRange
@@ -142,12 +142,15 @@ class Issue56DeviceJourneyTest {
         composeTestRule.onNodeWithTag("device_onboarding_title").assertIsDisplayed()
         composeTestRule.onNodeWithTag("device_shop_name_input")
             .performTextInput("Shree Shyam Store")
+        composeTestRule.onNodeWithTag("device_shop_name_input")
             .assertTextContains("Shree Shyam Store")
         composeTestRule.onNodeWithTag("device_add_category_item").assertIsDisplayed()
         composeTestRule.onNodeWithTag("device_customer_search")
             .performScrollTo()
             .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("device_customer_search")
             .performTextInput("Customer")
+        composeTestRule.onNodeWithTag("device_customer_search")
             .assertTextContains("Customer")
         composeTestRule.onNodeWithTag("device_save_product")
             .performScrollTo()
