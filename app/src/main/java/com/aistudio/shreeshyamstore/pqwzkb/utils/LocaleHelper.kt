@@ -204,6 +204,29 @@ interface AppStrings {
     val udhaarGiven: String
     val topSellingProducts: String
     val salesHistory: String
+    val reportsRangeSummary: (String, String) -> String
+    val reportsStartDate: String
+    val reportsEndDate: String
+    val reportsSelectStartDate: String
+    val reportsSelectEndDate: String
+    val reportsApplyCustomRange: String
+    val reportsClearCustomRange: String
+    val reportsInvalidCustomRange: String
+    val reportsLoading: String
+    val reportsLoadError: String
+    val reportsRetry: String
+    val reportsNoSalesInRange: String
+    val reportsExportReady: String
+    val reportsExportEmpty: String
+    val reportsExportFailed: String
+    val reportsPaymentState: String
+    val reportsPaymentNotRequired: String
+    val reportsPaymentPending: String
+    val reportsPaymentReceived: String
+    val reportsPaymentFailed: String
+    val reportsPaymentPartiallyRefunded: String
+    val reportsPaymentRefunded: String
+    val reportsPaymentUnknown: String
 
     // Settings
     val settingsTitle: String
@@ -760,6 +783,29 @@ object HindiStrings : AppStrings {
     override val udhaarGiven = "उधार दिया"
     override val topSellingProducts = "सबसे ज्यादा बिकने वाला सामान"
     override val salesHistory = "बिक्री इतिहास"
+    override val reportsRangeSummary: (String, String) -> String = { start, end -> "$start से $end तक" }
+    override val reportsStartDate = "शुरू तारीख"
+    override val reportsEndDate = "अंतिम तारीख"
+    override val reportsSelectStartDate = "शुरू तारीख चुनें"
+    override val reportsSelectEndDate = "अंतिम तारीख चुनें"
+    override val reportsApplyCustomRange = "तारीख लागू करें"
+    override val reportsClearCustomRange = "तारीखें साफ़ करें"
+    override val reportsInvalidCustomRange = "कृपया सही तारीख सीमा चुनें।"
+    override val reportsLoading = "रिपोर्ट लोड हो रही है..."
+    override val reportsLoadError = "रिपोर्ट लोड नहीं हो सकी।"
+    override val reportsRetry = "फिर प्रयास करें"
+    override val reportsNoSalesInRange = "इस तारीख सीमा में कोई बिक्री नहीं मिली।"
+    override val reportsExportReady = "रिपोर्ट साझा करने के लिए तैयार है।"
+    override val reportsExportEmpty = "निर्यात करने के लिए कोई बिक्री नहीं है।"
+    override val reportsExportFailed = "रिपोर्ट निर्यात नहीं हो सकी।"
+    override val reportsPaymentState = "भुगतान स्थिति:"
+    override val reportsPaymentNotRequired = "भुगतान आवश्यक नहीं"
+    override val reportsPaymentPending = "भुगतान लंबित"
+    override val reportsPaymentReceived = "भुगतान प्राप्त"
+    override val reportsPaymentFailed = "भुगतान विफल"
+    override val reportsPaymentPartiallyRefunded = "आंशिक रिफंड"
+    override val reportsPaymentRefunded = "रिफंड किया गया"
+    override val reportsPaymentUnknown = "स्थिति उपलब्ध नहीं"
 
     override val settingsTitle = "ऐप सेटिंग्स"
     override val languageSection = "भाषा चुनें"
@@ -1244,6 +1290,29 @@ object EnglishStrings : AppStrings {
     override val udhaarGiven = "Credit Given"
     override val topSellingProducts = "Top Selling Products"
     override val salesHistory = "Sales History"
+    override val reportsRangeSummary: (String, String) -> String = { start, end -> "$start to $end" }
+    override val reportsStartDate = "Start date"
+    override val reportsEndDate = "End date"
+    override val reportsSelectStartDate = "Select start date"
+    override val reportsSelectEndDate = "Select end date"
+    override val reportsApplyCustomRange = "Apply dates"
+    override val reportsClearCustomRange = "Clear dates"
+    override val reportsInvalidCustomRange = "Select a valid date range."
+    override val reportsLoading = "Loading reports..."
+    override val reportsLoadError = "Reports could not be loaded."
+    override val reportsRetry = "Try again"
+    override val reportsNoSalesInRange = "No sales found in this date range."
+    override val reportsExportReady = "Report is ready to share."
+    override val reportsExportEmpty = "There are no sales to export."
+    override val reportsExportFailed = "The report could not be exported."
+    override val reportsPaymentState = "Payment status:"
+    override val reportsPaymentNotRequired = "Payment not required"
+    override val reportsPaymentPending = "Payment pending"
+    override val reportsPaymentReceived = "Payment received"
+    override val reportsPaymentFailed = "Payment failed"
+    override val reportsPaymentPartiallyRefunded = "Partially refunded"
+    override val reportsPaymentRefunded = "Refunded"
+    override val reportsPaymentUnknown = "Status unavailable"
 
     override val settingsTitle = "Settings"
     override val languageSection = "Language"
