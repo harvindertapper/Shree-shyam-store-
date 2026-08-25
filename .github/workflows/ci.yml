@@ -232,6 +232,12 @@ jobs:
             -validity 10000 \
             -dname 'CN=Android Debug,O=Android,C=US'
 
+      - name: Enable KVM group permissions
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Run Issue #56 emulator smoke coverage
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -239,6 +245,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_2
+          emulator-boot-timeout: 900
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           disable-animations: true
           script: ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
