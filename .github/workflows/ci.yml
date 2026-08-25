@@ -138,7 +138,7 @@ jobs:
 
       - name: Upload unit test reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shree-shyam-store-unit-test-results
           path: app/build/test-results/testDebugUnitTest
@@ -166,7 +166,7 @@ jobs:
 
       - name: Upload Room schema artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shree-shyam-store-room-schemas
           path: app/schemas
@@ -174,7 +174,7 @@ jobs:
 
       - name: Upload debug APK
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shree-shyam-store-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
@@ -182,7 +182,7 @@ jobs:
 
       - name: Upload minified release outputs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: shree-shyam-store-release-outputs
           path: app/build/outputs/apk/release
