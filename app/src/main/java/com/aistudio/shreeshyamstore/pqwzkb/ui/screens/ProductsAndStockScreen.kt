@@ -133,7 +133,8 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                     }
                     IconButton(
                         onClick = { if (!mutationInFlight) showCategoryManagerDialog = true },
-                        enabled = !mutationInFlight
+                        enabled = !mutationInFlight,
+                        modifier = Modifier.testTag("manage_categories_button")
                     ) {
                         Icon(Icons.Default.Category, contentDescription = strings.commonManageCategories)
                     }
@@ -513,7 +514,8 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                                             newCatName = ""
                                         }
                                     }
-                                }
+                                },
+                                modifier = Modifier.testTag("category_add_button")
                             ) {
                                 Text(strings.productFormAddCategory)
                             }
@@ -578,7 +580,9 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                         Button(
                             onClick = { if (!mutationInFlight) showCategoryManagerDialog = false },
                             enabled = !mutationInFlight,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("done_category_manager_button")
                         ) {
                             Text(strings.productFormDone)
                         }
@@ -812,7 +816,7 @@ fun AddEditProductScreen(
                             onValueChange = { newCategoryName = it },
                             singleLine = true,
                             label = { Text(strings.productFormCategoryName) },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().testTag("new_category_name_input"),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = TextNearBlack,
                                 unfocusedTextColor = TextNearBlack,
@@ -831,13 +835,17 @@ fun AddEditProductScreen(
                                     showNewCategoryDialog = false
                                 }
                             },
-                            enabled = newCategoryName.trim().isNotEmpty()
+                            enabled = newCategoryName.trim().isNotEmpty(),
+                            modifier = Modifier.testTag("confirm_new_category_button")
                         ) {
                             Text(strings.productFormAddCategory)
                         }
                     },
                     dismissButton = {
-                        TextButton(onClick = { showNewCategoryDialog = false }) {
+                        TextButton(
+                            onClick = { showNewCategoryDialog = false },
+                            modifier = Modifier.testTag("cancel_new_category_button")
+                        ) {
                             Text(strings.cancel, color = TextMediumGray)
                         }
                     }
