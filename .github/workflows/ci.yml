@@ -111,6 +111,8 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsDataStoreTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsControlCenterTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogRepositoryTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryLocaleContractTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest

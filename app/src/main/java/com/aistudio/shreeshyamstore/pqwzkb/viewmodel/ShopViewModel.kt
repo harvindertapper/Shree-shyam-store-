@@ -837,10 +837,14 @@ class ShopViewModel(
         viewModelScope.launch {
             try {
                 val normalizedName = InventoryValidation.validateProductName(name)
-                val normalizedMrp = InventoryValidation.validateProductMoney(mrp, "MRP")
-                val normalizedStock = InventoryValidation.validateQuantity(currentStock, "Current stock")
-                val normalizedUnit = InventoryValidation.validateUnit(unit)
-                val normalizedBarcode = InventoryValidation.normalizeBarcode(barcode)
+                val normalizedMrp = InventoryValidation.validateRequiredProductMoney(mrp, "MRP")
+                val normalizedUnit = InventoryValidation.validateRequiredUnit(unit)
+                val normalizedStock = if (trackStock) {
+                    InventoryValidation.validateQuantityForUnit(currentStock, "Current stock", normalizedUnit)
+                } else {
+                    InventoryValidation.validateQuantity(currentStock, "Current stock")
+                }
+                val normalizedBarcode = InventoryValidation.validateOptionalBarcode(barcode)
                 require(repository.isBarcodeAvailable(normalizedBarcode.orEmpty())) {
                     "Barcode already belongs to another active product"
                 }
@@ -854,7 +858,7 @@ class ShopViewModel(
                     currentStock = normalizedStock,
                     unit = normalizedUnit,
                     trackStock = trackStock,
-                    barcode = barcode.trim(),
+                    barcode = normalizedBarcode.orEmpty(),
                     barcodeKey = normalizedBarcode,
                     isActive = true,
                     createdAt = now,

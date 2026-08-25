@@ -222,6 +222,75 @@ interface AppStrings {
     val logout: String
     val activeOwner: String
 
+    // Product and stock form validation
+    val productFormBack: String
+    val productFormBarcodeLabel: String
+    val productFormBarcodePlaceholder: String
+    val productFormScanBarcode: String
+    val productFormAddCategoryTitle: String
+    val productFormCategoryName: String
+    val productFormAddCategory: String
+    val productFormUnitLabel: String
+    val productFormUnitHint: String
+    val productFormTrackStockHint: String
+    val productFormActiveLabel: String
+    val productFormActiveHint: String
+    val productFormMoneyHint: String
+    val productFormQuantityHint: String
+    val productFormRequiredField: (String) -> String
+    val productFormInvalidNumber: (String) -> String
+    val productFormInvalidField: (String) -> String
+    val productFormNegativeNumber: (String) -> String
+    val productFormNonPositiveMrp: String
+    val productFormFractionNotAllowed: (String) -> String
+    val productFormCategoryRequired: String
+    val productFormBarcodeInvalid: String
+    val productFormBarcodeSet: (String) -> String
+    val productFormChooseCategory: String
+    val productFormFastAddPrefix: String
+    val productFormAddItem: String
+    val productFormRecentlyAdded: String
+    val productFormTotal: String
+    val productFormNoItemsInCategory: String
+    val productFormPrice: String
+    val productFormStock: String
+    val productFormUntracked: String
+    val productFormNoProducts: String
+    val productFormInactive: String
+    val productFormLowStock: (String) -> String
+    val productFormStockAvailable: (String) -> String
+    val productFormStockUntracked: String
+    val productFormAdjustStock: String
+    val productFormSaveAndAdd: String
+    val productFormCategoryManager: String
+    val productFormNewCategoryPlaceholder: String
+    val productFormRenameCategory: String
+    val productFormUpdateCategory: String
+    val productFormDone: String
+    val productFormNoLowStock: String
+    val productFormStockHealthy: String
+    val productFormAddStock: String
+    val productFormLeft: (String) -> String
+    val productFormClose: String
+    val productFormPlusOneStock: String
+    val productFormCopy: String
+    val productFormBarcodeScanned: (String) -> String
+    val productFormLowStockBanner: (Int) -> String
+    val productFormReorderListHint: String
+    val productFormOrderList: String
+    val stockAdjustmentCurrentStock: (String) -> String
+    val stockAdjustmentEnterPhysicalCount: String
+    val stockAdjustmentReason: String
+    val stockAdjustmentSave: String
+    val stockAdjustmentHistory: String
+    val stockAdjustmentStockTransition: (String, String) -> String
+    val stockAdjustmentProductNotFound: String
+    val stockReasonCountCorrection: String
+    val stockReasonPurchaseAdded: String
+    val stockReasonDamaged: String
+    val stockReasonOpening: String
+    val stockReasonOther: String
+
     // Settings control center
     val settingsAccountSection: String
     val settingsAccountProvider: String
@@ -464,6 +533,73 @@ object HindiStrings : AppStrings {
     override val lowStock = "कम स्टॉक"
     override val outOfStock = "स्टॉक खत्म"
     override val searchProductPlaceholder = "सामान खोजें..."
+    override val productFormBack = "वापस"
+    override val productFormBarcodeLabel = "बारकोड (वैकल्पिक)"
+    override val productFormBarcodePlaceholder = "EAN / UPC / QR कोड"
+    override val productFormScanBarcode = "बारकोड स्कैन करें"
+    override val productFormAddCategoryTitle = "नई कैटेगरी जोड़ें"
+    override val productFormCategoryName = "कैटेगरी का नाम"
+    override val productFormAddCategory = "जोड़ें"
+    override val productFormUnitLabel = "इकाई"
+    override val productFormUnitHint = "जैसे pcs, kg, g या litre"
+    override val productFormTrackStockHint = "बिल बनने पर स्टॉक अपने आप घटेगा"
+    override val productFormActiveLabel = "सामान सक्रिय है"
+    override val productFormActiveHint = "बंद करने पर यह सामान बिलिंग में नहीं दिखेगा"
+    override val productFormMoneyHint = "रकम रुपये में लिखें; 10.50 या 10,50 दोनों चलेंगे।"
+    override val productFormQuantityHint = "मात्रा खाली या गलत नहीं हो सकती।"
+    override val productFormRequiredField: (String) -> String = { field -> "$field आवश्यक है" }
+    override val productFormInvalidNumber: (String) -> String = { field -> "$field की संख्या सही नहीं है" }
+    override val productFormInvalidField: (String) -> String = { field -> "$field सही नहीं है" }
+    override val productFormNegativeNumber: (String) -> String = { field -> "$field ऋणात्मक नहीं हो सकता" }
+    override val productFormNonPositiveMrp = "MRP शून्य से अधिक होना चाहिए"
+    override val productFormFractionNotAllowed: (String) -> String = { field -> "$field में पूरी संख्या लिखें" }
+    override val productFormCategoryRequired = "सक्रिय कैटेगरी चुनें"
+    override val productFormBarcodeInvalid = "बारकोड में स्पेस नहीं होना चाहिए और वह 128 अक्षरों से छोटा हो"
+    override val productFormBarcodeSet: (String) -> String = { code -> "बारकोड दर्ज हुआ: $code" }
+    override val productFormChooseCategory = "कैटेगरी चुनें"
+    override val productFormFastAddPrefix = "त्वरित जोड़ें"
+    override val productFormAddItem = "सामान जोड़ें"
+    override val productFormRecentlyAdded = "हाल में जोड़ा गया सामान"
+    override val productFormTotal = "कुल"
+    override val productFormNoItemsInCategory = "इस कैटेगरी में अभी कोई सामान नहीं है।"
+    override val productFormPrice = "कीमत"
+    override val productFormStock = "स्टॉक"
+    override val productFormUntracked = "ट्रैक नहीं हो रहा"
+    override val productFormNoProducts = "अभी कोई सामान उपलब्ध नहीं है।"
+    override val productFormInactive = "निष्क्रिय"
+    override val productFormLowStock: (String) -> String = { stock -> "कम स्टॉक: $stock बचा है" }
+    override val productFormStockAvailable: (String) -> String = { stock -> "स्टॉक: $stock उपलब्ध" }
+    override val productFormStockUntracked = "स्टॉक ट्रैक नहीं हो रहा"
+    override val productFormAdjustStock = "स्टॉक सुधारें"
+    override val productFormSaveAndAdd = "सेव करें और बिल में जोड़ें"
+    override val productFormCategoryManager = "कैटेगरी प्रबंधन"
+    override val productFormNewCategoryPlaceholder = "नई कैटेगरी का नाम"
+    override val productFormRenameCategory = "कैटेगरी का नाम बदलें"
+    override val productFormUpdateCategory = "बदलें"
+    override val productFormDone = "पूर्ण"
+    override val productFormNoLowStock = "कोई सामान कम नहीं है"
+    override val productFormStockHealthy = "दुकान में पर्याप्त स्टॉक मौजूद है।"
+    override val productFormAddStock = "माल जोड़ें"
+    override val productFormLeft: (String) -> String = { stock -> "$stock बचा है" }
+    override val productFormClose = "बंद करें"
+    override val productFormPlusOneStock = "स्टॉक में 1 जोड़ें"
+    override val productFormCopy = "कॉपी"
+    override val productFormBarcodeScanned: (String) -> String = { code -> "बारकोड स्कैन हुआ: $code" }
+    override val productFormLowStockBanner: (Int) -> String = { count -> "कम स्टॉक चेतावनी: $count सामान" }
+    override val productFormReorderListHint = "थोक खरीदारी लिस्ट देखें"
+    override val productFormOrderList = "ऑर्डर लिस्ट"
+    override val stockAdjustmentCurrentStock: (String) -> String = { stock -> "वर्तमान स्टॉक: $stock" }
+    override val stockAdjustmentEnterPhysicalCount = "दुकान में मौजूद वास्तविक स्टॉक संख्या दर्ज करें"
+    override val stockAdjustmentReason = "कारण"
+    override val stockAdjustmentSave = "स्टॉक सुधार सुरक्षित करें"
+    override val stockAdjustmentHistory = "स्टॉक सुधार इतिहास"
+    override val stockAdjustmentStockTransition: (String, String) -> String = { old, new -> "स्टॉक: $old ➔ $new" }
+    override val stockAdjustmentProductNotFound = "यह सामान नहीं मिला या अब सक्रिय नहीं है। वापस जाकर दूसरा सामान चुनें।"
+    override val stockReasonCountCorrection = "स्टॉक मिलान"
+    override val stockReasonPurchaseAdded = "नया माल आया"
+    override val stockReasonDamaged = "खराब या एक्सपायर सामान"
+    override val stockReasonOpening = "ओपनिंग स्टॉक प्रविष्टि"
+    override val stockReasonOther = "अन्य"
 
     override val udhaarTitle = "उधार बहीखाता"
     override val addCustomer = "नया ग्राहक जोड़ें"
@@ -744,6 +880,73 @@ object EnglishStrings : AppStrings {
     override val lowStock = "Low Stock"
     override val outOfStock = "Out of Stock"
     override val searchProductPlaceholder = "Search products..."
+    override val productFormBack = "Back"
+    override val productFormBarcodeLabel = "Barcode (optional)"
+    override val productFormBarcodePlaceholder = "EAN / UPC / QR code"
+    override val productFormScanBarcode = "Scan barcode"
+    override val productFormAddCategoryTitle = "Add new category"
+    override val productFormCategoryName = "Category name"
+    override val productFormAddCategory = "Add"
+    override val productFormUnitLabel = "Unit"
+    override val productFormUnitHint = "For example, pcs, kg, g, or litre"
+    override val productFormTrackStockHint = "Stock reduces automatically when billing"
+    override val productFormActiveLabel = "Product is active"
+    override val productFormActiveHint = "Inactive products are hidden from billing"
+    override val productFormMoneyHint = "Enter rupee amounts; both 10.50 and 10,50 are accepted."
+    override val productFormQuantityHint = "Quantity cannot be blank or malformed."
+    override val productFormRequiredField: (String) -> String = { field -> "$field is required" }
+    override val productFormInvalidNumber: (String) -> String = { field -> "$field is not a valid number" }
+    override val productFormInvalidField: (String) -> String = { field -> "$field is not valid" }
+    override val productFormNegativeNumber: (String) -> String = { field -> "$field cannot be negative" }
+    override val productFormNonPositiveMrp = "MRP must be greater than zero"
+    override val productFormFractionNotAllowed: (String) -> String = { field -> "Enter a whole number for $field" }
+    override val productFormCategoryRequired = "Choose an active category"
+    override val productFormBarcodeInvalid = "Barcode must contain no spaces and be 128 characters or shorter"
+    override val productFormBarcodeSet: (String) -> String = { code -> "Barcode set: $code" }
+    override val productFormChooseCategory = "Choose category"
+    override val productFormFastAddPrefix = "Fast add"
+    override val productFormAddItem = "Add product"
+    override val productFormRecentlyAdded = "Recently added items"
+    override val productFormTotal = "Total"
+    override val productFormNoItemsInCategory = "No products in this category yet."
+    override val productFormPrice = "Price"
+    override val productFormStock = "Stock"
+    override val productFormUntracked = "Not tracked"
+    override val productFormNoProducts = "No products are available yet."
+    override val productFormInactive = "Inactive"
+    override val productFormLowStock: (String) -> String = { stock -> "Low stock: $stock left" }
+    override val productFormStockAvailable: (String) -> String = { stock -> "Stock: $stock available" }
+    override val productFormStockUntracked = "Stock is not tracked"
+    override val productFormAdjustStock = "Adjust stock"
+    override val productFormSaveAndAdd = "Save and add to bill"
+    override val productFormCategoryManager = "Category management"
+    override val productFormNewCategoryPlaceholder = "New category name"
+    override val productFormRenameCategory = "Rename category"
+    override val productFormUpdateCategory = "Update"
+    override val productFormDone = "Done"
+    override val productFormNoLowStock = "No low-stock products"
+    override val productFormStockHealthy = "Store inventory is well stocked."
+    override val productFormAddStock = "Add stock"
+    override val productFormLeft: (String) -> String = { stock -> "$stock left" }
+    override val productFormClose = "Close"
+    override val productFormPlusOneStock = "Add 1 to stock"
+    override val productFormCopy = "Copy"
+    override val productFormBarcodeScanned: (String) -> String = { code -> "Barcode scanned: $code" }
+    override val productFormLowStockBanner: (Int) -> String = { count -> "Low-stock warning: $count items" }
+    override val productFormReorderListHint = "View wholesale reorder list"
+    override val productFormOrderList = "Order list"
+    override val stockAdjustmentCurrentStock: (String) -> String = { stock -> "Current stock: $stock" }
+    override val stockAdjustmentEnterPhysicalCount = "Enter the actual physical stock count"
+    override val stockAdjustmentReason = "Reason"
+    override val stockAdjustmentSave = "Save stock adjustment"
+    override val stockAdjustmentHistory = "Stock adjustment history"
+    override val stockAdjustmentStockTransition: (String, String) -> String = { old, new -> "Stock: $old ➔ $new" }
+    override val stockAdjustmentProductNotFound = "This product was not found or is no longer active. Go back and choose another product."
+    override val stockReasonCountCorrection = "Stock count correction"
+    override val stockReasonPurchaseAdded = "Purchase added"
+    override val stockReasonDamaged = "Damaged or expired"
+    override val stockReasonOpening = "Opening stock entry"
+    override val stockReasonOther = "Other"
 
     override val udhaarTitle = "Udhaar Ledger"
     override val addCustomer = "Add New Customer"
