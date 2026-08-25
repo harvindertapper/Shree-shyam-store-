@@ -119,6 +119,8 @@ jobs:
           --tests com.aistudio.shreeshyamstore.pqwzkb.ReportPolicyTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.Issue55ReportLocaleContractTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.Issue55ReportSemanticsTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue56JourneyCoverageContractTest
+          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue56JourneySemanticsTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
           --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
@@ -185,3 +187,58 @@ jobs:
           name: shree-shyam-store-release-outputs
           path: app/build/outputs/apk/release
           if-no-files-found: warn
+
+  device-smoke:
+    name: Issue #56 device journey smoke (API ${{ matrix.api-level }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [35, 36]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install compile SDK packages
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Validate Gradle wrapper
+        run: ./gradlew --version
+
+      - name: Create debug signing key
+        shell: bash
+        run: |
+          keytool -genkeypair -v \
+            -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname 'CN=Android Debug,O=Android,C=US'
+
+      - name: Run Issue #56 emulator smoke coverage
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api-level }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest

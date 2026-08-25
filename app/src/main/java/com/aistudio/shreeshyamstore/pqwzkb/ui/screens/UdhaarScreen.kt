@@ -726,7 +726,9 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         ) {
                             TextButton(
                                 onClick = { if (!mutationInFlight) showReceivePaymentDialog = false },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("cancel_payment_button")
                             ) {
                                 Text(strings.cancel)
                             }
@@ -813,7 +815,9 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         ) {
                             TextButton(
                                 onClick = { if (!mutationInFlight) selectedLedgerEvent = null },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("cancel_ledger_correction_button")
                             ) {
                                 Text(strings.cancel)
                             }
@@ -831,7 +835,9 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("reverse_ledger_entry_button")
                             ) {
                                 Text(strings.udhaarReverse)
                             }
@@ -851,7 +857,9 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .testTag("correct_ledger_entry_button")
                             ) {
                                 Text(strings.udhaarCorrect)
                             }

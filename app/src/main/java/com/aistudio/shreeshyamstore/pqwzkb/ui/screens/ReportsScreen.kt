@@ -933,7 +933,7 @@ fun WeeklySalesBarChart(
 }
 
 @Composable
-internal fun ReportIntervalTabs(
+fun ReportIntervalTabs(
     strings: AppStrings,
     selectedInterval: ReportInterval,
     onSelected: (ReportInterval) -> Unit,
@@ -968,7 +968,7 @@ private enum class ReportDatePickerTarget {
 }
 
 @Composable
-internal fun ReportLoadingState(
+fun ReportLoadingState(
     strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
     modifier: Modifier = Modifier
 ) {
@@ -990,7 +990,7 @@ internal fun ReportLoadingState(
 }
 
 @Composable
-internal fun ReportErrorState(
+fun ReportErrorState(
     strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -1020,7 +1020,7 @@ internal fun ReportErrorState(
 }
 
 @Composable
-internal fun ReportEmptyState(
+fun ReportEmptyState(
     title: String,
     detail: String,
     modifier: Modifier = Modifier
@@ -1049,7 +1049,7 @@ internal fun ReportEmptyState(
 }
 
 @Composable
-internal fun CustomReportRangeSelector(
+fun CustomReportRangeSelector(
     strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
     startDate: ReportDate?,
     endDate: ReportDate?,

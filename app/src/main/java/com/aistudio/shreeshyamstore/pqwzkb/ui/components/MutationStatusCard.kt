@@ -120,20 +120,32 @@ fun AppMutationStatusCard(
                         onClick = onRetry,
                         enabled = !isBusy,
                         colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
-                        modifier = Modifier.height(44.dp)
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("mutation_retry_button")
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(strings.retryAction, fontWeight = FontWeight.Bold)
                     }
                     if (onDismiss != null) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.height(44.dp)) {
+                        OutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .testTag("mutation_dismiss_button")
+                        ) {
                             Text(strings.dismissAction)
                         }
                     }
                 }
             } else if (onDismiss != null && !isBusy) {
-                OutlinedButton(onClick = onDismiss, modifier = Modifier.height(44.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("mutation_dismiss_button")
+                ) {
                     Text(strings.dismissAction)
                 }
             }
