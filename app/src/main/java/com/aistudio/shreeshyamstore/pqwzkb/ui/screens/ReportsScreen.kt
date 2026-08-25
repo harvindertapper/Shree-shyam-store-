@@ -712,6 +712,7 @@ fun WeeklySalesBarChart(
     salesHistory: List<Sale>
 ) {
     val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
     if (salesHistory.isEmpty()) return
 
