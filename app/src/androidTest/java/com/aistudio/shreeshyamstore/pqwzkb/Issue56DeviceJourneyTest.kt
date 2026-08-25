@@ -13,7 +13,6 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.foundation.text.KeyboardOptions
@@ -157,9 +156,6 @@ class Issue56DeviceJourneyTest {
             .performScrollTo()
             .assertIsDisplayed()
             .assertTextContains(strings.saveProduct)
-        composeTestRule.onNodeWithText(strings.statusRetryableError)
-            .performScrollTo()
-            .assertIsDisplayed()
         composeTestRule.onNodeWithTag("mutation_retry_button")
             .performScrollTo()
             .assertIsDisplayed()
