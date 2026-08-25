@@ -49,7 +49,8 @@ import kotlinx.coroutines.launch
 fun LanguageSwitcherPill(
     currentLanguage: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    strings: AppStrings = LocaleHelper.getStrings(currentLanguage)
 ) {
     Surface(
         shape = RoundedCornerShape(50),
@@ -63,7 +64,7 @@ fun LanguageSwitcherPill(
         ) {
             Icon(
                 Icons.Default.Language,
-                contentDescription = "Language",
+                contentDescription = strings.commonLanguage,
                 tint = Color.White,
                 modifier = Modifier.size(16.dp)
             )
@@ -79,7 +80,7 @@ fun LanguageSwitcherPill(
                     .testTag("lang_en_button")
             ) {
                 Text(
-                    text = "EN",
+                    text = strings.languageEnglishCode,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (currentLanguage == AppLanguage.ENGLISH) SaffronDark else Color.White,
@@ -99,7 +100,7 @@ fun LanguageSwitcherPill(
                     .testTag("lang_hi_button")
             ) {
                 Text(
-                    text = "हिंदी",
+                    text = strings.languageHindiCode,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     color = if (currentLanguage == AppLanguage.HINDI) SaffronDark else Color.White,
@@ -150,7 +151,8 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                 LanguageSwitcherPill(
                     currentLanguage = settings.appLanguage,
                     onLanguageChange = { viewModel.setLanguage(it) },
-                    modifier = Modifier.align(Alignment.TopEnd)
+                    modifier = Modifier.align(Alignment.TopEnd),
+                    strings = strings
                 )
 
                 Column(
@@ -263,8 +265,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                                         email = user.email ?: "",
                                         displayName = user.displayName ?: "",
                                         onSuccess = { isFirstTime ->
-                                            val welcomeMsg = if (settings.appLanguage == AppLanguage.HINDI) "लॉगिन सफल!" else "Login Successful!"
-                                            Toast.makeText(context, "$welcomeMsg ${user.displayName ?: ""}", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, strings.authLoginSuccess(user.displayName.orEmpty()), Toast.LENGTH_SHORT).show()
                                             if (isFirstTime) {
                                                 viewModel.navigateTo(Screen.Setup)
                                             } else {
@@ -275,7 +276,7 @@ fun WelcomeScreen(viewModel: ShopViewModel) {
                                     )
                                 }
                             } else {
-                                errorMessage = result.exceptionOrNull()?.localizedMessage ?: "Google Sign In Failed"
+                                errorMessage = result.exceptionOrNull()?.localizedMessage ?: strings.authGoogleSignInFailed
                             }
                         }
                     },
@@ -477,7 +478,6 @@ fun LoginScreen(viewModel: ShopViewModel) {
             viewModel = viewModel,
             registeredEmail = settings.loggedInEmail,
             provider = settings.identityProvider,
-            language = settings.appLanguage,
             strings = strings,
             onDismiss = { showForgotPinDialog = false },
             onSwitchAccount = {
@@ -620,7 +620,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
                                             if (settings.biometricEnabled) {
-                                                Icon(Icons.Default.Fingerprint, contentDescription = "Biometric", tint = SaffronDark, modifier = Modifier.size(32.dp))
+                                                Icon(Icons.Default.Fingerprint, contentDescription = strings.commonBiometric, tint = SaffronDark, modifier = Modifier.size(32.dp))
                                             }
                                         }
                                     }
@@ -641,7 +641,7 @@ fun LoginScreen(viewModel: ShopViewModel) {
                                             .testTag("pin_key_delete")
                                     ) {
                                         Box(contentAlignment = Alignment.Center) {
-                                            Icon(Icons.Default.Backspace, contentDescription = "Delete", tint = TextNearBlack, modifier = Modifier.size(24.dp))
+                                            Icon(Icons.Default.Backspace, contentDescription = strings.commonDelete, tint = TextNearBlack, modifier = Modifier.size(24.dp))
                                         }
                                     }
                                 }
@@ -713,13 +713,11 @@ fun ForgotPinDialog(
     viewModel: ShopViewModel,
     registeredEmail: String,
     provider: com.aistudio.shreeshyamstore.pqwzkb.data.IdentityProvider?,
-    language: AppLanguage,
     strings: AppStrings,
     onDismiss: () -> Unit,
     onSwitchAccount: () -> Unit
 ) {
     val recoveryMethod = com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryPolicy.method(provider)
-    val isHindi = language == AppLanguage.HINDI
     var emailInput by remember { mutableStateOf(registeredEmail) }
     var identifierInput by remember { mutableStateOf(registeredEmail) }
     var passwordInput by remember { mutableStateOf("") }
@@ -728,23 +726,6 @@ fun ForgotPinDialog(
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var isSuccess by remember { mutableStateOf(false) }
 
-    fun localTitle() = if (isHindi) "लोकल अकाउंट से पिन बदलें" else "Reset PIN with local account"
-    fun localHelp() = if (isHindi) {
-        "Firebase ईमेल रीसेट लोकल अकाउंट के डिवाइस PIN को नहीं बदलता। अपने लोकल अकाउंट का पासवर्ड और नया PIN दर्ज करें।"
-    } else {
-        "A Firebase email reset cannot change a local account's device PIN. Verify the local account password and choose a new PIN."
-    }
-    fun firebaseTitle() = if (isHindi) "Google से PIN सत्यापित करें" else "Verify with Google to reset PIN"
-    fun firebaseHelp() = if (isHindi) {
-        "आपका app-lock PIN डिवाइस पर रहता है। Google account को दोबारा verify करने के बाद नया PIN सेट होगा; कोई password-reset email नहीं भेजी जाएगी।"
-    } else {
-        "Your app-lock PIN stays on this device. Re-verify the same Google account, then choose a new PIN; no password-reset email will be sent."
-    }
-    fun switchHelp() = if (isHindi) {
-        "कोई active account उपलब्ध नहीं है। पहले सही account से sign in करें।"
-    } else {
-        "No active account is available. Sign in with the correct account first."
-    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -764,8 +745,8 @@ fun ForgotPinDialog(
 
                 Text(
                     text = when (recoveryMethod) {
-                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> localTitle()
-                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> firebaseTitle()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> strings.authLocalPinTitle
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> strings.authGooglePinTitle
                         com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> strings.resetPin
                     },
                     fontSize = 18.sp,
@@ -776,9 +757,9 @@ fun ForgotPinDialog(
 
                 Text(
                     text = when (recoveryMethod) {
-                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> localHelp()
-                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> firebaseHelp()
-                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> switchHelp()
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.LOCAL_ACCOUNT_REAUTH -> strings.authLocalPinHelp
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> strings.authGooglePinHelp
+                        com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> strings.authSwitchAccountHelp
                     },
                     fontSize = 13.sp,
                     color = TextMediumGray,
@@ -790,14 +771,14 @@ fun ForgotPinDialog(
                         OutlinedTextField(
                             value = identifierInput,
                             onValueChange = { identifierInput = it },
-                            label = { Text(if (isHindi) "Username या Email" else "Username or Email") },
+                            label = { Text(strings.authUsernameOrEmail) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = passwordInput,
                             onValueChange = { passwordInput = it },
-                            label = { Text(if (isHindi) "लोकल पासवर्ड" else "Local account password") },
+                            label = { Text(strings.authLocalPassword) },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
                             modifier = Modifier.fillMaxWidth()
@@ -805,7 +786,7 @@ fun ForgotPinDialog(
                     }
                     com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> {
                         Text(
-                            text = if (isHindi) "Account: ${emailInput.ifBlank { "Google account" }}" else "Account: ${emailInput.ifBlank { "Google account" }}",
+                            text = strings.authAccount(emailInput.ifBlank { strings.authGoogleAccount }),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = TextMediumGray,
@@ -821,7 +802,7 @@ fun ForgotPinDialog(
                         onValueChange = { value ->
                             if (value.length <= 4 && value.all(Char::isDigit)) newPinInput = value
                         },
-                        label = { Text(if (isHindi) "नया 4-अंकों का PIN" else "New 4-digit app PIN") },
+                        label = { Text(strings.authNewPin) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                         visualTransformation = PasswordVisualTransformation(),
@@ -864,7 +845,7 @@ fun ForgotPinDialog(
                                         onSuccess = {
                                             isLoading = false
                                             isSuccess = true
-                                            statusMessage = if (isHindi) "PIN बदल गया।" else "PIN changed successfully."
+                                            statusMessage = strings.authPinChanged
                                             onDismiss()
                                         },
                                         onError = { error ->
@@ -879,7 +860,7 @@ fun ForgotPinDialog(
                                 modifier = Modifier.weight(1.4f)
                             ) {
                                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                                else Text(if (isHindi) "PIN बदलें" else "Change PIN", fontWeight = FontWeight.Bold)
+                                else Text(strings.authChangePin, fontWeight = FontWeight.Bold)
                             }
                         }
                         com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.GOOGLE_REAUTH -> {
@@ -892,7 +873,7 @@ fun ForgotPinDialog(
                                         onSuccess = {
                                             isLoading = false
                                             isSuccess = true
-                                            statusMessage = if (isHindi) "PIN बदल गया।" else "PIN changed successfully."
+                                            statusMessage = strings.authPinChanged
                                             onDismiss()
                                         },
                                         onError = { error ->
@@ -907,7 +888,7 @@ fun ForgotPinDialog(
                                 modifier = Modifier.weight(1.4f)
                             ) {
                                 if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-                                else Text(if (isHindi) "Google से सत्यापित करें" else "Verify with Google", fontWeight = FontWeight.Bold)
+                                else Text(strings.authVerifyGoogle, fontWeight = FontWeight.Bold)
                             }
                         }
                         com.aistudio.shreeshyamstore.pqwzkb.utils.AppLockRecoveryMethod.SWITCH_ACCOUNT -> {
@@ -917,7 +898,7 @@ fun ForgotPinDialog(
                                 colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
                                 modifier = Modifier.weight(1.4f)
                             ) {
-                                Text(if (isHindi) "Sign in करें" else "Sign in", fontWeight = FontWeight.Bold)
+                                Text(strings.authSignIn, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

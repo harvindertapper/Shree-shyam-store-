@@ -40,6 +40,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.Executors
@@ -53,8 +54,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 fun BarcodeScannerDialog(
     onDismiss: () -> Unit,
     onBarcodeScanned: (String) -> Unit,
-    title: String = "बारकोड / QR कोड स्कैन करें",
-    subtitle: String = "कैमरे को बारकोड के सामने रखें"
+    strings: AppStrings,
+    title: String = strings.scannerTitle,
+    subtitle: String = strings.scannerSubtitle
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -131,7 +133,7 @@ fun BarcodeScannerDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Close Scanner",
+                            contentDescription = strings.commonClose,
                             tint = TextNearBlack
                         )
                     }
@@ -159,7 +161,7 @@ fun BarcodeScannerDialog(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            text = "कैमरा अनुमति आवश्यक है\n(Camera Permission Required)",
+                            text = strings.scannerCameraPermissionTitle,
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
@@ -167,7 +169,7 @@ fun BarcodeScannerDialog(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "बारकोड स्कैन करने के लिए कृपया कैमरा एक्सेस की अनुमति दें।",
+                            text = strings.scannerCameraPermissionMessage,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
                             color = TextMediumGray
@@ -178,7 +180,7 @@ fun BarcodeScannerDialog(
                             colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("अनुमति दें / Allow", fontWeight = FontWeight.Bold)
+                            Text(strings.scannerAllow, fontWeight = FontWeight.Bold)
                         }
                     }
                 } else {
@@ -298,7 +300,7 @@ fun BarcodeScannerDialog(
                         ) {
                             Icon(
                                 imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
-                                contentDescription = "Toggle Torch",
+                                contentDescription = strings.scannerToggleTorch,
                                 tint = if (isTorchOn) SaffronPrimary else Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -326,7 +328,7 @@ fun BarcodeScannerDialog(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "रद्द करें / Cancel",
+                        text = strings.scannerCancel,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )

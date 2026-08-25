@@ -87,7 +87,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                 title = { Text(strings.reportsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 },
                 actions = {
@@ -95,7 +95,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                         onClick = { reportsViewModel.exportSalesCsv(context, filteredSales) },
                         modifier = Modifier.testTag("export_sales_csv_button")
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Export Sales CSV", tint = SaffronPrimary)
+                        Icon(Icons.Default.Download, contentDescription = strings.commonExportSales, tint = SaffronPrimary)
                     }
                 }
             )
@@ -155,7 +155,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                val salesVolumeTitle = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total Sales"
+                                val salesVolumeTitle = strings.reportsTotalSalesTitle
                                 Text(salesVolumeTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                                 Text(
                                     text = CurrencyUtils.formatRupees(totalRevenue),
@@ -164,11 +164,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     color = SaffronDark
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                val billCountMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                                    "$invoicesCount बिल बनाए गए"
-                                } else {
-                                    "$invoicesCount bills generated"
-                                }
+                                val billCountMsg = strings.reportsBillsGenerated(invoicesCount)
                                 Text(billCountMsg, fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -250,7 +246,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                 // Header lists title
                 item {
-                    val salesHistoryTitle = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री का इतिहास:" else "Sales History:"
+                    val salesHistoryTitle = strings.reportsHistoryTitle
                     Text(
                         text = salesHistoryTitle,
                         fontWeight = FontWeight.Bold,
@@ -270,7 +266,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                         ) {
                             Icon(Icons.Default.History, null, modifier = Modifier.size(48.dp), tint = BorderStrong)
                             Spacer(modifier = Modifier.height(8.dp))
-                            val noRecordMsg = if (settings.appLanguage == AppLanguage.HINDI) "कोई रिकॉर्ड नहीं मिला!" else "No records found!"
+                            val noRecordMsg = strings.reportsNoRecords
                             Text(noRecordMsg, color = TextMediumGray, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -308,8 +304,8 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     )
                                     // Customer name if Udhaar
                                     if (sale.paymentMode == "UDHAAR") {
-                                        val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
-                                        val udhaarCustLabel = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक" else "Udhaar Client"
+                                        val custName = customers.find { it.id == sale.customerId }?.name ?: strings.commonCustomer
+                                        val udhaarCustLabel = strings.reportsUdhaarCustomer
                                         Text(
                                             text = "$udhaarCustLabel: $custName",
                                             fontSize = 12.sp,
@@ -367,7 +363,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
         // --- DETAILED INVOICE MODAL DIALOG ---
         selectedViewSale?.let { sale ->
             val saleItems = reportsViewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
-            val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
+            val custName = customers.find { it.id == sale.customerId }?.name ?: strings.commonCustomer
 
             Dialog(onDismissRequest = { selectedViewSale = null }) {
                 Card(
@@ -395,13 +391,13 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val billNoLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिल नं:" else "Bill No:"
+                            val billNoLabel = strings.reportsBillNumber
                             Text("$billNoLabel ${sale.billNumber}", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
                             Text(DateTimeUtils.formatDateOnly(sale.createdAt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }
 
                         if (sale.paymentMode == "UDHAAR") {
-                            val clientLabel = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक:" else "Client:"
+                            val clientLabel = strings.reportsCustomer
                             Text("$clientLabel $custName", fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
                         }
 
@@ -448,7 +444,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val modeLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम:" else "Payment Mode:"
+                            val modeLabel = strings.reportsPaymentMode
                             Text(modeLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                             val modeVal = when (sale.paymentMode) {
                                 "UPI" -> "UPI"
@@ -481,7 +477,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("WhatsApp", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(strings.commonWhatsApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -501,7 +497,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    val copyInvoiceText = if (settings.appLanguage == AppLanguage.HINDI) "कॉपी" else "Copy"
+                                    val copyInvoiceText = strings.reportsCopy
                                     Text(copyInvoiceText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -513,7 +509,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            val closeText = if (settings.appLanguage == AppLanguage.HINDI) "बंद करें" else "Close"
+                            val closeText = strings.reportsClose
                             Text(closeText, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -547,11 +543,7 @@ fun PaymentDistributionDonutChart(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val noDataMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                    "वितरण चार्ट के लिए कोई बिक्री डेटा उपलब्ध नहीं है।"
-                } else {
-                    "No sales data available for distribution chart."
-                }
+                val noDataMsg = strings.reportsNoChartData
                 Text(
                     text = noDataMsg,
                     fontWeight = FontWeight.Bold,
@@ -582,7 +574,7 @@ fun PaymentDistributionDonutChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val chartTitle = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम वितरण" else "Payment Mode Split"
+            val chartTitle = strings.reportsPaymentModeSplit
             Text(
                 text = chartTitle,
                 fontSize = 15.sp,
@@ -668,7 +660,7 @@ fun PaymentDistributionDonutChart(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val totalSalesLabel = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total"
+                        val totalSalesLabel = strings.reportsTotal
                         Text(
                             text = totalSalesLabel,
                             fontSize = 11.sp,
@@ -767,7 +759,7 @@ fun WeeklySalesBarChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val weeklyTitle = if (settings.appLanguage == AppLanguage.HINDI) "पिछले 7 दिनों की बिक्री" else "Weekly Sales Trend"
+            val weeklyTitle = strings.reportsWeeklyTrend
             Text(
                 text = weeklyTitle,
                 fontSize = 15.sp,

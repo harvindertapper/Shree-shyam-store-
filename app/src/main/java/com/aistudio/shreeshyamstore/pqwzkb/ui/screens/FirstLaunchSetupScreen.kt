@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.sp
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppOutlinedTextField
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppPrimaryButton
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
-import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.SecurityUtils
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
@@ -136,11 +135,9 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             isError = shopNameError,
                             supportingText = {
                                 if (shopNameError) {
-                                    val err = if (currentSettings.appLanguage == AppLanguage.HINDI) "दुकान का नाम आवश्यक है!" else "Shop name is required!"
-                                    Text(err, color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(strings.setupShopNameRequired, color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 } else {
-                                    val hint = if (currentSettings.appLanguage == AppLanguage.HINDI) "यह नाम ग्राहकों के बिल पर दिखेगा।" else "This name will appear on bills."
-                                    Text(hint, color = TextMutedGray, fontSize = 12.sp)
+                                    Text(strings.setupShopNameHint, color = TextMutedGray, fontSize = 12.sp)
                                 }
                             },
                             modifier = Modifier
@@ -174,7 +171,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             leadingIcon = {
                                 Icon(Icons.Default.Phone, contentDescription = null, tint = SaffronPrimary)
                             },
-                            placeholder = "9876543210",
+                            placeholder = strings.settingsOwnerPhonePlaceholder,
                             isError = phoneError != null,
                             supportingText = {
                                 if (phoneError != null) {
@@ -220,7 +217,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             leadingIcon = {
                                 Icon(Icons.Default.Lock, contentDescription = null, tint = SaffronPrimary)
                             },
-                            placeholder = "4-digit PIN",
+                            placeholder = strings.settingsPinPlaceholder,
                             isError = pinError != null,
                             supportingText = {
                                 if (pinError != null) {
@@ -271,15 +268,11 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             return@AppPrimaryButton
                         }
                         if (ownerPhone.isNotEmpty() && ownerPhone.length < 10) {
-                            phoneError = if (currentSettings.appLanguage == AppLanguage.HINDI) "कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें" else "Please enter valid 10 digit phone number"
+                            phoneError = strings.setupPhoneInvalid
                             return@AppPrimaryButton
                         }
                         if (!SecurityUtils.isAcceptableNewPin(securityPin)) {
-                            pinError = if (currentSettings.appLanguage == AppLanguage.HINDI) {
-                                "कृपया 1234, दोहराए गए या लगातार अंकों के बिना मजबूत 4-अंकों का पिन सेट करें"
-                            } else {
-                                "Set a strong 4-digit PIN; default, repeated, and sequential PINs are not allowed"
-                            }
+                            pinError = strings.setupPinInvalid
                             return@AppPrimaryButton
                         }
 
@@ -289,7 +282,7 @@ fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
                             ownerPhone = ownerPhone,
                             onSuccess = {
                                 viewModel.setAppLockPin(securityPin, enableBiometric)
-                                val successMsg = if (currentSettings.appLanguage == AppLanguage.HINDI) "दुकान सेटअप पूरा हुआ! 🎉" else "Shop setup completed! 🎉"
+                                val successMsg = strings.setupCompleted
                                 Toast.makeText(context, successMsg, Toast.LENGTH_SHORT).show()
                                 viewModel.completeFirstLaunch()
                             }
