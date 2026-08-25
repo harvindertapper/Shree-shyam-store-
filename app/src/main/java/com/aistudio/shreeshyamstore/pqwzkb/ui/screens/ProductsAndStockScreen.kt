@@ -34,7 +34,6 @@ import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuSurface
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
-import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ProductFormError
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.ProductFormField
@@ -97,7 +96,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                 title = { Text(strings.productsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 },
                 actions = {
@@ -120,7 +119,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                         ) {
                             Icon(
                                 Icons.Default.PlaylistAddCheck,
-                                contentDescription = "Re-order List",
+                                contentDescription = strings.commonReorderList,
                                 tint = if (lowStockProducts.isNotEmpty()) ErrorRed else SaffronPrimary
                             )
                         }
@@ -130,13 +129,13 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                         onClick = { viewModel.exportStockCsv(context, products, categories) },
                         modifier = Modifier.testTag("export_stock_csv_button")
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Export Stock CSV", tint = SaffronPrimary)
+                        Icon(Icons.Default.Download, contentDescription = strings.commonExportStock, tint = SaffronPrimary)
                     }
                     IconButton(
                         onClick = { if (!mutationInFlight) showCategoryManagerDialog = true },
                         enabled = !mutationInFlight
                     ) {
-                        Icon(Icons.Default.Category, contentDescription = "Manage Categories")
+                        Icon(Icons.Default.Category, contentDescription = strings.commonManageCategories)
                     }
                 }
             )
@@ -206,6 +205,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
             if (showBarcodeScanner) {
                 BarcodeScannerDialog(
                     onDismiss = { showBarcodeScanner = false },
+                    strings = strings,
                     onBarcodeScanned = { scannedCode ->
                         showBarcodeScanner = false
                         searchQuery = scannedCode.trim()
@@ -398,7 +398,7 @@ fun ProductsScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMo
                                             fontWeight = FontWeight.Bold,
                                             color = TextMediumGray
                                         )
-                                        val spLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री" else "SP"
+                                        val spLabel = strings.productFormSellingPriceShort
                                         Text(
                                             text = "$spLabel: ${CurrencyUtils.formatRupees(prod.getEffectivePrice())}",
                                             fontSize = 14.sp,
@@ -1057,6 +1057,7 @@ fun AddEditProductScreen(
             if (showBarcodeScanner) {
                 BarcodeScannerDialog(
                     onDismiss = { showBarcodeScanner = false },
+                    strings = strings,
                     onBarcodeScanned = { scannedCode ->
                         showBarcodeScanner = false
                         barcode = scannedCode.trim()
@@ -1732,11 +1733,7 @@ fun LowStockReorderDialog(
                                 color = TextNearBlack
                             )
                         }
-                        val countMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                            "कुल ${lowStockProducts.size} सामान कम हैं"
-                        } else {
-                            "Total ${lowStockProducts.size} items low in stock"
-                        }
+                        val countMsg = strings.productFormLowStockCount(lowStockProducts.size)
                         Text(
                             text = countMsg,
                             fontSize = 12.sp,
@@ -1746,7 +1743,7 @@ fun LowStockReorderDialog(
                     }
 
                     IconButton(onClick = { if (!mutationInFlight) onDismiss() }) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = TextMediumGray)
+                        Icon(Icons.Default.Close, contentDescription = strings.commonClose, tint = TextMediumGray)
                     }
                 }
 
@@ -1772,7 +1769,7 @@ fun LowStockReorderDialog(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("WhatsApp", fontSize = 13.sp, fontWeight = FontWeight.Black)
+                            Text(strings.productFormWhatsApp, fontSize = 13.sp, fontWeight = FontWeight.Black)
                         }
                     }
 
@@ -1856,7 +1853,7 @@ fun LowStockReorderDialog(
                                                 color = TextNearBlack
                                             )
                                             Text(
-                                                text = "$catName | MRP: ${CurrencyUtils.formatRupees(item.mrp)}",
+                                                text = "$catName | ${strings.mrpPrice}: ${CurrencyUtils.formatRupees(item.mrp)}",
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = TextMediumGray
