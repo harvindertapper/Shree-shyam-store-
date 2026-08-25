@@ -63,11 +63,11 @@ class Issue55ReportSemanticsTest {
                         onSelected = {},
                         modifier = Modifier.testTag("issue55_report_intervals")
                     )
-                    Text(strings.today)
-                    Text(strings.thisWeek)
-                    Text(strings.thisMonth)
-                    Text(strings.allTime)
-                    Text(strings.customRange)
+                    Text(strings.today, modifier = Modifier.testTag("issue55_today"))
+                    Text(strings.thisWeek, modifier = Modifier.testTag("issue55_this_week"))
+                    Text(strings.thisMonth, modifier = Modifier.testTag("issue55_this_month"))
+                    Text(strings.allTime, modifier = Modifier.testTag("issue55_all_time"))
+                    Text(strings.customRange, modifier = Modifier.testTag("issue55_custom_range_label"))
                     CustomReportRangeSelector(
                         strings = strings,
                         startDate = ReportDate(2026, 8, 1),
@@ -99,8 +99,14 @@ class Issue55ReportSemanticsTest {
         }
 
         composeTestRule.onNodeWithTag("issue55_report_intervals").assertIsDisplayed()
-        composeTestRule.onNodeWithText(strings.thisWeek).assertTextContains(strings.thisWeek)
-        composeTestRule.onNodeWithText(strings.customRange).assertTextContains(strings.customRange)
+        composeTestRule.onNodeWithTag("issue55_this_week")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertTextContains(strings.thisWeek)
+        composeTestRule.onNodeWithTag("issue55_custom_range_label")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertTextContains(strings.customRange)
         composeTestRule.onNodeWithTag("report_select_start_date")
             .performScrollTo()
             .assertIsDisplayed()
