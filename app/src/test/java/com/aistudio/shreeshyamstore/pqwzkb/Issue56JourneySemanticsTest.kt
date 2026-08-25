@@ -190,7 +190,7 @@ class Issue56JourneySemanticsTest {
             .performScrollTo()
             .assertIsDisplayed()
             .assertTextContains(strings.saveProduct)
-        composeTestRule.onNodeWithTag("mutation_status_card")
+        composeTestRule.onNodeWithText(strings.statusRetryableError)
             .performScrollTo()
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag("mutation_retry_button")
