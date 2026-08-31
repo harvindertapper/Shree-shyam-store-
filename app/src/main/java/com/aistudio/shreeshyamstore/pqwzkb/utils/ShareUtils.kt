@@ -16,6 +16,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+enum class SalesExportResult {
+    SHARED,
+    NO_SALES,
+    FAILED
+}
+
 object ShareUtils {
 
     private fun csvField(value: String): String =
@@ -217,13 +223,12 @@ object ShareUtils {
         context: Context,
         sales: List<Sale>,
         shopName: String
-    ) {
+    ): SalesExportResult {
         if (sales.isEmpty()) {
-            Toast.makeText(context, "कोई बिक्री रिकॉर्ड नहीं है (No sales to export)", Toast.LENGTH_SHORT).show()
-            return
+            return SalesExportResult.NO_SALES
         }
 
-        try {
+        return try {
             val fileName = "Sales_Report_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ENGLISH).format(Date())}.csv"
             val file = File(context.cacheDir, fileName)
             val writer = FileWriter(file)
@@ -247,9 +252,13 @@ object ShareUtils {
             writer.flush()
             writer.close()
 
-            shareCsvFile(context, file, "$shopName - Sales Report CSV")
+            if (shareCsvFile(context, file, "$shopName - Sales Report CSV", onFailure = {})) {
+                SalesExportResult.SHARED
+            } else {
+                SalesExportResult.FAILED
+            }
         } catch (e: Exception) {
-            Toast.makeText(context, "Export error: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            SalesExportResult.FAILED
         }
     }
 
@@ -330,7 +339,14 @@ object ShareUtils {
         }
     }
 
-    private fun shareCsvFile(context: Context, file: File, title: String) {
+    private fun shareCsvFile(
+        context: Context,
+        file: File,
+        title: String,
+        onFailure: () -> Unit = {
+            Toast.makeText(context, "Error sharing report file", Toast.LENGTH_SHORT).show()
+        }
+    ): Boolean {
         try {
             val uri = FileProvider.getUriForFile(
                 context,
@@ -345,6 +361,7 @@ object ShareUtils {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             context.startActivity(Intent.createChooser(intent, title))
+            return true
         } catch (e: Exception) {
             // Fallback: Read file text and share directly as CSV text
             try {
@@ -355,8 +372,10 @@ object ShareUtils {
                     putExtra(Intent.EXTRA_TEXT, content)
                 }
                 context.startActivity(Intent.createChooser(textIntent, title))
+                return true
             } catch (ex: Exception) {
-                Toast.makeText(context, "Error sharing report file: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                onFailure()
+                return false
             }
         }
     }

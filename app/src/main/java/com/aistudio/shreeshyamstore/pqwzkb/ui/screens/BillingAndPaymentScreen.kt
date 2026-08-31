@@ -38,13 +38,13 @@ import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppDropdownMenuSurface
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.BarcodeScannerDialog
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
-import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MutationStatus
 import com.aistudio.shreeshyamstore.pqwzkb.commerce.CommerceValidation
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ProductFormValidation
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.InventoryViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
@@ -110,7 +110,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                 },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 },
                 actions = {
@@ -119,7 +119,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                         enabled = !mutationInFlight,
                         colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Quick Add")
+                        Icon(Icons.Default.Add, contentDescription = strings.commonQuickAdd)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(strings.quickAddProduct, fontWeight = FontWeight.Bold)
                     }
@@ -162,7 +162,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                         ) {
                             Icon(
                                 imageVector = Icons.Default.QrCodeScanner,
-                                contentDescription = "Scan Barcode",
+                                contentDescription = strings.commonScanBarcode,
                                 tint = SaffronPrimary
                             )
                         }
@@ -232,9 +232,8 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                     tint = BorderStrong
                                 )
                                 Spacer(modifier = Modifier.height(8.dp))
-                                val noProductFound = if (settings.appLanguage == AppLanguage.HINDI) "कोई सामान नहीं मिला!" else "No product found!"
                                 Text(
-                                    noProductFound,
+                                    strings.billingProductNotFound,
                                     fontWeight = FontWeight.Bold,
                                     color = TextMutedGray
                                 )
@@ -304,7 +303,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else if (product.currentStock <= product.lowStockAlertQty) {
-                                            val lowStockMsg = if (settings.appLanguage == AppLanguage.HINDI) "कम स्टॉक: ${product.currentStock} बचा है" else "Low stock: ${product.currentStock} left"
+                                            val lowStockMsg = strings.billingLowStock(product.getFormattedStock())
                                             Text(
                                                 lowStockMsg,
                                                 color = WarningOrange,
@@ -312,7 +311,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                                 fontWeight = FontWeight.Black
                                             )
                                         } else {
-                                            val stockMsg = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक: ${product.currentStock} उपलब्ध" else "Stock: ${product.currentStock} available"
+                                            val stockMsg = strings.billingStockAvailable(product.getFormattedStock())
                                             Text(
                                                 stockMsg,
                                                 color = SuccessGreen,
@@ -321,7 +320,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                             )
                                         }
                                     } else {
-                                        val untrackedMsg = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक अनट्रैक्ड" else "Stock untracked"
+                                        val untrackedMsg = strings.billingStockUntracked
                                         Text(untrackedMsg, color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     }
                                 }
@@ -406,7 +405,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                     .background(SaffronLight)
                                     .padding(8.dp)
                             ) {
-                                val basketHeader = if (settings.appLanguage == AppLanguage.HINDI) "थैला: $qtyLabel सामान" else "Cart: $qtyLabel items"
+                                val basketHeader = strings.billingCartSummary(qtyLabel)
                                 Text(
                                     basketHeader,
                                     fontSize = 13.sp,
@@ -460,7 +459,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                                     ) {
                                                         Icon(
                                                             Icons.Default.RemoveCircleOutline,
-                                                            "Remove",
+                                                            strings.commonRemoveFromBasket,
                                                             tint = TextNearBlack,
                                                             modifier = Modifier.size(20.dp)
                                                         )
@@ -483,7 +482,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                                     ) {
                                                         Icon(
                                                             Icons.Default.AddCircleOutline,
-                                                            "Add",
+                                                            strings.commonAddToBasket,
                                                             tint = SaffronPrimary,
                                                             modifier = Modifier.size(20.dp)
                                                         )
@@ -552,13 +551,9 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
 
         // 1. Incomplete Stock alert confirmation
         showStockWarningProduct?.let { product ->
-            val dialogTitle = if (settings.appLanguage == AppLanguage.HINDI) "पर्याप्त स्टॉक नहीं है" else "Insufficient stock"
-            val dialogBody = if (settings.appLanguage == AppLanguage.HINDI) {
-                "प्रोडक्ट '${product.name}' का उपलब्ध स्टॉक ${product.currentStock} है। इससे अधिक मात्रा का बिल नहीं बनाया जा सकता।"
-            } else {
-                "Product '${product.name}' has only ${product.currentStock} available. A bill cannot include more than the available stock."
-            }
-            val confirmAdd = if (settings.appLanguage == AppLanguage.HINDI) "ठीक है" else "OK"
+            val dialogTitle = strings.billingInsufficientStockTitle
+            val dialogBody = strings.billingInsufficientStockMessage(product.name, product.getFormattedStock())
+            val confirmAdd = strings.commonOkay
 
             AlertDialog(
                 onDismissRequest = { showStockWarningProduct = null },
@@ -579,6 +574,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
         if (showBarcodeScanner) {
             BarcodeScannerDialog(
                 onDismiss = { showBarcodeScanner = false },
+                strings = strings,
                 onBarcodeScanned = { scannedCode ->
                     showBarcodeScanner = false
                     val matchedProduct = activeProducts.find { 
@@ -589,21 +585,11 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                             showStockWarningProduct = matchedProduct
                         } else {
                             viewModel.addProductToCart(matchedProduct)
-                            val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                                "✓ ${matchedProduct.name} बिल में जोड़ा गया"
-                            } else {
-                                "✓ ${matchedProduct.name} added to cart"
-                            }
-                            Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.billingProductAdded(matchedProduct.name), Toast.LENGTH_SHORT).show()
                         }
                     } else {
                         searchQuery = scannedCode.trim()
-                        val notFoundMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                            "बारकोड: $scannedCode (उत्पाद नहीं मिला - नया उत्पाद जोड़ें)"
-                        } else {
-                            "Barcode: $scannedCode (Product not found in inventory)"
-                        }
-                        Toast.makeText(context, notFoundMsg, Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, strings.billingBarcodeNotFound(scannedCode), Toast.LENGTH_LONG).show()
                     }
                 }
             )
@@ -614,9 +600,18 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
             Dialog(onDismissRequest = { if (!mutationInFlight) showQuickAddDialog = false }) {
                 var newName by remember { mutableStateOf("") }
                 var newMrp by remember { mutableStateOf("") }
-                var selectedCatId by remember { mutableStateOf<Long>(categories.firstOrNull()?.id ?: 1L) }
+                var newUnit by remember { mutableStateOf("pcs") }
+                var selectedCatId by remember { mutableStateOf<Long?>(null) }
                 var trackStock by remember { mutableStateOf(true) }
-                var initialStock by remember { mutableStateOf("10") }
+                var initialStock by remember { mutableStateOf("") }
+
+                LaunchedEffect(categories) {
+                    if (selectedCatId == null && categories.isNotEmpty()) {
+                        selectedCatId = categories.first().id
+                    } else if (selectedCatId != null && categories.none { it.id == selectedCatId }) {
+                        selectedCatId = categories.firstOrNull()?.id
+                    }
+                }
 
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -669,19 +664,27 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                             )
                         }
 
+                        OutlinedTextField(
+                            value = newUnit,
+                            onValueChange = { newUnit = it; quickAddInputError = null },
+                            label = { Text(strings.productFormUnitLabel) },
+                            placeholder = { Text(strings.productFormUnitHint) },
+                            modifier = Modifier.fillMaxWidth().testTag("quick_add_product_unit")
+                        )
+
                         // Category Dropdown
                         var dropdownExpanded by remember { mutableStateOf(false) }
-                        var selectedCatName by remember(selectedCatId) {
-                            mutableStateOf(categories.find { it.id == selectedCatId }?.name ?: "General")
-                        }
+                        val selectedCatName = categories.firstOrNull { it.id == selectedCatId }?.name
+                            ?: strings.productFormChooseCategory
 
                         Box(modifier = Modifier.fillMaxWidth()) {
                             OutlinedButton(
-                                onClick = { dropdownExpanded = true },
+                                onClick = { if (categories.isNotEmpty()) dropdownExpanded = true },
+                                enabled = categories.isNotEmpty(),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("${strings.category}: $selectedCatName")
-                                Icon(Icons.Default.ArrowDropDown, null)
+                                Icon(Icons.Default.ArrowDropDown, strings.productFormChooseCategory)
                             }
                             AppDropdownMenuSurface(
                                 expanded = dropdownExpanded,
@@ -699,7 +702,6 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                             text = cat.name,
                                             onClick = {
                                                 selectedCatId = cat.id
-                                                selectedCatName = cat.name
                                                 dropdownExpanded = false
                                             }
                                         )
@@ -730,22 +732,32 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                 Text(strings.cancel)
                             }
 
-                            val saveAndAddText = if (settings.appLanguage == AppLanguage.HINDI) "सेव करें व बिल में जोड़ें" else "Save & Add to Bill"
                             Button(
                                 enabled = !mutationInFlight,
                                 onClick = {
-                                    val mrpValue = MoneyUtils.parseMajorUnits(newMrp)
-                                    val stockValue = initialStock.toDoubleOrNull() ?: 0.0
-                                    if (newName.trim().isEmpty() || mrpValue == null || mrpValue <= 0L) {
+                                    val validation = ProductFormValidation.validate(
+                                        name = newName,
+                                        categoryId = selectedCatId,
+                                        mrp = newMrp,
+                                        sellingPrice = "",
+                                        purchasePrice = "",
+                                        unit = newUnit,
+                                        stock = initialStock,
+                                        lowStockAlert = "5",
+                                        barcode = "",
+                                        trackStock = trackStock
+                                    )
+                                    if (!validation.isValid) {
                                         quickAddInputError = strings.statusValidationError
                                     } else {
                                         quickAddInputError = null
                                         viewModel.quickAddProduct(
-                                            name = newName,
-                                            mrp = mrpValue,
-                                            categoryId = selectedCatId,
+                                            name = validation.normalizedName,
+                                            mrp = validation.normalizedMrp!!,
+                                            categoryId = validation.normalizedCategoryId!!,
                                             trackStock = trackStock,
-                                            currentStock = if (trackStock) stockValue else 0.0,
+                                            currentStock = validation.normalizedStock ?: 0.0,
+                                            unit = validation.normalizedUnit,
                                             onSuccess = { showQuickAddDialog = false }
                                         )
                                     }
@@ -753,7 +765,7 @@ fun BillingScreen(viewModel: ShopViewModel, inventoryViewModel: InventoryViewMod
                                 modifier = Modifier.weight(1.5f),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
-                                Text(saveAndAddText)
+                                Text(strings.productFormSaveAndAdd)
                             }
                         }
                     }
@@ -829,7 +841,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                 },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Billing) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 }
             )
@@ -863,7 +875,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                     modifier = Modifier.padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val payableTitle = if (settings.appLanguage == AppLanguage.HINDI) "कुल चुकाने योग्य राशि" else "Total Payable Amount"
+                    val payableTitle = strings.billingPayableAmount
                     Text(text = payableTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -882,11 +894,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val receivedLabel = if (settings.appLanguage == AppLanguage.HINDI) {
-                        "प्राप्त राशि (Cash / UPI)"
-                    } else {
-                        "Received amount (Cash / UPI)"
-                    }
+                    val receivedLabel = strings.billingReceivedCashUpi
                     Text(receivedLabel, fontWeight = FontWeight.Bold, color = TextNearBlack)
                     OutlinedTextField(
                         value = receivedAmountText,
@@ -944,17 +952,13 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                         ) {
                             AsyncImage(
                                 model = settings.staticPaytmQrImageUri,
-                                contentDescription = "Static Paytm QR Code",
+                                contentDescription = strings.commonStaticPaytmQr,
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
                         }
                         Spacer(modifier = Modifier.height(8.dp))
-                        val qrPrompt = if (settings.appLanguage == AppLanguage.HINDI) {
-                            "ग्राहक से कहें: 'QR स्कैन करके राशि दर्ज करें।'"
-                        } else {
-                            "Ask customer: 'Scan QR and enter exact amount.'"
-                        }
+                        val qrPrompt = strings.billingQrPrompt
                         Text(
                             text = qrPrompt,
                             fontSize = 12.sp,
@@ -971,11 +975,11 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                 .border(1.5.dp, BorderStrong, RoundedCornerShape(12.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.Default.QrCode2, "No QR Configured", tint = SaffronPrimary, modifier = Modifier.size(80.dp))
+                            Icon(Icons.Default.QrCode2, strings.commonNoQrConfigured, tint = SaffronPrimary, modifier = Modifier.size(80.dp))
                         }
                         Spacer(modifier = Modifier.height(16.dp))
-                        val noQrTitle = if (settings.appLanguage == AppLanguage.HINDI) "UPI QR सेट नहीं है" else "UPI QR not set"
-                        val noQrSub = if (settings.appLanguage == AppLanguage.HINDI) "सेटिंग्स में जाकर दुकान का Paytm Business QR लगाएं।" else "Go to Settings to configure shop Paytm QR."
+                        val noQrTitle = strings.billingNoQrTitle
+                        val noQrSub = strings.billingNoQrMessage
                         Text(
                             text = noQrTitle,
                             fontSize = 16.sp,
@@ -1032,7 +1036,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.QrCodeScanner, null, tint = Color.White)
-                            val upiText = if (settings.appLanguage == AppLanguage.HINDI) "UPI भुगतान" else "UPI Paid"
+                            val upiText = strings.billingUpiPaid
                             Text(upiText, fontWeight = FontWeight.Black, fontSize = 14.sp)
                         }
                     }
@@ -1091,7 +1095,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                 { checkoutInputError = null; viewModel.clearCheckoutMutationStatus() }
                             } else null
                         )
-                        val selectCustHeader = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक चुनें" else "Select Udhaar Customer"
+                        val selectCustHeader = strings.billingSelectUdhaarCustomer
                         Text(
                             selectCustHeader,
                             fontSize = 18.sp,
@@ -1119,11 +1123,11 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                     modifier = Modifier.fillMaxWidth().padding(8.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    val noCustFound = if (settings.appLanguage == AppLanguage.HINDI) "कोई ग्राहक नहीं मिला।" else "No customer found."
+                                    val noCustFound = strings.billingNoCustomerFound
                                     Text(noCustFound, color = TextMutedGray, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Spacer(modifier = Modifier.height(4.dp))
                                     TextButton(onClick = { showAddNewCustomerBlock = true }) {
-                                        val addNewLabel = if (settings.appLanguage == AppLanguage.HINDI) "+ नया जोड़ें: '$searchCustName'" else "+ Add New: '$searchCustName'"
+                                        val addNewLabel = strings.billingAddCustomer(searchCustName)
                                         Text(addNewLabel, color = SaffronPrimary, fontWeight = FontWeight.Black)
                                     }
                                 }
@@ -1182,7 +1186,7 @@ fun PaymentScreen(viewModel: ShopViewModel, invoiceTotal: Long) {
                                 )
                             )
 
-                            val confirmUdhaarLabel = if (settings.appLanguage == AppLanguage.HINDI) "खाता खोलें और उधार लिखें" else "Open Ledger & Confirm Udhaar"
+                            val confirmUdhaarLabel = strings.billingConfirmUdhaar
                             Button(
                                 onClick = {
                                     if (searchCustName.trim().isEmpty()) {
@@ -1247,7 +1251,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
         ) {
             Icon(
                 imageVector = Icons.Default.CheckCircle,
-                contentDescription = "Success",
+                contentDescription = strings.commonSuccess,
                 tint = SuccessGreen,
                 modifier = Modifier.size(72.dp)
             )
@@ -1260,7 +1264,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
             )
 
             lastSale?.let { sale ->
-                val billNoPrefix = if (settings.appLanguage == AppLanguage.HINDI) "बिल नंबर:" else "Bill No:"
+                val billNoPrefix = strings.billingBillNumber
                 Text(
                     text = "$billNoPrefix ${sale.billNumber}",
                     fontSize = 15.sp,
@@ -1275,7 +1279,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                     color = TextNearBlack
                 )
 
-                val paymentModeLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम:" else "Payment Mode:"
+                val paymentModeLabel = strings.billingPaymentMode
                 val modeDisplay = when (sale.paymentMode) {
                     "UPI" -> "UPI"
                     "UDHAAR" -> strings.udhaarMode
@@ -1290,21 +1294,21 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                         else -> SuccessGreen
                     }
                 )
-                val paymentStatusLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान स्थिति:" else "Payment Status:"
+                val paymentStatusLabel = strings.billingPaymentStatus
                 Text(
                     text = "$paymentStatusLabel ${sale.paymentState}",
                     fontWeight = FontWeight.Bold,
                     color = TextMediumGray
                 )
                 sale.receivedAmount?.let { received ->
-                    val receivedLabel = if (settings.appLanguage == AppLanguage.HINDI) "प्राप्त राशि:" else "Received:"
+                    val receivedLabel = strings.billingReceived
                     Text(
                         text = "$receivedLabel ${CurrencyUtils.formatRupees(received)}",
                         fontWeight = FontWeight.Bold,
                         color = TextNearBlack
                     )
                     if (sale.paymentMode.equals("CASH", ignoreCase = true) && received > sale.totalAmount) {
-                        val changeLabel = if (settings.appLanguage == AppLanguage.HINDI) "वापसी:" else "Change:"
+                        val changeLabel = strings.billingChange
                         Text(
                             text = "$changeLabel ${CurrencyUtils.formatRupees(received - sale.totalAmount)}",
                             fontWeight = FontWeight.Bold,
@@ -1342,7 +1346,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary)
                     Spacer(modifier = Modifier.width(8.dp))
-                    val copyLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिल कॉपी करें" else "Copy Invoice"
+                    val copyLabel = strings.billingCopyInvoice
                     Text(copyLabel, fontWeight = FontWeight.Bold)
                 }
             }
@@ -1357,7 +1361,7 @@ fun BillSuccessScreen(viewModel: ShopViewModel) {
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = TextNearBlack),
                     modifier = Modifier.weight(1f).height(48.dp)
                 ) {
-                    val histLabel = if (settings.appLanguage == AppLanguage.HINDI) "इतिहास" else "History"
+                    val histLabel = strings.billingHistory
                     Text(histLabel, fontWeight = FontWeight.Bold)
                 }
 

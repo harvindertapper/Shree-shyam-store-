@@ -312,7 +312,9 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 onClick = { viewModel.logoutUser() },
                                 colors = ButtonDefaults.buttonColors(containerColor = ErrorRed, contentColor = Color.White),
                                 shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.testTag("logout_button").heightIn(min = 40.dp)
+                                modifier = Modifier
+                                    .testTag("logout_button")
+                                    .heightIn(min = 48.dp)
                             ) {
                                 Icon(Icons.Default.Logout, contentDescription = strings.logout, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -1064,7 +1066,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             enabled = !mutationInFlight,
                             colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .testTag("settings_backup_now_button")
                         ) {
                             Icon(Icons.Default.CloudUpload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -1078,7 +1083,10 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             enabled = !mutationInFlight,
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE91E63)),
                             shape = RoundedCornerShape(10.dp),
-                            modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .testTag("settings_restore_button")
                         ) {
                             Icon(Icons.Default.CloudDownload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -1157,14 +1165,16 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 showRestoreConfirmDialog = false
                                 viewModel.restoreAllFromCloud { _, _ -> }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
+                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                            modifier = Modifier.testTag("settings_confirm_restore")
                         ) {
                             Text(confirmBtn, fontWeight = FontWeight.Bold)
                         }
                     },
                     dismissButton = {
                         TextButton(
-                            onClick = { showRestoreConfirmDialog = false }
+                            onClick = { showRestoreConfirmDialog = false },
+                            modifier = Modifier.testTag("settings_cancel_restore")
                         ) {
                             Text(strings.cancel, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }

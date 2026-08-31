@@ -204,6 +204,29 @@ interface AppStrings {
     val udhaarGiven: String
     val topSellingProducts: String
     val salesHistory: String
+    val reportsRangeSummary: (String, String) -> String
+    val reportsStartDate: String
+    val reportsEndDate: String
+    val reportsSelectStartDate: String
+    val reportsSelectEndDate: String
+    val reportsApplyCustomRange: String
+    val reportsClearCustomRange: String
+    val reportsInvalidCustomRange: String
+    val reportsLoading: String
+    val reportsLoadError: String
+    val reportsRetry: String
+    val reportsNoSalesInRange: String
+    val reportsExportReady: String
+    val reportsExportEmpty: String
+    val reportsExportFailed: String
+    val reportsPaymentState: String
+    val reportsPaymentNotRequired: String
+    val reportsPaymentPending: String
+    val reportsPaymentReceived: String
+    val reportsPaymentFailed: String
+    val reportsPaymentPartiallyRefunded: String
+    val reportsPaymentRefunded: String
+    val reportsPaymentUnknown: String
 
     // Settings
     val settingsTitle: String
@@ -221,6 +244,75 @@ interface AppStrings {
     val saveSettings: String
     val logout: String
     val activeOwner: String
+
+    // Product and stock form validation
+    val productFormBack: String
+    val productFormBarcodeLabel: String
+    val productFormBarcodePlaceholder: String
+    val productFormScanBarcode: String
+    val productFormAddCategoryTitle: String
+    val productFormCategoryName: String
+    val productFormAddCategory: String
+    val productFormUnitLabel: String
+    val productFormUnitHint: String
+    val productFormTrackStockHint: String
+    val productFormActiveLabel: String
+    val productFormActiveHint: String
+    val productFormMoneyHint: String
+    val productFormQuantityHint: String
+    val productFormRequiredField: (String) -> String
+    val productFormInvalidNumber: (String) -> String
+    val productFormInvalidField: (String) -> String
+    val productFormNegativeNumber: (String) -> String
+    val productFormNonPositiveMrp: String
+    val productFormFractionNotAllowed: (String) -> String
+    val productFormCategoryRequired: String
+    val productFormBarcodeInvalid: String
+    val productFormBarcodeSet: (String) -> String
+    val productFormChooseCategory: String
+    val productFormFastAddPrefix: String
+    val productFormAddItem: String
+    val productFormRecentlyAdded: String
+    val productFormTotal: String
+    val productFormNoItemsInCategory: String
+    val productFormPrice: String
+    val productFormStock: String
+    val productFormUntracked: String
+    val productFormNoProducts: String
+    val productFormInactive: String
+    val productFormLowStock: (String) -> String
+    val productFormStockAvailable: (String) -> String
+    val productFormStockUntracked: String
+    val productFormAdjustStock: String
+    val productFormSaveAndAdd: String
+    val productFormCategoryManager: String
+    val productFormNewCategoryPlaceholder: String
+    val productFormRenameCategory: String
+    val productFormUpdateCategory: String
+    val productFormDone: String
+    val productFormNoLowStock: String
+    val productFormStockHealthy: String
+    val productFormAddStock: String
+    val productFormLeft: (String) -> String
+    val productFormClose: String
+    val productFormPlusOneStock: String
+    val productFormCopy: String
+    val productFormBarcodeScanned: (String) -> String
+    val productFormLowStockBanner: (Int) -> String
+    val productFormReorderListHint: String
+    val productFormOrderList: String
+    val stockAdjustmentCurrentStock: (String) -> String
+    val stockAdjustmentEnterPhysicalCount: String
+    val stockAdjustmentReason: String
+    val stockAdjustmentSave: String
+    val stockAdjustmentHistory: String
+    val stockAdjustmentStockTransition: (String, String) -> String
+    val stockAdjustmentProductNotFound: String
+    val stockReasonCountCorrection: String
+    val stockReasonPurchaseAdded: String
+    val stockReasonDamaged: String
+    val stockReasonOpening: String
+    val stockReasonOther: String
 
     // Settings control center
     val settingsAccountSection: String
@@ -306,6 +398,144 @@ interface AppStrings {
     val settingsSyncStatusNoChanges: String
     val settingsSyncStatusFailed: String
     val settingsSyncStatusUnavailable: String
+
+    // Issue #54 localization completeness: shared and representative journey copy
+    val commonLanguage: String
+    val commonBack: String
+    val commonClose: String
+    val commonOkay: String
+    val commonDelete: String
+    val commonBiometric: String
+    val commonSuccess: String
+    val commonScanBarcode: String
+    val commonQuickAdd: String
+    val commonReorderList: String
+    val commonExportStock: String
+    val commonManageCategories: String
+    val commonExportSales: String
+    val commonExportUdhaar: String
+    val commonSeeItems: String
+    val commonAddToBasket: String
+    val commonRemoveFromBasket: String
+    val commonAdd: String
+    val commonRemove: String
+    val commonLedgerActions: String
+    val commonStaticPaytmQr: String
+    val commonNoQrConfigured: String
+    val commonWhatsApp: String
+    val commonCustomer: String
+    val scannerTitle: String
+    val scannerSubtitle: String
+    val scannerCameraPermissionTitle: String
+    val scannerCameraPermissionMessage: String
+    val scannerAllow: String
+    val scannerToggleTorch: String
+    val scannerCancel: String
+
+    val languageEnglishCode: String
+    val languageHindiCode: String
+    val authLoginSuccess: (String) -> String
+    val authGoogleSignInFailed: String
+    val authLocalPinTitle: String
+    val authLocalPinHelp: String
+    val authGooglePinTitle: String
+    val authGooglePinHelp: String
+    val authSwitchAccountHelp: String
+    val authUsernameOrEmail: String
+    val authLocalPassword: String
+    val authAccount: (String) -> String
+    val authGoogleAccount: String
+    val authNewPin: String
+    val authPinChanged: String
+    val authChangePin: String
+    val authVerifyGoogle: String
+    val authSignIn: String
+
+    val billingProductNotFound: String
+    val billingLowStock: (String) -> String
+    val billingStockAvailable: (String) -> String
+    val billingStockUntracked: String
+    val billingCartSummary: (String) -> String
+    val billingInsufficientStockTitle: String
+    val billingInsufficientStockMessage: (String, String) -> String
+    val billingProductAdded: (String) -> String
+    val billingBarcodeNotFound: (String) -> String
+    val billingPayableAmount: String
+    val billingReceivedCashUpi: String
+    val billingQrPrompt: String
+    val billingNoQrTitle: String
+    val billingNoQrMessage: String
+    val billingUpiPaid: String
+    val billingSelectUdhaarCustomer: String
+    val billingNoCustomerFound: String
+    val billingAddCustomer: (String) -> String
+    val billingConfirmUdhaar: String
+    val billingBillNumber: String
+    val billingPaymentMode: String
+    val billingPaymentStatus: String
+    val billingReceived: String
+    val billingChange: String
+    val billingCopyInvoice: String
+    val billingHistory: String
+
+    val homeCloudSyncTriggered: String
+    val homeCloudBackupActive: String
+    val homeBillsCreated: (Int) -> String
+    val homeRestockNeeded: (Int) -> String
+    val homeStockSafe: String
+    val homeStockSufficient: String
+    val homeBillingSubtitle: String
+    val homeInventorySubtitle: String
+    val homeUdhaarSubtitle: String
+    val homeReportsSubtitle: String
+
+    val reportsTotalSalesTitle: String
+    val reportsBillsGenerated: (Int) -> String
+    val reportsHistoryTitle: String
+    val reportsNoRecords: String
+    val reportsUdhaarCustomer: String
+    val reportsBillNumber: String
+    val reportsCustomer: String
+    val reportsPaymentMode: String
+    val reportsCopy: String
+    val reportsClose: String
+    val reportsNoChartData: String
+    val reportsPaymentModeSplit: String
+    val reportsTotal: String
+    val reportsWeeklyTrend: String
+
+    val udhaarDebtorsOnly: String
+    val udhaarNoCustomerFound: String
+    val udhaarSaveCustomer: String
+    val udhaarCustomerNameRequired: String
+    val udhaarCustomerAdded: (String) -> String
+    val udhaarPhoneLabel: String
+    val udhaarLedgerHistory: String
+    val udhaarNoTransactions: String
+    val udhaarCreditGiven: String
+    val udhaarPaymentReceived: String
+    val udhaarCorrectionReversal: String
+    val udhaarInvalidEntry: String
+    val udhaarReceivePaymentTitle: String
+    val udhaarReceivedAmountLabel: String
+    val udhaarNoteModeLabel: String
+    val udhaarNoteModePlaceholder: String
+    val udhaarSavePayment: String
+    val udhaarCorrectEntry: String
+    val udhaarCorrectAmount: String
+    val udhaarReasonRequired: String
+    val udhaarReverse: String
+    val udhaarCorrect: String
+
+    val setupShopNameRequired: String
+    val setupShopNameHint: String
+    val setupPhoneInvalid: String
+    val setupPinInvalid: String
+    val setupCompleted: String
+
+    val productFormSellingPriceShort: String
+    val productFormLowStockCount: (Int) -> String
+    val productFormWhatsApp: String
 }
 
 object HindiStrings : AppStrings {
@@ -464,6 +694,73 @@ object HindiStrings : AppStrings {
     override val lowStock = "कम स्टॉक"
     override val outOfStock = "स्टॉक खत्म"
     override val searchProductPlaceholder = "सामान खोजें..."
+    override val productFormBack = "वापस"
+    override val productFormBarcodeLabel = "बारकोड (वैकल्पिक)"
+    override val productFormBarcodePlaceholder = "EAN / UPC / QR कोड"
+    override val productFormScanBarcode = "बारकोड स्कैन करें"
+    override val productFormAddCategoryTitle = "नई कैटेगरी जोड़ें"
+    override val productFormCategoryName = "कैटेगरी का नाम"
+    override val productFormAddCategory = "जोड़ें"
+    override val productFormUnitLabel = "इकाई"
+    override val productFormUnitHint = "जैसे pcs, kg, g या litre"
+    override val productFormTrackStockHint = "बिल बनने पर स्टॉक अपने आप घटेगा"
+    override val productFormActiveLabel = "सामान सक्रिय है"
+    override val productFormActiveHint = "बंद करने पर यह सामान बिलिंग में नहीं दिखेगा"
+    override val productFormMoneyHint = "रकम रुपये में लिखें; 10.50 या 10,50 दोनों चलेंगे।"
+    override val productFormQuantityHint = "मात्रा खाली या गलत नहीं हो सकती।"
+    override val productFormRequiredField: (String) -> String = { field -> "$field आवश्यक है" }
+    override val productFormInvalidNumber: (String) -> String = { field -> "$field की संख्या सही नहीं है" }
+    override val productFormInvalidField: (String) -> String = { field -> "$field सही नहीं है" }
+    override val productFormNegativeNumber: (String) -> String = { field -> "$field ऋणात्मक नहीं हो सकता" }
+    override val productFormNonPositiveMrp = "MRP शून्य से अधिक होना चाहिए"
+    override val productFormFractionNotAllowed: (String) -> String = { field -> "$field में पूरी संख्या लिखें" }
+    override val productFormCategoryRequired = "सक्रिय कैटेगरी चुनें"
+    override val productFormBarcodeInvalid = "बारकोड में स्पेस नहीं होना चाहिए और वह 128 अक्षरों से छोटा हो"
+    override val productFormBarcodeSet: (String) -> String = { code -> "बारकोड दर्ज हुआ: $code" }
+    override val productFormChooseCategory = "कैटेगरी चुनें"
+    override val productFormFastAddPrefix = "त्वरित जोड़ें"
+    override val productFormAddItem = "सामान जोड़ें"
+    override val productFormRecentlyAdded = "हाल में जोड़ा गया सामान"
+    override val productFormTotal = "कुल"
+    override val productFormNoItemsInCategory = "इस कैटेगरी में अभी कोई सामान नहीं है।"
+    override val productFormPrice = "कीमत"
+    override val productFormStock = "स्टॉक"
+    override val productFormUntracked = "ट्रैक नहीं हो रहा"
+    override val productFormNoProducts = "अभी कोई सामान उपलब्ध नहीं है।"
+    override val productFormInactive = "निष्क्रिय"
+    override val productFormLowStock: (String) -> String = { stock -> "कम स्टॉक: $stock बचा है" }
+    override val productFormStockAvailable: (String) -> String = { stock -> "स्टॉक: $stock उपलब्ध" }
+    override val productFormStockUntracked = "स्टॉक ट्रैक नहीं हो रहा"
+    override val productFormAdjustStock = "स्टॉक सुधारें"
+    override val productFormSaveAndAdd = "सेव करें और बिल में जोड़ें"
+    override val productFormCategoryManager = "कैटेगरी प्रबंधन"
+    override val productFormNewCategoryPlaceholder = "नई कैटेगरी का नाम"
+    override val productFormRenameCategory = "कैटेगरी का नाम बदलें"
+    override val productFormUpdateCategory = "बदलें"
+    override val productFormDone = "पूर्ण"
+    override val productFormNoLowStock = "कोई सामान कम नहीं है"
+    override val productFormStockHealthy = "दुकान में पर्याप्त स्टॉक मौजूद है।"
+    override val productFormAddStock = "माल जोड़ें"
+    override val productFormLeft: (String) -> String = { stock -> "$stock बचा है" }
+    override val productFormClose = "बंद करें"
+    override val productFormPlusOneStock = "स्टॉक में 1 जोड़ें"
+    override val productFormCopy = "कॉपी"
+    override val productFormBarcodeScanned: (String) -> String = { code -> "बारकोड स्कैन हुआ: $code" }
+    override val productFormLowStockBanner: (Int) -> String = { count -> "कम स्टॉक चेतावनी: $count सामान" }
+    override val productFormReorderListHint = "थोक खरीदारी लिस्ट देखें"
+    override val productFormOrderList = "ऑर्डर लिस्ट"
+    override val stockAdjustmentCurrentStock: (String) -> String = { stock -> "वर्तमान स्टॉक: $stock" }
+    override val stockAdjustmentEnterPhysicalCount = "दुकान में मौजूद वास्तविक स्टॉक संख्या दर्ज करें"
+    override val stockAdjustmentReason = "कारण"
+    override val stockAdjustmentSave = "स्टॉक सुधार सुरक्षित करें"
+    override val stockAdjustmentHistory = "स्टॉक सुधार इतिहास"
+    override val stockAdjustmentStockTransition: (String, String) -> String = { old, new -> "स्टॉक: $old ➔ $new" }
+    override val stockAdjustmentProductNotFound = "यह सामान नहीं मिला या अब सक्रिय नहीं है। वापस जाकर दूसरा सामान चुनें।"
+    override val stockReasonCountCorrection = "स्टॉक मिलान"
+    override val stockReasonPurchaseAdded = "नया माल आया"
+    override val stockReasonDamaged = "खराब या एक्सपायर सामान"
+    override val stockReasonOpening = "ओपनिंग स्टॉक प्रविष्टि"
+    override val stockReasonOther = "अन्य"
 
     override val udhaarTitle = "उधार बहीखाता"
     override val addCustomer = "नया ग्राहक जोड़ें"
@@ -486,6 +783,29 @@ object HindiStrings : AppStrings {
     override val udhaarGiven = "उधार दिया"
     override val topSellingProducts = "सबसे ज्यादा बिकने वाला सामान"
     override val salesHistory = "बिक्री इतिहास"
+    override val reportsRangeSummary: (String, String) -> String = { start, end -> "$start से $end तक" }
+    override val reportsStartDate = "शुरू तारीख"
+    override val reportsEndDate = "अंतिम तारीख"
+    override val reportsSelectStartDate = "शुरू तारीख चुनें"
+    override val reportsSelectEndDate = "अंतिम तारीख चुनें"
+    override val reportsApplyCustomRange = "तारीख लागू करें"
+    override val reportsClearCustomRange = "तारीखें साफ़ करें"
+    override val reportsInvalidCustomRange = "कृपया सही तारीख सीमा चुनें।"
+    override val reportsLoading = "रिपोर्ट लोड हो रही है..."
+    override val reportsLoadError = "रिपोर्ट लोड नहीं हो सकी।"
+    override val reportsRetry = "फिर प्रयास करें"
+    override val reportsNoSalesInRange = "इस तारीख सीमा में कोई बिक्री नहीं मिली।"
+    override val reportsExportReady = "रिपोर्ट साझा करने के लिए तैयार है।"
+    override val reportsExportEmpty = "निर्यात करने के लिए कोई बिक्री नहीं है।"
+    override val reportsExportFailed = "रिपोर्ट निर्यात नहीं हो सकी।"
+    override val reportsPaymentState = "भुगतान स्थिति:"
+    override val reportsPaymentNotRequired = "भुगतान आवश्यक नहीं"
+    override val reportsPaymentPending = "भुगतान लंबित"
+    override val reportsPaymentReceived = "भुगतान प्राप्त"
+    override val reportsPaymentFailed = "भुगतान विफल"
+    override val reportsPaymentPartiallyRefunded = "आंशिक रिफंड"
+    override val reportsPaymentRefunded = "रिफंड किया गया"
+    override val reportsPaymentUnknown = "स्थिति उपलब्ध नहीं"
 
     override val settingsTitle = "ऐप सेटिंग्स"
     override val languageSection = "भाषा चुनें"
@@ -586,6 +906,143 @@ object HindiStrings : AppStrings {
     override val settingsSyncStatusNoChanges = "स्थिति: कोई नया बदलाव नहीं"
     override val settingsSyncStatusFailed = "स्थिति: सिंक अधूरा है; फिर प्रयास होगा"
     override val settingsSyncStatusUnavailable = "स्थिति: अभी उपलब्ध नहीं"
+
+    override val commonLanguage = "भाषा"
+    override val commonBack = "वापस"
+    override val commonClose = "बंद करें"
+    override val commonOkay = "ठीक है"
+    override val commonDelete = "हटाएँ"
+    override val commonBiometric = "बायोमेट्रिक"
+    override val commonSuccess = "सफल"
+    override val commonScanBarcode = "बारकोड स्कैन करें"
+    override val commonQuickAdd = "त्वरित जोड़ें"
+    override val commonReorderList = "री-ऑर्डर लिस्ट"
+    override val commonExportStock = "स्टॉक CSV निर्यात करें"
+    override val commonManageCategories = "कैटेगरी प्रबंधित करें"
+    override val commonExportSales = "बिक्री CSV निर्यात करें"
+    override val commonExportUdhaar = "उधार CSV निर्यात करें"
+    override val commonSeeItems = "सामान देखें"
+    override val commonAddToBasket = "कार्ट में जोड़ें"
+    override val commonRemoveFromBasket = "कार्ट से हटाएँ"
+    override val commonAdd = "जोड़ें"
+    override val commonRemove = "हटाएँ"
+    override val commonLedgerActions = "खाता विकल्प"
+    override val commonStaticPaytmQr = "दुकान का स्थिर Paytm QR"
+    override val commonNoQrConfigured = "QR सेट नहीं है"
+    override val commonWhatsApp = "WhatsApp"
+    override val commonCustomer = "ग्राहक"
+    override val scannerTitle = "बारकोड / QR कोड स्कैन करें"
+    override val scannerSubtitle = "कैमरे को बारकोड के सामने रखें"
+    override val scannerCameraPermissionTitle = "कैमरा अनुमति आवश्यक है"
+    override val scannerCameraPermissionMessage = "बारकोड स्कैन करने के लिए कृपया कैमरा एक्सेस की अनुमति दें।"
+    override val scannerAllow = "अनुमति दें"
+    override val scannerToggleTorch = "फ्लैशलाइट चालू या बंद करें"
+    override val scannerCancel = "रद्द करें"
+
+    override val languageEnglishCode = "EN"
+    override val languageHindiCode = "हिंदी"
+    override val authLoginSuccess: (String) -> String = { name -> "लॉगिन सफल! $name".trim() }
+    override val authGoogleSignInFailed = "Google साइन इन विफल हुआ"
+    override val authLocalPinTitle = "लोकल अकाउंट से पिन बदलें"
+    override val authLocalPinHelp = "Firebase ईमेल रीसेट लोकल अकाउंट के डिवाइस PIN को नहीं बदलता। अपने लोकल अकाउंट का पासवर्ड और नया PIN दर्ज करें।"
+    override val authGooglePinTitle = "Google से PIN सत्यापित करें"
+    override val authGooglePinHelp = "आपका ऐप लॉक PIN डिवाइस पर रहता है। Google account को दोबारा verify करने के बाद नया PIN सेट होगा; कोई password-reset email नहीं भेजी जाएगी।"
+    override val authSwitchAccountHelp = "कोई active account उपलब्ध नहीं है। पहले सही account से sign in करें।"
+    override val authUsernameOrEmail = "Username या Email"
+    override val authLocalPassword = "लोकल पासवर्ड"
+    override val authAccount: (String) -> String = { account -> "Account: $account" }
+    override val authGoogleAccount = "Google account"
+    override val authNewPin = "नया 4-अंकों का PIN"
+    override val authPinChanged = "PIN बदल गया।"
+    override val authChangePin = "PIN बदलें"
+    override val authVerifyGoogle = "Google से सत्यापित करें"
+    override val authSignIn = "Sign in करें"
+
+    override val billingProductNotFound = "कोई सामान नहीं मिला!"
+    override val billingLowStock: (String) -> String = { stock -> "कम स्टॉक: $stock बचा है" }
+    override val billingStockAvailable: (String) -> String = { stock -> "स्टॉक: $stock उपलब्ध" }
+    override val billingStockUntracked = "स्टॉक अनट्रैक्ड"
+    override val billingCartSummary: (String) -> String = { quantity -> "थैला: $quantity सामान" }
+    override val billingInsufficientStockTitle = "पर्याप्त स्टॉक नहीं है"
+    override val billingInsufficientStockMessage: (String, String) -> String = { name, stock -> "प्रोडक्ट '$name' का उपलब्ध स्टॉक $stock है। इससे अधिक मात्रा का बिल नहीं बनाया जा सकता।" }
+    override val billingProductAdded: (String) -> String = { name -> "✓ $name बिल में जोड़ा गया" }
+    override val billingBarcodeNotFound: (String) -> String = { code -> "बारकोड: $code (उत्पाद नहीं मिला - नया उत्पाद जोड़ें)" }
+    override val billingPayableAmount = "कुल चुकाने योग्य राशि"
+    override val billingReceivedCashUpi = "प्राप्त राशि (Cash / UPI)"
+    override val billingQrPrompt = "ग्राहक से कहें: 'QR स्कैन करके राशि दर्ज करें।'"
+    override val billingNoQrTitle = "UPI QR सेट नहीं है"
+    override val billingNoQrMessage = "सेटिंग्स में जाकर दुकान का Paytm Business QR लगाएं।"
+    override val billingUpiPaid = "UPI भुगतान"
+    override val billingSelectUdhaarCustomer = "उधार ग्राहक चुनें"
+    override val billingNoCustomerFound = "कोई ग्राहक नहीं मिला।"
+    override val billingAddCustomer: (String) -> String = { name -> "+ नया जोड़ें: '$name'" }
+    override val billingConfirmUdhaar = "खाता खोलें और उधार लिखें"
+    override val billingBillNumber = "बिल नंबर:"
+    override val billingPaymentMode = "भुगतान माध्यम:"
+    override val billingPaymentStatus = "भुगतान स्थिति:"
+    override val billingReceived = "प्राप्त राशि:"
+    override val billingChange = "वापसी:"
+    override val billingCopyInvoice = "बिल कॉपी करें"
+    override val billingHistory = "इतिहास"
+
+    override val homeCloudSyncTriggered = "⚡ क्लाउड सिंक शुरू हुआ"
+    override val homeCloudBackupActive = "क्लाउड बैकअप सक्रिय ⚡"
+    override val homeBillsCreated: (Int) -> String = { count -> "$count बिल बने" }
+    override val homeRestockNeeded: (Int) -> String = { count -> "$count सामान जल्द ख़त्म होने वाले हैं।" }
+    override val homeStockSafe = "दुकान का स्टॉक सुरक्षित है"
+    override val homeStockSufficient = "सभी जरूरी सामान पर्याप्त मात्रा में उपलब्ध हैं।"
+    override val homeBillingSubtitle = "नकद / UPI / उधार"
+    override val homeInventorySubtitle = "स्टॉक एंट्री"
+    override val homeUdhaarSubtitle = "खाता व WhatsApp तगादा"
+    override val homeReportsSubtitle = "दैनिक व मासिक बिक्री"
+
+    override val reportsTotalSalesTitle = "कुल बिक्री"
+    override val reportsBillsGenerated: (Int) -> String = { count -> "$count बिल बनाए गए" }
+    override val reportsHistoryTitle = "बिक्री का इतिहास:"
+    override val reportsNoRecords = "कोई रिकॉर्ड नहीं मिला!"
+    override val reportsUdhaarCustomer = "उधार ग्राहक"
+    override val reportsBillNumber = "बिल नं:"
+    override val reportsCustomer = "ग्राहक:"
+    override val reportsPaymentMode = "भुगतान माध्यम:"
+    override val reportsCopy = "कॉपी"
+    override val reportsClose = "बंद करें"
+    override val reportsNoChartData = "वितरण चार्ट के लिए कोई बिक्री डेटा उपलब्ध नहीं है।"
+    override val reportsPaymentModeSplit = "भुगतान माध्यम वितरण"
+    override val reportsTotal = "कुल बिक्री"
+    override val reportsWeeklyTrend = "पिछले 7 दिनों की बिक्री"
+
+    override val udhaarDebtorsOnly = "बकाया वाले"
+    override val udhaarNoCustomerFound = "कोई ग्राहक नहीं मिला!"
+    override val udhaarSaveCustomer = "खाता खोलें"
+    override val udhaarCustomerNameRequired = "ग्राहक का नाम आवश्यक है!"
+    override val udhaarCustomerAdded: (String) -> String = { name -> "$name खाता खुल गया!" }
+    override val udhaarPhoneLabel = "मोबाइल:"
+    override val udhaarLedgerHistory = "लेन-देन इतिहास:"
+    override val udhaarNoTransactions = "इस खाते में कोई लेन-देन इतिहास नहीं है।"
+    override val udhaarCreditGiven = "उधार दिया"
+    override val udhaarPaymentReceived = "रकम प्राप्त हुई"
+    override val udhaarCorrectionReversal = "सुधार / रिवर्सल"
+    override val udhaarInvalidEntry = "अमान्य प्रविष्टि"
+    override val udhaarReceivePaymentTitle = "जमा राशि दर्ज करें"
+    override val udhaarReceivedAmountLabel = "प्राप्त रकम *"
+    override val udhaarNoteModeLabel = "टिप्पणी / माध्यम (वैकल्पिक)"
+    override val udhaarNoteModePlaceholder = "उदा. नकद, UPI, Paytm..."
+    override val udhaarSavePayment = "जमा सुरक्षित करें"
+    override val udhaarCorrectEntry = "लेजर सुधार"
+    override val udhaarCorrectAmount = "सही रकम *"
+    override val udhaarReasonRequired = "कारण *"
+    override val udhaarReverse = "रिवर्स"
+    override val udhaarCorrect = "सुधार"
+
+    override val setupShopNameRequired = "दुकान का नाम आवश्यक है!"
+    override val setupShopNameHint = "यह नाम ग्राहकों के बिल पर दिखेगा।"
+    override val setupPhoneInvalid = "कृपया सही 10 अंकों का मोबाइल नंबर दर्ज करें"
+    override val setupPinInvalid = "कृपया सुरक्षित 4-अंकों का PIN दर्ज करें"
+    override val setupCompleted = "दुकान सेटअप पूरा हुआ!"
+
+    override val productFormSellingPriceShort = "बिक्री"
+    override val productFormLowStockCount: (Int) -> String = { count -> "कुल $count सामान कम हैं" }
+    override val productFormWhatsApp = "WhatsApp"
 }
 
 object EnglishStrings : AppStrings {
@@ -744,6 +1201,73 @@ object EnglishStrings : AppStrings {
     override val lowStock = "Low Stock"
     override val outOfStock = "Out of Stock"
     override val searchProductPlaceholder = "Search products..."
+    override val productFormBack = "Back"
+    override val productFormBarcodeLabel = "Barcode (optional)"
+    override val productFormBarcodePlaceholder = "EAN / UPC / QR code"
+    override val productFormScanBarcode = "Scan barcode"
+    override val productFormAddCategoryTitle = "Add new category"
+    override val productFormCategoryName = "Category name"
+    override val productFormAddCategory = "Add"
+    override val productFormUnitLabel = "Unit"
+    override val productFormUnitHint = "For example, pcs, kg, g, or litre"
+    override val productFormTrackStockHint = "Stock reduces automatically when billing"
+    override val productFormActiveLabel = "Product is active"
+    override val productFormActiveHint = "Inactive products are hidden from billing"
+    override val productFormMoneyHint = "Enter rupee amounts; both 10.50 and 10,50 are accepted."
+    override val productFormQuantityHint = "Quantity cannot be blank or malformed."
+    override val productFormRequiredField: (String) -> String = { field -> "$field is required" }
+    override val productFormInvalidNumber: (String) -> String = { field -> "$field is not a valid number" }
+    override val productFormInvalidField: (String) -> String = { field -> "$field is not valid" }
+    override val productFormNegativeNumber: (String) -> String = { field -> "$field cannot be negative" }
+    override val productFormNonPositiveMrp = "MRP must be greater than zero"
+    override val productFormFractionNotAllowed: (String) -> String = { field -> "Enter a whole number for $field" }
+    override val productFormCategoryRequired = "Choose an active category"
+    override val productFormBarcodeInvalid = "Barcode must contain no spaces and be 128 characters or shorter"
+    override val productFormBarcodeSet: (String) -> String = { code -> "Barcode set: $code" }
+    override val productFormChooseCategory = "Choose category"
+    override val productFormFastAddPrefix = "Fast add"
+    override val productFormAddItem = "Add product"
+    override val productFormRecentlyAdded = "Recently added items"
+    override val productFormTotal = "Total"
+    override val productFormNoItemsInCategory = "No products in this category yet."
+    override val productFormPrice = "Price"
+    override val productFormStock = "Stock"
+    override val productFormUntracked = "Not tracked"
+    override val productFormNoProducts = "No products are available yet."
+    override val productFormInactive = "Inactive"
+    override val productFormLowStock: (String) -> String = { stock -> "Low stock: $stock left" }
+    override val productFormStockAvailable: (String) -> String = { stock -> "Stock: $stock available" }
+    override val productFormStockUntracked = "Stock is not tracked"
+    override val productFormAdjustStock = "Adjust stock"
+    override val productFormSaveAndAdd = "Save and add to bill"
+    override val productFormCategoryManager = "Category management"
+    override val productFormNewCategoryPlaceholder = "New category name"
+    override val productFormRenameCategory = "Rename category"
+    override val productFormUpdateCategory = "Update"
+    override val productFormDone = "Done"
+    override val productFormNoLowStock = "No low-stock products"
+    override val productFormStockHealthy = "Store inventory is well stocked."
+    override val productFormAddStock = "Add stock"
+    override val productFormLeft: (String) -> String = { stock -> "$stock left" }
+    override val productFormClose = "Close"
+    override val productFormPlusOneStock = "Add 1 to stock"
+    override val productFormCopy = "Copy"
+    override val productFormBarcodeScanned: (String) -> String = { code -> "Barcode scanned: $code" }
+    override val productFormLowStockBanner: (Int) -> String = { count -> "Low-stock warning: $count items" }
+    override val productFormReorderListHint = "View wholesale reorder list"
+    override val productFormOrderList = "Order list"
+    override val stockAdjustmentCurrentStock: (String) -> String = { stock -> "Current stock: $stock" }
+    override val stockAdjustmentEnterPhysicalCount = "Enter the actual physical stock count"
+    override val stockAdjustmentReason = "Reason"
+    override val stockAdjustmentSave = "Save stock adjustment"
+    override val stockAdjustmentHistory = "Stock adjustment history"
+    override val stockAdjustmentStockTransition: (String, String) -> String = { old, new -> "Stock: $old ➔ $new" }
+    override val stockAdjustmentProductNotFound = "This product was not found or is no longer active. Go back and choose another product."
+    override val stockReasonCountCorrection = "Stock count correction"
+    override val stockReasonPurchaseAdded = "Purchase added"
+    override val stockReasonDamaged = "Damaged or expired"
+    override val stockReasonOpening = "Opening stock entry"
+    override val stockReasonOther = "Other"
 
     override val udhaarTitle = "Udhaar Ledger"
     override val addCustomer = "Add New Customer"
@@ -766,6 +1290,29 @@ object EnglishStrings : AppStrings {
     override val udhaarGiven = "Credit Given"
     override val topSellingProducts = "Top Selling Products"
     override val salesHistory = "Sales History"
+    override val reportsRangeSummary: (String, String) -> String = { start, end -> "$start to $end" }
+    override val reportsStartDate = "Start date"
+    override val reportsEndDate = "End date"
+    override val reportsSelectStartDate = "Select start date"
+    override val reportsSelectEndDate = "Select end date"
+    override val reportsApplyCustomRange = "Apply dates"
+    override val reportsClearCustomRange = "Clear dates"
+    override val reportsInvalidCustomRange = "Select a valid date range."
+    override val reportsLoading = "Loading reports..."
+    override val reportsLoadError = "Reports could not be loaded."
+    override val reportsRetry = "Try again"
+    override val reportsNoSalesInRange = "No sales found in this date range."
+    override val reportsExportReady = "Report is ready to share."
+    override val reportsExportEmpty = "There are no sales to export."
+    override val reportsExportFailed = "The report could not be exported."
+    override val reportsPaymentState = "Payment status:"
+    override val reportsPaymentNotRequired = "Payment not required"
+    override val reportsPaymentPending = "Payment pending"
+    override val reportsPaymentReceived = "Payment received"
+    override val reportsPaymentFailed = "Payment failed"
+    override val reportsPaymentPartiallyRefunded = "Partially refunded"
+    override val reportsPaymentRefunded = "Refunded"
+    override val reportsPaymentUnknown = "Status unavailable"
 
     override val settingsTitle = "Settings"
     override val languageSection = "Language"
@@ -866,4 +1413,141 @@ object EnglishStrings : AppStrings {
     override val settingsSyncStatusNoChanges = "Status: No new changes"
     override val settingsSyncStatusFailed = "Status: Sync incomplete; retry will continue"
     override val settingsSyncStatusUnavailable = "Status: Not available yet"
+
+    override val commonLanguage = "Language"
+    override val commonBack = "Back"
+    override val commonClose = "Close"
+    override val commonOkay = "OK"
+    override val commonDelete = "Delete"
+    override val commonBiometric = "Biometric"
+    override val commonSuccess = "Success"
+    override val commonScanBarcode = "Scan barcode"
+    override val commonQuickAdd = "Quick add"
+    override val commonReorderList = "Reorder list"
+    override val commonExportStock = "Export stock CSV"
+    override val commonManageCategories = "Manage categories"
+    override val commonExportSales = "Export sales CSV"
+    override val commonExportUdhaar = "Export Udhaar CSV"
+    override val commonSeeItems = "See items"
+    override val commonAddToBasket = "Add to cart"
+    override val commonRemoveFromBasket = "Remove from cart"
+    override val commonAdd = "Add"
+    override val commonRemove = "Remove"
+    override val commonLedgerActions = "Ledger actions"
+    override val commonStaticPaytmQr = "Static shop Paytm QR"
+    override val commonNoQrConfigured = "No QR configured"
+    override val commonWhatsApp = "WhatsApp"
+    override val commonCustomer = "Customer"
+    override val scannerTitle = "Scan barcode / QR code"
+    override val scannerSubtitle = "Place the camera in front of the barcode"
+    override val scannerCameraPermissionTitle = "Camera permission required"
+    override val scannerCameraPermissionMessage = "Allow camera access to scan a barcode."
+    override val scannerAllow = "Allow camera"
+    override val scannerToggleTorch = "Toggle flashlight"
+    override val scannerCancel = "Cancel"
+
+    override val languageEnglishCode = "EN"
+    override val languageHindiCode = "Hindi"
+    override val authLoginSuccess: (String) -> String = { name -> "Login successful! $name".trim() }
+    override val authGoogleSignInFailed = "Google sign-in failed"
+    override val authLocalPinTitle = "Reset PIN with local account"
+    override val authLocalPinHelp = "A Firebase email reset cannot change a local account's device PIN. Verify the local account password and choose a new PIN."
+    override val authGooglePinTitle = "Verify with Google to reset PIN"
+    override val authGooglePinHelp = "Your app-lock PIN stays on this device. Re-verify the same Google account, then choose a new PIN; no password-reset email will be sent."
+    override val authSwitchAccountHelp = "No active account is available. Sign in with the correct account first."
+    override val authUsernameOrEmail = "Username or email"
+    override val authLocalPassword = "Local account password"
+    override val authAccount: (String) -> String = { account -> "Account: $account" }
+    override val authGoogleAccount = "Google account"
+    override val authNewPin = "New 4-digit app PIN"
+    override val authPinChanged = "PIN changed successfully."
+    override val authChangePin = "Change PIN"
+    override val authVerifyGoogle = "Verify with Google"
+    override val authSignIn = "Sign in"
+
+    override val billingProductNotFound = "No product found!"
+    override val billingLowStock: (String) -> String = { stock -> "Low stock: $stock left" }
+    override val billingStockAvailable: (String) -> String = { stock -> "Stock: $stock available" }
+    override val billingStockUntracked = "Stock untracked"
+    override val billingCartSummary: (String) -> String = { quantity -> "Cart: $quantity items" }
+    override val billingInsufficientStockTitle = "Insufficient stock"
+    override val billingInsufficientStockMessage: (String, String) -> String = { name, stock -> "Product '$name' has only $stock available. A bill cannot include more than the available stock." }
+    override val billingProductAdded: (String) -> String = { name -> "✓ $name added to cart" }
+    override val billingBarcodeNotFound: (String) -> String = { code -> "Barcode: $code (Product not found in inventory)" }
+    override val billingPayableAmount = "Total payable amount"
+    override val billingReceivedCashUpi = "Received amount (Cash / UPI)"
+    override val billingQrPrompt = "Ask customer: 'Scan QR and enter exact amount.'"
+    override val billingNoQrTitle = "UPI QR not set"
+    override val billingNoQrMessage = "Go to Settings to configure the shop Paytm QR."
+    override val billingUpiPaid = "UPI paid"
+    override val billingSelectUdhaarCustomer = "Select Udhaar customer"
+    override val billingNoCustomerFound = "No customer found."
+    override val billingAddCustomer: (String) -> String = { name -> "+ Add new: '$name'" }
+    override val billingConfirmUdhaar = "Open ledger & confirm Udhaar"
+    override val billingBillNumber = "Bill no:"
+    override val billingPaymentMode = "Payment mode:"
+    override val billingPaymentStatus = "Payment status:"
+    override val billingReceived = "Received:"
+    override val billingChange = "Change:"
+    override val billingCopyInvoice = "Copy invoice"
+    override val billingHistory = "History"
+
+    override val homeCloudSyncTriggered = "⚡ Cloud sync triggered"
+    override val homeCloudBackupActive = "Cloud backup active ⚡"
+    override val homeBillsCreated: (Int) -> String = { count -> "$count bills created" }
+    override val homeRestockNeeded: (Int) -> String = { count -> "$count items need restock." }
+    override val homeStockSafe = "Store stock is optimal"
+    override val homeStockSufficient = "All key products are well stocked."
+    override val homeBillingSubtitle = "Cash / UPI / Udhaar"
+    override val homeInventorySubtitle = "Stock inventory"
+    override val homeUdhaarSubtitle = "Ledger & WhatsApp"
+    override val homeReportsSubtitle = "Sales & profit"
+
+    override val reportsTotalSalesTitle = "Total sales"
+    override val reportsBillsGenerated: (Int) -> String = { count -> "$count bills generated" }
+    override val reportsHistoryTitle = "Sales history:"
+    override val reportsNoRecords = "No records found!"
+    override val reportsUdhaarCustomer = "Udhaar customer"
+    override val reportsBillNumber = "Bill no:"
+    override val reportsCustomer = "Customer:"
+    override val reportsPaymentMode = "Payment mode:"
+    override val reportsCopy = "Copy"
+    override val reportsClose = "Close"
+    override val reportsNoChartData = "No sales data available for the distribution chart."
+    override val reportsPaymentModeSplit = "Payment mode split"
+    override val reportsTotal = "Total"
+    override val reportsWeeklyTrend = "Weekly sales trend"
+
+    override val udhaarDebtorsOnly = "Debtors only"
+    override val udhaarNoCustomerFound = "No customer found!"
+    override val udhaarSaveCustomer = "Save customer"
+    override val udhaarCustomerNameRequired = "Customer name required!"
+    override val udhaarCustomerAdded: (String) -> String = { name -> "$name added!" }
+    override val udhaarPhoneLabel = "Phone:"
+    override val udhaarLedgerHistory = "Transaction ledger history:"
+    override val udhaarNoTransactions = "No transactions in this account yet."
+    override val udhaarCreditGiven = "Credit given"
+    override val udhaarPaymentReceived = "Payment received"
+    override val udhaarCorrectionReversal = "Correction / reversal"
+    override val udhaarInvalidEntry = "Invalid ledger entry"
+    override val udhaarReceivePaymentTitle = "Receive payment"
+    override val udhaarReceivedAmountLabel = "Received amount *"
+    override val udhaarNoteModeLabel = "Note / mode (optional)"
+    override val udhaarNoteModePlaceholder = "e.g. Cash, UPI, Paytm..."
+    override val udhaarSavePayment = "Save payment"
+    override val udhaarCorrectEntry = "Correct ledger entry"
+    override val udhaarCorrectAmount = "Correct amount *"
+    override val udhaarReasonRequired = "Reason *"
+    override val udhaarReverse = "Reverse"
+    override val udhaarCorrect = "Correct"
+
+    override val setupShopNameRequired = "Shop name is required!"
+    override val setupShopNameHint = "This name will appear on customer bills."
+    override val setupPhoneInvalid = "Please enter a valid 10-digit mobile number"
+    override val setupPinInvalid = "Please enter a safe 4-digit PIN"
+    override val setupCompleted = "Shop setup completed!"
+
+    override val productFormSellingPriceShort = "Sales"
+    override val productFormLowStockCount: (Int) -> String = { count -> "Total $count items low in stock" }
+    override val productFormWhatsApp = "WhatsApp"
 }

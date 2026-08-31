@@ -153,8 +153,7 @@ fun HomeScreen(
                     modifier = Modifier
                         .clickable {
                             viewModel.triggerAutoSync()
-                            val syncToast = if (settings.appLanguage == AppLanguage.HINDI) "⚡ क्लाउड सिंक शुरू हुआ" else "⚡ Cloud Sync Triggered"
-                            Toast.makeText(context, syncToast, Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, strings.homeCloudSyncTriggered, Toast.LENGTH_SHORT).show()
                         }
                 ) {
                     Row(
@@ -167,7 +166,7 @@ fun HomeScreen(
                                 .background(Color(0xFF22C55E), CircleShape)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        val syncLabel = if (settings.appLanguage == AppLanguage.HINDI) "क्लाउड बैकअप सक्रिय ⚡" else "Cloud Backup Active ⚡"
+                        val syncLabel = strings.homeCloudBackupActive
                         Text(
                             text = if (settings.lastSyncTime.isNotEmpty() && settings.lastSyncTime != "Never Synced") "${settings.lastSyncTime}" else syncLabel,
                             color = Color.White,
@@ -259,9 +258,8 @@ fun HomeScreen(
                                         tint = SaffronDark,
                                         modifier = Modifier.size(16.dp)
                                     )
-                                    val billsSuffix = if (settings.appLanguage == AppLanguage.HINDI) "बिल बने" else "Bills cut"
                                     Text(
-                                        text = "$billsCount $billsSuffix",
+                                        text = strings.homeBillsCreated(billsCount),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.ExtraBold,
                                         color = SaffronDark
@@ -344,7 +342,7 @@ fun HomeScreen(
                                 fontWeight = FontWeight.Black,
                                 color = ErrorRed
                             )
-                            val restockMsg = if (settings.appLanguage == AppLanguage.HINDI) "$lowStockCount सामान जल्द ख़त्म होने वाले हैं।" else "$lowStockCount items need restock."
+                            val restockMsg = strings.homeRestockNeeded(lowStockCount)
                             Text(
                                 text = restockMsg,
                                 fontSize = 12.sp,
@@ -354,7 +352,7 @@ fun HomeScreen(
                         }
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "See items",
+                            contentDescription = strings.commonSeeItems,
                             tint = ErrorRed,
                             modifier = Modifier.size(24.dp)
                         )
@@ -379,8 +377,8 @@ fun HomeScreen(
                             modifier = Modifier.size(28.dp)
                         )
                         Column {
-                            val safeStock = if (settings.appLanguage == AppLanguage.HINDI) "दुकान का स्टॉक सुरक्षित है 👍" else "Store stock is optimal 👍"
-                            val sufficientStock = if (settings.appLanguage == AppLanguage.HINDI) "सभी जरूरी सामान पर्याप्त मात्रा में उपलब्ध हैं।" else "All key products are well stocked."
+                            val safeStock = strings.homeStockSafe
+                            val sufficientStock = strings.homeStockSufficient
                             Text(
                                 text = safeStock,
                                 fontSize = 14.sp,
@@ -413,7 +411,7 @@ fun HomeScreen(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val billSub = if (settings.appLanguage == AppLanguage.HINDI) "नकद / UPI / उधार" else "Cash / UPI / Udhaar"
+                    val billSub = strings.homeBillingSubtitle
                     ModernQuickActionCard(
                         title = strings.createNewBill,
                         subtitle = billSub,
@@ -426,7 +424,7 @@ fun HomeScreen(
                         onClick = { viewModel.navigateTo(Screen.Billing) }
                     )
 
-                    val prodSub = if (settings.appLanguage == AppLanguage.HINDI) "स्टॉक एंट्री" else "Stock Inventory"
+                    val prodSub = strings.homeInventorySubtitle
                     ModernQuickActionCard(
                         title = strings.addNewProduct,
                         subtitle = prodSub,
@@ -443,7 +441,7 @@ fun HomeScreen(
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val udhaarSub = if (settings.appLanguage == AppLanguage.HINDI) "खाता व WhatsApp तगादा" else "Ledger & WhatsApp"
+                    val udhaarSub = strings.homeUdhaarSubtitle
                     ModernQuickActionCard(
                         title = strings.customerUdhaar,
                         subtitle = udhaarSub,
@@ -456,7 +454,7 @@ fun HomeScreen(
                         onClick = { viewModel.navigateTo(Screen.Udhaar) }
                     )
 
-                    val reportSub = if (settings.appLanguage == AppLanguage.HINDI) "दैनिक व मासिक बिक्री" else "Sales & Profit"
+                    val reportSub = strings.homeReportsSubtitle
                     ModernQuickActionCard(
                         title = strings.dailyReports,
                         subtitle = reportSub,

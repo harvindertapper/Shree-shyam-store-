@@ -28,7 +28,6 @@ import com.aistudio.shreeshyamstore.pqwzkb.data.Customer
 import com.aistudio.shreeshyamstore.pqwzkb.data.UdhaarTransaction
 import com.aistudio.shreeshyamstore.pqwzkb.ui.components.AppMutationStatusCard
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
-import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.DateTimeUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
@@ -83,7 +82,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                 title = { Text(strings.udhaarTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 },
                 actions = {
@@ -91,10 +90,10 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                         onClick = { viewModel.exportUdhaarCsv(context, customers, customerBalances) },
                         modifier = Modifier.testTag("export_udhaar_csv_button")
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Export Udhaar CSV", tint = SaffronPrimary)
+                        Icon(Icons.Default.Download, contentDescription = strings.commonExportUdhaar, tint = SaffronPrimary)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val debtorsOnlyLabel = if (settings.appLanguage == AppLanguage.HINDI) "बकाया वाले" else "Debtors Only"
+                        val debtorsOnlyLabel = strings.udhaarDebtorsOnly
                         Text(debtorsOnlyLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Checkbox(
                             checked = filterDebtorsOnly,
@@ -207,7 +206,7 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                         ) {
                             Icon(Icons.Default.ImportContacts, null, modifier = Modifier.size(56.dp), tint = Color.LightGray)
                             Spacer(modifier = Modifier.height(12.dp))
-                            val noCustMsg = if (settings.appLanguage == AppLanguage.HINDI) "कोई ग्राहक नहीं मिला!" else "No customer found!"
+                            val noCustMsg = strings.udhaarNoCustomerFound
                             Text(noCustMsg, color = Color.Gray)
                         }
                     }
@@ -356,17 +355,15 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
                                 Text(strings.cancel)
                             }
 
-                            val openLedgerText = if (settings.appLanguage == AppLanguage.HINDI) "खाता खोलें" else "Save Customer"
+                            val openLedgerText = strings.udhaarSaveCustomer
                             Button(
                                 onClick = {
                                     if (name.trim().isEmpty()) {
-                                        val reqName = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक का नाम आवश्यक है!" else "Customer name required!"
-                                        Toast.makeText(context, reqName, Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, strings.udhaarCustomerNameRequired, Toast.LENGTH_SHORT).show()
                                     } else {
                                         viewModel.quickAddCustomer(name, phone)
                                         showAddCustomerDialog = false
-                                        val addedMsg = if (settings.appLanguage == AppLanguage.HINDI) "${name.trim()} खाता खुल गया!" else "${name.trim()} added!"
-                                        Toast.makeText(context, addedMsg, Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, strings.udhaarCustomerAdded(name.trim()), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 modifier = Modifier
@@ -422,7 +419,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                 title = { Text(customer?.name ?: strings.customerLedger, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Udhaar) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 }
             )
@@ -485,7 +482,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         )
                         if (!cust.phone.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
-                            val phoneLabel = if (settings.appLanguage == AppLanguage.HINDI) "मोबाइल:" else "Phone:"
+                            val phoneLabel = strings.udhaarPhoneLabel
                             Text(
                                 text = "$phoneLabel ${cust.phone}",
                                 fontSize = 14.sp,
@@ -514,7 +511,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                     }
                 }
 
-                val ledgerHistoryTitle = if (settings.appLanguage == AppLanguage.HINDI) "लेन-देन इतिहास:" else "Transaction Ledger History:"
+                val ledgerHistoryTitle = strings.udhaarLedgerHistory
                 Text(
                     text = ledgerHistoryTitle,
                     fontWeight = FontWeight.Bold,
@@ -528,7 +525,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                 ) {
                     if (customerTransactions.value.isEmpty()) {
                         item {
-                            val noTxMsg = if (settings.appLanguage == AppLanguage.HINDI) "इस खाते में कोई लेन-देन इतिहास नहीं है।" else "No transactions in this account yet."
+                            val noTxMsg = strings.udhaarNoTransactions
                             Text(
                                 noTxMsg,
                                 color = Color.Gray,
@@ -591,10 +588,10 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
 
                                         Column {
                                             val txTypeLabel = when {
-                                                isCredit -> if (settings.appLanguage == AppLanguage.HINDI) "उधार दिया" else "Credit Given"
-                                                isPayment -> if (settings.appLanguage == AppLanguage.HINDI) "रकम प्राप्त हुई" else "Payment Received"
-                                                isCorrection -> if (settings.appLanguage == AppLanguage.HINDI) "सुधार / रिवर्सल" else "Correction / Reversal"
-                                                else -> if (settings.appLanguage == AppLanguage.HINDI) "अमान्य प्रविष्टि" else "Invalid ledger entry"
+                                                isCredit -> strings.udhaarCreditGiven
+                                                isPayment -> strings.udhaarPaymentReceived
+                                                isCorrection -> strings.udhaarCorrectionReversal
+                                                else -> strings.udhaarInvalidEntry
                                             }
                                             Text(
                                                 text = txTypeLabel,
@@ -642,7 +639,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                                 onClick = { selectedLedgerEvent = record },
                                                 modifier = Modifier.testTag("ledger_event_actions_${record.eventId}")
                                             ) {
-                                                Icon(Icons.Default.MoreVert, contentDescription = "Ledger actions", tint = TextMediumGray)
+                                                Icon(Icons.Default.MoreVert, contentDescription = strings.commonLedgerActions, tint = TextMediumGray)
                                             }
                                         }
                                     }
@@ -680,7 +677,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                 { udhaarInputError = null; viewModel.clearMutationStatus() }
                             } else null
                         )
-                        val depositTitle = if (settings.appLanguage == AppLanguage.HINDI) "जमा राशि दर्ज करें" else "Receive Payment"
+                        val depositTitle = strings.udhaarReceivePaymentTitle
                         Text(
                             depositTitle,
                             fontSize = 18.sp,
@@ -688,7 +685,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             color = SuccessGreen
                         )
 
-                        val amountLabel = if (settings.appLanguage == AppLanguage.HINDI) "प्राप्त रकम *" else "Received Amount *"
+                        val amountLabel = strings.udhaarReceivedAmountLabel
                         OutlinedTextField(
                             value = amount,
                             onValueChange = { amount = it; udhaarInputError = null },
@@ -705,8 +702,8 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                             )
                         )
 
-                        val noteLabel = if (settings.appLanguage == AppLanguage.HINDI) "टिप्पणी / माध्यम (वैकल्पिक)" else "Note / Mode (Optional)"
-                        val notePlaceholder = if (settings.appLanguage == AppLanguage.HINDI) "उदा. नकद, UPI, Paytm..." else "e.g. Cash, Paytm, PhonePe..."
+                        val noteLabel = strings.udhaarNoteModeLabel
+                        val notePlaceholder = strings.udhaarNoteModePlaceholder
                         OutlinedTextField(
                             value = note,
                             onValueChange = { note = it; udhaarInputError = null },
@@ -729,12 +726,14 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         ) {
                             TextButton(
                                 onClick = { if (!mutationInFlight) showReceivePaymentDialog = false },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("cancel_payment_button")
                             ) {
                                 Text(strings.cancel)
                             }
 
-                            val confirmDepositText = if (settings.appLanguage == AppLanguage.HINDI) "जमा सुरक्षित करें" else "Save Payment"
+                            val confirmDepositText = strings.udhaarSavePayment
                             Button(
                                 enabled = !mutationInFlight,
                                 onClick = {
@@ -789,7 +788,7 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                 { udhaarInputError = null; viewModel.clearMutationStatus() }
                             } else null
                         )
-                        val title = if (settings.appLanguage == AppLanguage.HINDI) "लेजर सुधार" else "Correct Ledger Entry"
+                        val title = strings.udhaarCorrectEntry
                         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = PurpleAccent)
                         Text(
                             text = "${record.type}: ${CurrencyUtils.formatRupees(record.amount)}",
@@ -800,14 +799,14 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         OutlinedTextField(
                             value = correctedAmount,
                             onValueChange = { correctedAmount = it; udhaarInputError = null },
-                            label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "सही रकम *" else "Correct Amount *") },
+                            label = { Text(strings.udhaarCorrectAmount) },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth().testTag("ledger_correction_amount_input")
                         )
                         OutlinedTextField(
                             value = reason,
                             onValueChange = { reason = it; udhaarInputError = null },
-                            label = { Text(if (settings.appLanguage == AppLanguage.HINDI) "कारण *" else "Reason *") },
+                            label = { Text(strings.udhaarReasonRequired) },
                             modifier = Modifier.fillMaxWidth().testTag("ledger_correction_reason_input")
                         )
                         Row(
@@ -816,7 +815,9 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                         ) {
                             TextButton(
                                 onClick = { if (!mutationInFlight) selectedLedgerEvent = null },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("cancel_ledger_correction_button")
                             ) {
                                 Text(strings.cancel)
                             }
@@ -834,9 +835,11 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("reverse_ledger_entry_button")
                             ) {
-                                Text(if (settings.appLanguage == AppLanguage.HINDI) "रिवर्स" else "Reverse")
+                                Text(strings.udhaarReverse)
                             }
                             Button(
                                 enabled = !mutationInFlight,
@@ -854,9 +857,11 @@ fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {
                                         )
                                     }
                                 },
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier
+                                    .weight(1.2f)
+                                    .testTag("correct_ledger_entry_button")
                             ) {
-                                Text(if (settings.appLanguage == AppLanguage.HINDI) "सुधार" else "Correct")
+                                Text(strings.udhaarCorrect)
                             }
                         }
                     }

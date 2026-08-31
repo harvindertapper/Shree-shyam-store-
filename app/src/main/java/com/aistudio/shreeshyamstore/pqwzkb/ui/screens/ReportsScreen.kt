@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -26,16 +27,26 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.PaymentState
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDate
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportDateRange
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportInterval
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportPolicy
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportRangeError
+import com.aistudio.shreeshyamstore.pqwzkb.commerce.ReportRangeResult
 import com.aistudio.shreeshyamstore.pqwzkb.data.Sale
 import com.aistudio.shreeshyamstore.pqwzkb.ui.theme.*
-import com.aistudio.shreeshyamstore.pqwzkb.utils.AppLanguage
+import com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings
 import com.aistudio.shreeshyamstore.pqwzkb.utils.CurrencyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.DateTimeUtils
 import com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper
+import com.aistudio.shreeshyamstore.pqwzkb.utils.SalesExportResult
 import com.aistudio.shreeshyamstore.pqwzkb.utils.MoneyUtils
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ReportsViewModel
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.Screen
 import com.aistudio.shreeshyamstore.pqwzkb.viewmodel.ShopViewModel
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,8 +59,16 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
     val sales by reportsViewModel.salesHistory.collectAsState()
     val customers by viewModel.customers.collectAsState()
 
-    var selectedIntervalTab by remember { mutableStateOf(0) } // 0: Today, 1: This Month, 2: All Time
     var selectedViewSale by remember { mutableStateOf<Sale?>(null) }
+    var selectedIntervalName by rememberSaveable { mutableStateOf(ReportInterval.TODAY.name) }
+    var customStartPickerMillis by rememberSaveable { mutableStateOf<Long?>(null) }
+    var customEndPickerMillis by rememberSaveable { mutableStateOf<Long?>(null) }
+    var datePickerTarget by remember { mutableStateOf<ReportDatePickerTarget?>(null) }
+    var exportResult by remember { mutableStateOf<SalesExportResult?>(null) }
+    val selectedInterval = remember(selectedIntervalName) {
+        runCatching { ReportInterval.valueOf(selectedIntervalName) }
+            .getOrDefault(ReportInterval.TODAY)
+    }
 
     // Keep time-based report windows fresh while this screen remains visible.
     var clockTick by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -60,26 +79,41 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
         }
     }
 
-    // Intervals calculations
-    val todayStart = remember(clockTick) { DateTimeUtils.getStartOfDay() }
-    val todayEnd = remember(clockTick) { DateTimeUtils.getEndOfDay() }
-    val monthStart = remember(clockTick) { DateTimeUtils.getStartOfMonth() }
-
-    // Intermediary filter collections
-    val filteredSales = remember(sales, selectedIntervalTab, todayStart, todayEnd, monthStart) {
-        when (selectedIntervalTab) {
-            0 -> sales.filter { it.createdAt in todayStart..todayEnd }
-            1 -> sales.filter { it.createdAt >= monthStart }
-            else -> sales
+    val reportTimeZone = remember { TimeZone.getDefault() }
+    val customStartDate = customStartPickerMillis?.let(ReportDate::fromDatePickerMillis)
+    val customEndDate = customEndPickerMillis?.let(ReportDate::fromDatePickerMillis)
+    val rangeResult = remember(
+        selectedInterval,
+        clockTick,
+        customStartPickerMillis,
+        customEndPickerMillis,
+        reportTimeZone
+    ) {
+        ReportPolicy.resolveRange(
+            interval = selectedInterval,
+            nowMillis = clockTick,
+            timeZone = reportTimeZone,
+            customStart = customStartDate,
+            customEnd = customEndDate
+        )
+    }
+    val validRange = (rangeResult as? ReportRangeResult.Valid)?.range
+    val eligibleSales = remember(sales) {
+        ReportPolicy.filterSales(sales, ReportDateRange(startInclusiveMillis = null, endExclusiveMillis = null))
+    }
+    val filteredSales = remember(eligibleSales, validRange) {
+        validRange?.let { ReportPolicy.filterSales(eligibleSales, it) } ?: emptyList()
+    }
+    val reportSummary = remember(filteredSales) { ReportPolicy.summarize(filteredSales) }
+    val isSalesHistoryLoading by reportsViewModel.isSalesHistoryLoading.collectAsState()
+    val salesHistoryHasError by reportsViewModel.salesHistoryHasError.collectAsState()
+    val exportMessage = exportResult?.let { result ->
+        when (result) {
+            SalesExportResult.SHARED -> strings.reportsExportReady
+            SalesExportResult.NO_SALES -> strings.reportsExportEmpty
+            SalesExportResult.FAILED -> strings.reportsExportFailed
         }
     }
-
-    // Aggregates statistics
-    val totalRevenue = remember(filteredSales) { filteredSales.sumOf { it.totalAmount } }
-    val cashRevenue = remember(filteredSales) { filteredSales.filter { it.paymentMode == "CASH" }.sumOf { it.totalAmount } }
-    val upiRevenue = remember(filteredSales) { filteredSales.filter { it.paymentMode == "UPI" }.sumOf { it.totalAmount } }
-    val udhaarRevenue = remember(filteredSales) { filteredSales.filter { it.paymentMode == "UDHAAR" }.sumOf { it.totalAmount } }
-    val invoicesCount = remember(filteredSales) { filteredSales.size }
 
     Scaffold(
         topBar = {
@@ -87,15 +121,20 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                 title = { Text(strings.reportsTitle, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { viewModel.navigateTo(Screen.Home) }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = strings.commonBack)
                     }
                 },
                 actions = {
                     IconButton(
-                        onClick = { reportsViewModel.exportSalesCsv(context, filteredSales) },
+                        onClick = {
+                            reportsViewModel.exportSalesCsv(context, filteredSales) { result ->
+                                exportResult = result
+                            }
+                        },
+                        enabled = !isSalesHistoryLoading && !salesHistoryHasError && validRange != null,
                         modifier = Modifier.testTag("export_sales_csv_button")
                     ) {
-                        Icon(Icons.Default.Download, contentDescription = "Export Sales CSV", tint = SaffronPrimary)
+                        Icon(Icons.Default.Download, contentDescription = strings.commonExportSales, tint = SaffronPrimary)
                     }
                 }
             )
@@ -107,28 +146,49 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                 .padding(innerPadding)
                 .background(WarmCreamBg)
         ) {
-            // Filter Interval tabs
-            TabRow(
-                selectedTabIndex = selectedIntervalTab,
+            ReportIntervalTabs(
+                strings = strings,
+                selectedInterval = selectedInterval,
+                onSelected = { interval ->
+                    selectedIntervalName = interval.name
+                    exportResult = null
+                    if (interval == ReportInterval.CUSTOM) {
+                        datePickerTarget = ReportDatePickerTarget.START
+                    }
+                },
                 modifier = Modifier.fillMaxWidth()
-            ) {
-                Tab(
-                    selected = selectedIntervalTab == 0,
-                    onClick = { selectedIntervalTab = 0 },
-                    text = { Text(strings.today, fontSize = 14.sp) },
-                    modifier = Modifier.testTag("report_tab_today")
+            )
+
+            if (selectedInterval == ReportInterval.CUSTOM) {
+                CustomReportRangeSelector(
+                    strings = strings,
+                    startDate = customStartDate,
+                    endDate = customEndDate,
+                    rangeResult = rangeResult,
+                    onSelectStart = { datePickerTarget = ReportDatePickerTarget.START },
+                    onSelectEnd = { datePickerTarget = ReportDatePickerTarget.END },
+                    onClear = {
+                        customStartPickerMillis = null
+                        customEndPickerMillis = null
+                        exportResult = null
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                        .testTag("report_custom_range_selector")
                 )
-                Tab(
-                    selected = selectedIntervalTab == 1,
-                    onClick = { selectedIntervalTab = 1 },
-                    text = { Text(strings.thisMonth, fontSize = 14.sp) },
-                    modifier = Modifier.testTag("report_tab_month")
-                )
-                Tab(
-                    selected = selectedIntervalTab == 2,
-                    onClick = { selectedIntervalTab = 2 },
-                    text = { Text(strings.allTime, fontSize = 14.sp) },
-                    modifier = Modifier.testTag("report_tab_all")
+            }
+
+            exportMessage?.let { message ->
+                Text(
+                    text = message,
+                    color = if (message == strings.reportsExportFailed) ErrorRed else SuccessGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .testTag("report_export_message")
                 )
             }
 
@@ -139,6 +199,25 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                when {
+                    isSalesHistoryLoading -> item {
+                        ReportLoadingState(strings = strings, modifier = Modifier.testTag("report_loading_state"))
+                    }
+                    salesHistoryHasError -> item {
+                        ReportErrorState(
+                            strings = strings,
+                            onRetry = reportsViewModel::refreshSalesHistory,
+                            modifier = Modifier.testTag("report_error_state")
+                        )
+                    }
+                    rangeResult is ReportRangeResult.Invalid -> item {
+                        ReportEmptyState(
+                            title = strings.reportsInvalidCustomRange,
+                            detail = strings.reportsInvalidCustomRange,
+                            modifier = Modifier.testTag("report_invalid_range_state")
+                        )
+                    }
+                    else -> {
                 // Statistics Summary Card Group
                 item {
                     Column(
@@ -155,20 +234,16 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                val salesVolumeTitle = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total Sales"
+                                val salesVolumeTitle = strings.reportsTotalSalesTitle
                                 Text(salesVolumeTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                                 Text(
-                                    text = CurrencyUtils.formatRupees(totalRevenue),
+                                    text = CurrencyUtils.formatRupees(reportSummary.totalRevenuePaise),
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Black,
                                     color = SaffronDark
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
-                                val billCountMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                                    "$invoicesCount बिल बनाए गए"
-                                } else {
-                                    "$invoicesCount bills generated"
-                                }
+                                val billCountMsg = strings.reportsBillsGenerated(reportSummary.billsCount)
                                 Text(billCountMsg, fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                             }
                         }
@@ -186,7 +261,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.cash, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(cashRevenue),
+                                        CurrencyUtils.formatRupees(reportSummary.cashRevenuePaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = SuccessGreen
@@ -203,7 +278,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.upiPaytm, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(upiRevenue),
+                                        CurrencyUtils.formatRupees(reportSummary.upiRevenuePaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFF0E5A94)
@@ -220,7 +295,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.udhaar, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(udhaarRevenue),
+                                        CurrencyUtils.formatRupees(reportSummary.udhaarRevenuePaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = ErrorRed
@@ -233,24 +308,24 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                         PaymentDistributionDonutChart(
                             viewModel = viewModel,
-                            cashAmount = cashRevenue,
-                            upiAmount = upiRevenue,
-                            udhaarAmount = udhaarRevenue,
-                            totalAmount = totalRevenue
+                            cashAmount = reportSummary.cashRevenuePaise,
+                            upiAmount = reportSummary.upiRevenuePaise,
+                            udhaarAmount = reportSummary.udhaarRevenuePaise,
+                            totalAmount = reportSummary.totalRevenuePaise
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         WeeklySalesBarChart(
                             viewModel = viewModel,
-                            salesHistory = sales
+                            salesHistory = eligibleSales
                         )
                     }
                 }
 
                 // Header lists title
                 item {
-                    val salesHistoryTitle = if (settings.appLanguage == AppLanguage.HINDI) "बिक्री का इतिहास:" else "Sales History:"
+                    val salesHistoryTitle = strings.reportsHistoryTitle
                     Text(
                         text = salesHistoryTitle,
                         fontWeight = FontWeight.Bold,
@@ -262,17 +337,11 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                 if (filteredSales.isEmpty()) {
                     item {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(48.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Icon(Icons.Default.History, null, modifier = Modifier.size(48.dp), tint = BorderStrong)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val noRecordMsg = if (settings.appLanguage == AppLanguage.HINDI) "कोई रिकॉर्ड नहीं मिला!" else "No records found!"
-                            Text(noRecordMsg, color = TextMediumGray, fontWeight = FontWeight.Bold)
-                        }
+                        ReportEmptyState(
+                            title = strings.reportsNoSalesInRange,
+                            detail = strings.reportsNoRecords,
+                            modifier = Modifier.testTag("report_empty_state")
+                        )
                     }
                 } else {
                     items(filteredSales) { sale ->
@@ -308,8 +377,8 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     )
                                     // Customer name if Udhaar
                                     if (sale.paymentMode == "UDHAAR") {
-                                        val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
-                                        val udhaarCustLabel = if (settings.appLanguage == AppLanguage.HINDI) "उधार ग्राहक" else "Udhaar Client"
+                                        val custName = customers.find { it.id == sale.customerId }?.name ?: strings.commonCustomer
+                                        val udhaarCustLabel = strings.reportsUdhaarCustomer
                                         Text(
                                             text = "$udhaarCustLabel: $custName",
                                             fontSize = 12.sp,
@@ -361,13 +430,36 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                         }
                     }
                 }
+                    }
+                }
             }
+        }
+
+        datePickerTarget?.let { target ->
+            val initialDate = when (target) {
+                ReportDatePickerTarget.START -> customStartDate
+                ReportDatePickerTarget.END -> customEndDate
+            }
+            ReportDatePickerDialog(
+                strings = strings,
+                target = target,
+                initialSelectedDateMillis = initialDate?.toDatePickerMillis(),
+                onDismiss = { datePickerTarget = null },
+                onDateSelected = { selectedDateMillis ->
+                    when (target) {
+                        ReportDatePickerTarget.START -> customStartPickerMillis = selectedDateMillis
+                        ReportDatePickerTarget.END -> customEndPickerMillis = selectedDateMillis
+                    }
+                    exportResult = null
+                    datePickerTarget = null
+                }
+            )
         }
 
         // --- DETAILED INVOICE MODAL DIALOG ---
         selectedViewSale?.let { sale ->
             val saleItems = reportsViewModel.getSaleItems(sale.id).collectAsState(initial = emptyList())
-            val custName = customers.find { it.id == sale.customerId }?.name ?: "Customer"
+            val custName = customers.find { it.id == sale.customerId }?.name ?: strings.commonCustomer
 
             Dialog(onDismissRequest = { selectedViewSale = null }) {
                 Card(
@@ -395,13 +487,13 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val billNoLabel = if (settings.appLanguage == AppLanguage.HINDI) "बिल नं:" else "Bill No:"
+                            val billNoLabel = strings.reportsBillNumber
                             Text("$billNoLabel ${sale.billNumber}", fontWeight = FontWeight.Bold, color = TextNearBlack, fontSize = 12.sp)
                             Text(DateTimeUtils.formatDateOnly(sale.createdAt), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }
 
                         if (sale.paymentMode == "UDHAAR") {
-                            val clientLabel = if (settings.appLanguage == AppLanguage.HINDI) "ग्राहक:" else "Client:"
+                            val clientLabel = strings.reportsCustomer
                             Text("$clientLabel $custName", fontSize = 12.sp, fontWeight = FontWeight.Black, color = ErrorRed)
                         }
 
@@ -448,7 +540,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            val modeLabel = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम:" else "Payment Mode:"
+                            val modeLabel = strings.reportsPaymentMode
                             Text(modeLabel, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
                             val modeVal = when (sale.paymentMode) {
                                 "UPI" -> "UPI"
@@ -456,6 +548,19 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 else -> strings.cash
                             }
                             Text(modeVal, fontSize = 12.sp, fontWeight = FontWeight.Black, color = TextNearBlack)
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(strings.reportsPaymentState, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                            Text(
+                                reportPaymentStateLabel(sale.paymentState, strings),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                color = TextNearBlack
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -481,7 +586,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.Share, null, tint = Color.White, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    Text("WhatsApp", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(strings.commonWhatsApp, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -501,7 +606,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(Icons.Default.ContentCopy, null, tint = SaffronPrimary, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(4.dp))
-                                    val copyInvoiceText = if (settings.appLanguage == AppLanguage.HINDI) "कॉपी" else "Copy"
+                                    val copyInvoiceText = strings.reportsCopy
                                     Text(copyInvoiceText, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -513,7 +618,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             shape = RoundedCornerShape(10.dp),
                             modifier = Modifier.fillMaxWidth().height(44.dp)
                         ) {
-                            val closeText = if (settings.appLanguage == AppLanguage.HINDI) "बंद करें" else "Close"
+                            val closeText = strings.reportsClose
                             Text(closeText, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -547,11 +652,7 @@ fun PaymentDistributionDonutChart(
                     .padding(32.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val noDataMsg = if (settings.appLanguage == AppLanguage.HINDI) {
-                    "वितरण चार्ट के लिए कोई बिक्री डेटा उपलब्ध नहीं है।"
-                } else {
-                    "No sales data available for distribution chart."
-                }
+                val noDataMsg = strings.reportsNoChartData
                 Text(
                     text = noDataMsg,
                     fontWeight = FontWeight.Bold,
@@ -582,7 +683,7 @@ fun PaymentDistributionDonutChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val chartTitle = if (settings.appLanguage == AppLanguage.HINDI) "भुगतान माध्यम वितरण" else "Payment Mode Split"
+            val chartTitle = strings.reportsPaymentModeSplit
             Text(
                 text = chartTitle,
                 fontSize = 15.sp,
@@ -668,7 +769,7 @@ fun PaymentDistributionDonutChart(
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val totalSalesLabel = if (settings.appLanguage == AppLanguage.HINDI) "कुल बिक्री" else "Total"
+                        val totalSalesLabel = strings.reportsTotal
                         Text(
                             text = totalSalesLabel,
                             fontSize = 11.sp,
@@ -720,6 +821,7 @@ fun WeeklySalesBarChart(
     salesHistory: List<Sale>
 ) {
     val settings by viewModel.storeSettings.collectAsState()
+    val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
     if (salesHistory.isEmpty()) return
 
@@ -767,7 +869,7 @@ fun WeeklySalesBarChart(
             modifier = Modifier.padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val weeklyTitle = if (settings.appLanguage == AppLanguage.HINDI) "पिछले 7 दिनों की बिक्री" else "Weekly Sales Trend"
+            val weeklyTitle = strings.reportsWeeklyTrend
             Text(
                 text = weeklyTitle,
                 fontSize = 15.sp,
@@ -828,4 +930,270 @@ fun WeeklySalesBarChart(
             }
         }
     }
+}
+
+@Composable
+fun ReportIntervalTabs(
+    strings: AppStrings,
+    selectedInterval: ReportInterval,
+    onSelected: (ReportInterval) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // ScrollableTabRow keeps long Hindi labels readable.
+    ScrollableTabRow(
+        selectedTabIndex = selectedInterval.ordinal,
+        modifier = modifier
+    ) {
+        ReportInterval.entries.forEach { interval ->
+            val label = when (interval) {
+                ReportInterval.TODAY -> strings.today
+                ReportInterval.THIS_WEEK -> strings.thisWeek
+                ReportInterval.THIS_MONTH -> strings.thisMonth
+                ReportInterval.ALL_TIME -> strings.allTime
+                ReportInterval.CUSTOM -> strings.customRange
+            }
+            Tab(
+                selected = selectedInterval == interval,
+                onClick = { onSelected(interval) },
+                text = { Text(label, fontSize = 14.sp) },
+                modifier = Modifier.testTag("report_tab_${interval.name.lowercase(Locale.ENGLISH)}")
+            )
+        }
+    }
+}
+
+private enum class ReportDatePickerTarget {
+    START,
+    END
+}
+
+@Composable
+fun ReportLoadingState(
+    strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(48.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        CircularProgressIndicator(color = SaffronPrimary)
+        Text(
+            text = strings.reportsLoading,
+            color = TextMediumGray,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun ReportErrorState(
+    strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(44.dp))
+        Text(
+            text = strings.reportsLoadError,
+            color = TextNearBlack,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Button(
+            onClick = onRetry,
+            colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
+            modifier = Modifier.testTag("report_retry_button")
+        ) {
+            Text(strings.reportsRetry, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun ReportEmptyState(
+    title: String,
+    detail: String,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(48.dp), tint = BorderStrong)
+        Text(
+            text = title,
+            color = TextNearBlack,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Text(
+            text = detail,
+            color = TextMediumGray,
+            fontSize = 13.sp,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun CustomReportRangeSelector(
+    strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
+    startDate: ReportDate?,
+    endDate: ReportDate?,
+    rangeResult: ReportRangeResult,
+    onSelectStart: () -> Unit,
+    onSelectEnd: () -> Unit,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedButton(
+                onClick = onSelectStart,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("report_select_start_date")
+            ) {
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(strings.reportsStartDate, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = startDate?.displayValue() ?: strings.reportsSelectStartDate,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+            OutlinedButton(
+                onClick = onSelectEnd,
+                modifier = Modifier
+                    .weight(1f)
+                    .testTag("report_select_end_date")
+            ) {
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text(strings.reportsEndDate, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = endDate?.displayValue() ?: strings.reportsSelectEndDate,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
+        ) {
+            TextButton(
+                onClick = onClear,
+                enabled = startDate != null || endDate != null,
+                modifier = Modifier.testTag("report_clear_custom_range")
+            ) {
+                Text(strings.reportsClearCustomRange, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        if (startDate != null && endDate != null && rangeResult is ReportRangeResult.Valid) {
+            Text(
+                text = strings.reportsRangeSummary(startDate.displayValue(), endDate.displayValue()),
+                color = TextMediumGray,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("report_custom_range_summary")
+            )
+        }
+
+        val rangeError = (rangeResult as? ReportRangeResult.Invalid)?.error
+        if (rangeError != null &&
+            rangeError != ReportRangeError.START_DATE_REQUIRED &&
+            rangeError != ReportRangeError.END_DATE_REQUIRED
+        ) {
+            Text(
+                text = strings.reportsInvalidCustomRange,
+                color = ErrorRed,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.testTag("report_custom_range_error")
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportDatePickerDialog(
+    strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings,
+    target: ReportDatePickerTarget,
+    initialSelectedDateMillis: Long?,
+    onDismiss: () -> Unit,
+    onDateSelected: (Long) -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialSelectedDateMillis
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = { datePickerState.selectedDateMillis?.let(onDateSelected) },
+                modifier = Modifier.testTag("report_confirm_date")
+            ) {
+                Text(strings.reportsApplyCustomRange, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, modifier = Modifier.testTag("report_cancel_date")) {
+                Text(strings.commonClose, fontWeight = FontWeight.Bold)
+            }
+        }
+    ) {
+        Column {
+            Text(
+                text = if (target == ReportDatePickerTarget.START) {
+                    strings.reportsSelectStartDate
+                } else {
+                    strings.reportsSelectEndDate
+                },
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+            )
+            DatePicker(
+                state = datePickerState,
+                showModeToggle = false,
+                modifier = Modifier.testTag("report_date_picker")
+            )
+        }
+    }
+}
+
+private fun reportPaymentStateLabel(
+    paymentState: String,
+    strings: com.aistudio.shreeshyamstore.pqwzkb.utils.AppStrings
+): String = when (runCatching { PaymentState.fromWireValue(paymentState) }.getOrNull()) {
+    PaymentState.NOT_REQUIRED -> strings.reportsPaymentNotRequired
+    PaymentState.PENDING -> strings.reportsPaymentPending
+    PaymentState.RECEIVED -> strings.reportsPaymentReceived
+    PaymentState.FAILED -> strings.reportsPaymentFailed
+    PaymentState.PARTIALLY_REFUNDED -> strings.reportsPaymentPartiallyRefunded
+    PaymentState.REFUNDED -> strings.reportsPaymentRefunded
+    null -> strings.reportsPaymentUnknown
 }
