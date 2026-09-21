@@ -97,6 +97,13 @@ class MainActivity : FragmentActivity() {
                     com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
                 }
 
+                LaunchedEffect(settings.isUserLoggedIn, settings.autoSyncEnabled) {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.SyncManager.configureAutomaticSync(
+                        context = context,
+                        enabled = settings.isUserLoggedIn && settings.autoSyncEnabled
+                    )
+                }
+
                 LaunchedEffect(
                     settings.identityProvider,
                     settings.isUserLoggedIn,
