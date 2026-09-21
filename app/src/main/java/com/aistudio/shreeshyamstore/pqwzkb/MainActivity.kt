@@ -17,8 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.test.*
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.testTag
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
@@ -55,7 +53,6 @@ class MainActivity : FragmentActivity() {
             // Graceful offline fallback if Google Services config is absent
         }
 
-        // 1. Core Data Initializations (Room + DataStore)
         val database = AppDatabase.getDatabase(applicationContext)
         val settingsStore = SettingsDataStore(applicationContext)
         val repo = ShopRepository(
@@ -70,7 +67,6 @@ class MainActivity : FragmentActivity() {
             settingsDataStore = settingsStore
         )
 
-        // 2. ViewModel instantiation using custom provider factory
         viewModel = ViewModelProvider(
             this,
             ShopViewModelFactory(repo, settingsStore, applicationContext)
@@ -97,9 +93,16 @@ class MainActivity : FragmentActivity() {
                 val settings by viewModel.storeSettings.collectAsState()
                 val context = LocalContext.current
                 var isStartupResolving by remember { mutableStateOf(true) }
-                val strings = remember(settings.appLanguage) { com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage) }
+                val strings = remember(settings.appLanguage) {
+                    com.aistudio.shreeshyamstore.pqwzkb.utils.LocaleHelper.getStrings(settings.appLanguage)
+                }
 
-                LaunchedEffect(settings.identityProvider, settings.isUserLoggedIn, settings.firstLaunchCompleted, settings.appLockEnabled) {
+                LaunchedEffect(
+                    settings.identityProvider,
+                    settings.isUserLoggedIn,
+                    settings.firstLaunchCompleted,
+                    settings.appLockEnabled
+                ) {
                     val identitySession = viewModel.reconcileIdentitySession()
                     val isAuthenticated = identitySession != null
 
@@ -107,9 +110,9 @@ class MainActivity : FragmentActivity() {
                         viewModel.navigateTo(Screen.Welcome)
                     } else if (!settings.firstLaunchCompleted) {
                         viewModel.navigateTo(Screen.Setup)
-                    } else if (settings.appLockEnabled && (currentScreen is Screen.Boot || currentScreen is Screen.Welcome)) {
+                    } else if (settings.appLockEnabled && currentScreen is Screen.Welcome) {
                         viewModel.navigateTo(Screen.Login)
-                    } else if (!settings.appLockEnabled && (currentScreen is Screen.Boot || currentScreen is Screen.Welcome)) {
+                    } else if (!settings.appLockEnabled && currentScreen is Screen.Welcome) {
                         viewModel.navigateTo(Screen.Home)
                     }
                     isStartupResolving = false
@@ -121,7 +124,6 @@ class MainActivity : FragmentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         bottomBar = {
-                            // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
                             if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
                                 val navItemColors = NavigationBarItemDefaults.colors(
                                     selectedIconColor = TextNearBlack,
@@ -203,8 +205,8 @@ class MainActivity : FragmentActivity() {
                                 targetState = currentScreen,
                                 transitionSpec = {
                                     fadeIn(animationSpec = tween(220)) +
-                                            slideInVertically(animationSpec = tween(220), initialOffsetY = { 30 }) togetherWith
-                                            fadeOut(animationSpec = tween(150))
+                                        slideInVertically(animationSpec = tween(220), initialOffsetY = { 30 }) togetherWith
+                                        fadeOut(animationSpec = tween(150))
                                 },
                                 label = "ScreenNavigationTransition"
                             ) { screen ->
