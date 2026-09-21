@@ -1,12 +1,12 @@
 package com.aistudio.shreeshyamstore.pqwzkb.utils
 
 import android.content.Context
-import com.aistudio.shreeshyamstore.pqwzkb.BuildConfig
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import androidx.work.*
+import com.aistudio.shreeshyamstore.pqwzkb.BuildConfig
 import java.util.concurrent.TimeUnit
 
 object SyncManager {
@@ -14,32 +14,61 @@ object SyncManager {
     private const val UNIQUE_PERIODIC_WORK = "shreeshyam_periodic_sync"
     private const val UNIQUE_AUTOMATIC_BACKUP_ONCE = "shreeshyam_automatic_backup_once"
     private const val UNIQUE_AUTOMATIC_BACKUP_PERIODIC = "shreeshyam_automatic_backup_periodic"
+
+    private val callbackLock = Any()
     private var isNetworkCallbackRegistered = false
+    private var registeredConnectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var automaticSyncEnabled = false
 
     /**
-     * Registers a live network connectivity callback so that as soon as the device reconnects to the internet,
-     * unsynced local store data is automatically synced to the cloud.
+     * Registers one live network callback so that a reconnect can enqueue work.
+     * The callback is explicitly paired with unregisterNetworkCallback; it must
+     * never outlive the automatic-sync policy that created it.
      */
     fun registerNetworkCallback(context: Context) {
         if (!BuildConfig.CLOUD_SYNC_ENABLED) return
-        if (isNetworkCallbackRegistered) return
-        try {
-            val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            connectivityManager.registerNetworkCallback(request, object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    super.onAvailable(network)
-                    if (automaticSyncEnabled) {
-                        triggerImmediateSync(context.applicationContext)
+        synchronized(callbackLock) {
+            if (isNetworkCallbackRegistered) return
+            try {
+                val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE)
+                    as? ConnectivityManager ?: return
+                val request = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                val callback = object : ConnectivityManager.NetworkCallback() {
+                    override fun onAvailable(network: Network) {
+                        super.onAvailable(network)
+                        if (automaticSyncEnabled) {
+                            triggerImmediateSync(context.applicationContext)
+                        }
                     }
                 }
-            })
-            isNetworkCallbackRegistered = true
-        } catch (e: Exception) {
-            // Defensive handling for restricted environments
+                connectivityManager.registerNetworkCallback(request, callback)
+                registeredConnectivityManager = connectivityManager
+                networkCallback = callback
+                isNetworkCallbackRegistered = true
+            } catch (_: Exception) {
+                // Defensive handling for restricted environments.
+            }
+        }
+    }
+
+    /** Unregisters the reconnect callback when automatic sync is disabled. */
+    fun unregisterNetworkCallback(context: Context) {
+        synchronized(callbackLock) {
+            val callback = networkCallback ?: return
+            try {
+                val connectivityManager = registeredConnectivityManager
+                    ?: context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                connectivityManager?.unregisterNetworkCallback(callback)
+            } catch (_: Exception) {
+                // Defensive handling for already-unregistered/restricted callbacks.
+            } finally {
+                networkCallback = null
+                registeredConnectivityManager = null
+                isNetworkCallbackRegistered = false
+            }
         }
     }
 
@@ -59,6 +88,7 @@ object SyncManager {
                 triggerImmediateSync(context.applicationContext)
                 triggerAutomaticBackup(context.applicationContext)
             } else {
+                unregisterNetworkCallback(context.applicationContext)
                 workManager.cancelUniqueWork(UNIQUE_PERIODIC_WORK)
                 workManager.cancelUniqueWork(UNIQUE_ONE_TIME_WORK)
                 workManager.cancelUniqueWork(UNIQUE_AUTOMATIC_BACKUP_ONCE)
@@ -69,70 +99,50 @@ object SyncManager {
         }
     }
 
-    /**
-     * Triggers an immediate background sync with exponential retry when network is connected.
-     */
+    /** Triggers an immediate background sync with network-aware retry. */
     fun triggerImmediateSync(context: Context) {
         if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
-
             val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
                 .setConstraints(constraints)
-                .setBackoffCriteria(
-                    BackoffPolicy.EXPONENTIAL,
-                    15,
-                    TimeUnit.SECONDS
-                )
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .addTag("instant_sync")
                 .build()
-
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_ONE_TIME_WORK,
                 ExistingWorkPolicy.REPLACE,
                 syncRequest
             )
-        } catch (e: Throwable) {
-            // Defensive handling if WorkManager is not initialized or in testing
+        } catch (_: Throwable) {
+            // Defensive handling if WorkManager is not initialized or in testing.
         }
     }
 
-    /**
-     * Alias for triggerImmediateSync for seamless backward compatibility.
-     */
-    fun scheduleInstantSync(context: Context) {
-        triggerImmediateSync(context)
-    }
+    /** Alias retained for existing callers. */
+    fun scheduleInstantSync(context: Context) = triggerImmediateSync(context)
 
-    /**
-     * Schedules periodic background sync every 1 hour when connected to network.
-     */
+    /** Schedules periodic background sync every hour while connected. */
     fun schedulePeriodicSync(context: Context) {
         if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
-
             val periodicRequest = PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(constraints)
-                .setBackoffCriteria(
-                    BackoffPolicy.EXPONENTIAL,
-                    30,
-                    TimeUnit.SECONDS
-                )
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag("periodic_sync")
                 .build()
-
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
                 UNIQUE_PERIODIC_WORK,
                 ExistingPeriodicWorkPolicy.KEEP,
                 periodicRequest
             )
-        } catch (e: Throwable) {
-            // Defensive handling if WorkManager is not initialized or in testing
+        } catch (_: Throwable) {
+            // Defensive handling if WorkManager is not initialized or in testing.
         }
     }
 
@@ -178,9 +188,7 @@ object SyncManager {
         }
     }
 
-    /**
-     * Returns Flow of WorkInfo for the instant sync work
-     */
+    /** Returns the current WorkManager state for the instant sync work. */
     fun getInstantSyncWorkInfoFlow(context: Context) =
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(UNIQUE_ONE_TIME_WORK)
 }
