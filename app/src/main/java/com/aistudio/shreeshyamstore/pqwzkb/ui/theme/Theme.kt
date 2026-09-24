@@ -5,17 +5,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 
 private val DarkColorScheme = darkColorScheme(
-    primary = SaffronPrimary,
-    secondary = SlateSecondary,
-    tertiary = SaffronDark,
-    background = WarmCreamBg,
-    surface = SurfaceWhite,
-    onPrimary = SurfaceWhite,
-    onSecondary = SurfaceWhite,
-    onBackground = TextNearBlack,
-    onSurface = TextNearBlack
+    primary = Color(0xFFE18B68),
+    onPrimary = Color(0xFF3E160B),
+    primaryContainer = Color(0xFF6E2B18),
+    onPrimaryContainer = Color(0xFFFFDBCA),
+    secondary = Color(0xFFD8C4B6),
+    onSecondary = Color(0xFF392A22),
+    background = Color(0xFF171412),
+    surface = Color(0xFF211D1A),
+    surfaceVariant = Color(0xFF4B4039),
+    onBackground = Color(0xFFF1E8E1),
+    onSurface = Color(0xFFF1E8E1),
+    onSurfaceVariant = Color(0xFFD5C5BA),
+    outline = Color(0xFF9A897D),
+    outlineVariant = Color(0xFF594B42),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 private val LightColorScheme = lightColorScheme(
