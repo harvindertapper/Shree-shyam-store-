@@ -134,14 +134,14 @@ class MainActivity : FragmentActivity() {
                         // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
                         if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
                             val navItemColors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = TextNearBlack,
-                                selectedTextColor = SaffronPrimary,
+                                selectedIconColor = Color.White,
+                                selectedTextColor = Color.White,
                                 indicatorColor = SaffronPrimary,
-                                unselectedIconColor = TextMediumGray,
-                                unselectedTextColor = TextMediumGray
+                                unselectedIconColor = Color(0xFFB9ADA5),
+                                unselectedTextColor = Color(0xFFB9ADA5)
                             )
                             NavigationBar(
-                                containerColor = SlateSecondary,
+                                containerColor = Color(0xFF211D1A),
                                 contentColor = Color.White,
                                 modifier = Modifier.testTag("bottom_nav")
                             ) {
@@ -212,9 +212,8 @@ class MainActivity : FragmentActivity() {
                         AnimatedContent(
                             targetState = currentScreen,
                             transitionSpec = {
-                                fadeIn(animationSpec = tween(220)) +
-                                        slideInVertically(animationSpec = tween(220), initialOffsetY = { 30 }) togetherWith
-                                        fadeOut(animationSpec = tween(150))
+                                fadeIn(animationSpec = tween(180)) togetherWith
+                                        fadeOut(animationSpec = tween(120))
                             },
                             label = "ScreenNavigationTransition"
                         ) { screen ->

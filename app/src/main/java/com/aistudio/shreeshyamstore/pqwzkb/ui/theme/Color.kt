@@ -2,27 +2,24 @@ package com.aistudio.shreeshyamstore.pqwzkb.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary Brand Palette - Rich Warm Indian Saffron & Warm Amber
-val SaffronPrimary = Color(0xFFD9480F) // Vivid energetic Indian Saffron (Warm & Trustworthy)
-val SaffronDark = Color(0xFF9C3400) // Deep royal saffron
-val SaffronLight = Color(0xFFFFE8D6) // Soft warm saffron container
-val SaffronGradientStart = Color(0xFFE8590C)
-val SaffronGradientEnd = Color(0xFFC92A2A)
+// A restrained storefront palette: terracotta for action, paper for context, ink for trust.
+val SaffronPrimary = Color(0xFFB84A27)
+val SaffronDark = Color(0xFF7E2F1B)
+val SaffronLight = Color(0xFFF6E5DC)
+val SaffronGradientStart = SaffronPrimary
+val SaffronGradientEnd = SaffronPrimary
 
-// Secondary & Dark Neutrals
-val SlateSecondary = Color(0xFF1E293B) // High-contrast modern Slate
-val SlateContainer = Color(0xFFF1F5F9) // Clean slate container
+val SlateSecondary = Color(0xFF263238)
+val SlateContainer = Color(0xFFE8E3DD)
 
-// Background & Surfaces
-val WarmCreamBg = Color(0xFFF8F9FA) // Crisp, ultra-clean neutral background
-val SurfaceWhite = Color(0xFFFFFFFF) // Pure white card surface
-val SurfaceCardBorder = Color(0xFFE2E8F0) // Subtle refined border
+val WarmCreamBg = Color(0xFFF7F4EF)
+val SurfaceWhite = Color(0xFFFFFCF8)
+val SurfaceCardBorder = Color(0xFFE2D8CE)
 
-// Typography Colors
-val TextNearBlack = Color(0xFF0F172A) // 900 slate high contrast text
-val TextMediumGray = Color(0xFF334155) // 700 slate readable secondary text
-val TextMutedGray = Color(0xFF64748B) // 500 slate muted captions/labels
-val BorderStrong = Color(0xFFCBD5E1) // 300 slate for visible outlines
+val TextNearBlack = Color(0xFF24201D)
+val TextMediumGray = Color(0xFF5E5751)
+val TextMutedGray = Color(0xFF81786F)
+val BorderStrong = Color(0xFFCFC3B8)
 
 // Semantic & Status Accents
 val ErrorRed = Color(0xFFDC2626) // Vivid danger/Udhaar red

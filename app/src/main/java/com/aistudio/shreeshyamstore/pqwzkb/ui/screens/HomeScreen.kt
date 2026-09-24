@@ -89,7 +89,7 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(WarmCreamBg)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
             .padding(bottom = 88.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -99,81 +99,45 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(SaffronGradientStart, SaffronGradientEnd)
-                    ),
-                    shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)
                 )
-                .padding(horizontal = 20.dp, vertical = 24.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.Start
             ) {
-                // Top Devotional Badge
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color.White.copy(alpha = 0.2f),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                ) {
-                    Text(
-                        text = strings.godBlessing,
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
-                    )
-                }
-
-                // Shop Name
                 Text(
                     text = settings.shopName.ifEmpty { strings.defaultShopName },
-                    color = Color.White,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Black,
-                    textAlign = TextAlign.Center,
-                    letterSpacing = (-0.5).sp
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
-
-                // Subtitle / Time Greeting
                 Text(
                     text = timeGreeting,
-                    color = SaffronLight.copy(alpha = 0.95f),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 2.dp)
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
-
                 Spacer(modifier = Modifier.height(12.dp))
-
-                // Cloud Auto-Sync Indicator Badge
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = Color.Black.copy(alpha = 0.25f),
-                    modifier = Modifier
-                        .clickable {
-                            viewModel.triggerAutoSync()
-                            Toast.makeText(context, strings.homeCloudSyncTriggered, Toast.LENGTH_SHORT).show()
-                        }
+                Row(
+                    modifier = Modifier.clickable {
+                        viewModel.triggerAutoSync()
+                        Toast.makeText(context, strings.homeCloudSyncTriggered, Toast.LENGTH_SHORT).show()
+                    },
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(9.dp)
-                                .background(Color(0xFF22C55E), CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val syncLabel = strings.homeCloudBackupActive
-                        Text(
-                            text = if (settings.lastSyncTime.isNotEmpty() && settings.lastSyncTime != "Never Synced") "${settings.lastSyncTime}" else syncLabel,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(SuccessGreen, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (settings.lastSyncTime.isNotEmpty() && settings.lastSyncTime != "Never Synced") settings.lastSyncTime else strings.homeCloudBackupActive,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
         }
@@ -188,25 +152,19 @@ fun HomeScreen(
             // --- HERO SALES BANNER ---
             Card(
                 colors = CardDefaults.cardColors(containerColor = SurfaceWhite),
-                shape = RoundedCornerShape(24.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SaffronPrimary.copy(alpha = 0.25f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(
-                            brush = Brush.radialGradient(
-                                colors = listOf(SaffronLight.copy(alpha = 0.4f), Color.Transparent),
-                                radius = 600f
-                            )
-                        )
                         .padding(20.dp)
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
+horizontalAlignment = Alignment.Start
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -230,8 +188,8 @@ fun HomeScreen(
 
                         Text(
                             text = CurrencyUtils.formatRupees(totalToday),
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Black,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
                             color = TextNearBlack,
                             letterSpacing = (-0.5).sp
                         )
