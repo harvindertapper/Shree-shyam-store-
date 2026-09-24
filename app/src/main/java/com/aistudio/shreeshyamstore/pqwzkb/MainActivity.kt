@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModelProvider
 import com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase
@@ -134,15 +135,16 @@ class MainActivity : FragmentActivity() {
                         // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
                         if (currentScreen !is Screen.Welcome && currentScreen !is Screen.Login && currentScreen !is Screen.Setup) {
                             val navItemColors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Color.White,
-                                selectedTextColor = Color.White,
-                                indicatorColor = SaffronPrimary,
-                                unselectedIconColor = Color(0xFFB9ADA5),
-                                unselectedTextColor = Color(0xFFB9ADA5)
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimary,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primary,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             NavigationBar(
-                                containerColor = Color(0xFF211D1A),
-                                contentColor = Color.White,
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                tonalElevation = 8.dp,
                                 modifier = Modifier.testTag("bottom_nav")
                             ) {
                                 NavigationBarItem(

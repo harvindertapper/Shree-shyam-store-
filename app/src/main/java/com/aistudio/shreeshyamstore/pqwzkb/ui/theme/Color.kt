@@ -3,9 +3,9 @@ package com.aistudio.shreeshyamstore.pqwzkb.ui.theme
 import androidx.compose.ui.graphics.Color
 
 // A restrained storefront palette: terracotta for action, paper for context, ink for trust.
-val SaffronPrimary = Color(0xFFB84A27)
-val SaffronDark = Color(0xFF7E2F1B)
-val SaffronLight = Color(0xFFF6E5DC)
+val SaffronPrimary = Color(0xFFC4512B)
+val SaffronDark = Color(0xFF8D321C)
+val SaffronLight = Color(0xFFFFE8DC)
 val SaffronGradientStart = SaffronPrimary
 val SaffronGradientEnd = SaffronPrimary
 
