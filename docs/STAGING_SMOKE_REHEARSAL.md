@@ -15,7 +15,7 @@ Before installation, record the following values in the release evidence system 
 | Field | Required value |
 |---|---|
 | Artifact checksum | SHA-256 of the exact APK under test. |
-| Package identity | `com.aistudio.shreeshyamstore.pqwzkb`. |
+| Package identity | `com.sevenzenlabs.zenmart` (ZenMart). |
 | App version | Version code and version name from the reviewed artifact. |
 | Source commit | Immutable commit or release tag used to build the artifact. |
 | Device | Emulator/device model and Android API level, with API level at least 24. |

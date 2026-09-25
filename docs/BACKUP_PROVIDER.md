@@ -97,7 +97,7 @@ If the provider integration must be rolled back, revert the focused PR rather th
 
 ## References
 
-[1]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/utils/AuthenticatedBackupProvider.kt "Authenticated backup provider implementation"
-[2]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/utils/CloudSyncPolicy.kt "Cloud business-table allowlist"
-[3]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/data/ShopRepository.kt "Transactional cloud-restorable table replacement"
-[4]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/commerce/PlatformContracts.kt "Shared tenant and platform contracts"
+[1]: ../app/src/main/java/com/sevenzenlabs/zenmart/utils/AuthenticatedBackupProvider.kt "Authenticated backup provider implementation"
+[2]: ../app/src/main/java/com/sevenzenlabs/zenmart/utils/CloudSyncPolicy.kt "Cloud business-table allowlist"
+[3]: ../app/src/main/java/com/sevenzenlabs/zenmart/data/ShopRepository.kt "Transactional cloud-restorable table replacement"
+[4]: ../app/src/main/java/com/sevenzenlabs/zenmart/commerce/PlatformContracts.kt "Shared tenant and platform contracts"

@@ -1,80 +1,42 @@
-# Shree Shyam Store — Current Production Status
+# ZenMart — current engineering and release status
 
-**Status date:** 20 August 2026
-**Repository:** [`harvindertapper/Shree-shyam-store-`](https://github.com/harvindertapper/Shree-shyam-store-)
-**Current main:** `7abf378` — PR #35, restore snapshot envelope and recovery point
-**Product scope:** Merchant Android OS first; SaaS Control Plane/Admin Portal and Pickup Marketplace remain separate future repositories.
+**Reviewed:** 25 September 2026
+**GitHub main reviewed:** `ae426706f29189ed705fac3bbf990c8b9f262d0e`
+**Integration branch:** `codex/zenmart-sync` (local; not pushed)
+**Android application ID and namespace:** `com.sevenzenlabs.zenmart`
+**Launcher name:** ZenMart
 
-## Executive status
+This replaces the stale August status snapshot. GitHub main contains the latest home/theme refresh and dependency updates through PR #82. The integration branch carries those commits alongside the ZenMart package migration and updated production, test, and schema packages. The supplied Firebase client targets another package and has been removed from the build; a matching ZenMart client is not yet configured.
 
-The repository is now a **hardened internal/staging candidate**, not yet a production-distributable release. The original prototype risks around credential payload privacy, checkout money representation, stock policy, stable sync identity, tenant/device persistence, repository authorization, authenticated backup, snapshot integrity, and restore recovery have been addressed through the merged hardening sequence through PR #35.
+## Product that exists
 
-The remaining production blockers are concentrated in five areas: billing architecture decomposition, residual local credential KDF and compatibility cleanup, operational sync/conflict support, reproducible release engineering, and staging/recovery evidence. Server-authoritative tenant operations belong to the future private Control Plane repository and must not be implemented by making the Android client its own authority.
+The Android app is an offline-capable merchant product, not a screen-only mockup. It includes Room-backed catalog and inventory, barcode scanning, sales checkout, integer-paise money handling, cash/UPI/Udhaar recording, customer balances, stock adjustments, reports, PDF/CSV sharing, Hindi/English copy, app locking, and local authentication. Database migrations and focused commerce, security, synchronization, and recovery tests are present through Room schema version 11.
 
-> **Current source-of-truth rule:** The checked-out source, current `main`, the CI workflow, and this document describe the present state. Older audit statements are historical findings and must not be treated as evidence that already-merged controls are still absent.
+The app also contains an idempotent synchronization outbox, retry/conflict policies, Firestore client code, authenticated snapshot backup, validated restore and local recovery-point handling, release signing/R8 configuration, and Android CI. These prove implementation exists; they do not prove that production Firebase rules/provider are deployed, a signed release has been distributed, or a real shop has completed backup and restore.
 
-## Completed hardening sequence
+Payment recording is not bank settlement verification. Profit reporting is not complete until each sale preserves a valid cost basis. Future multi-store administration and marketplace plans are not shipped capabilities.
 
-| Area | Completed work | Evidence |
-|---|---|---|
-| Commerce foundation | Integer-paise money, checkout/payment lifecycle states, stock underflow policy, Udhaar credit/payment validation, and immutable correction/audit behavior. | PRs #14–#18 and the required commerce regression suite. |
-| Identity and local security | Firebase-versus-local authority reconciliation, app-lock hardening, credential privacy boundary, local-login throttling foundation, and migration coverage. | PRs #19, #22, #30; `SecurityUtilsTest`, `CredentialMigrationTest`, and `AppLockPolicyTest`. |
-| Persistence and schema | Non-destructive migration policy, Room schema artifacts, and current schema version 9 with explicit v8→v9 tenant/device migration. | PRs #20, #31, #32; `app/schemas/.../9.json` and migration tests. |
-| Architecture | Reporting and inventory state extraction, billing cart-state boundary, platform contracts, and tenant-aware domain models. | PRs #24–#26 and #29. |
-| Authorization | Repository-boundary tenant authorization for actor, membership, store, device, capability, and stale-command checks. | PR #33; `TenantAuthorizationTest`. |
-| Backup and recovery | HTTPS-only trusted-host backup provider, Firebase-authenticated short-lived bearer token, tenant-scoped paths, snapshot envelope, checksum/integrity validation, local recovery point, atomic replacement, and rollback. | PRs #34–#35; `AuthenticatedBackupProviderTest`, `RestoreRecoveryEnvelopeTest`, `RestoreSecurityTest`, `docs/BACKUP_PROVIDER.md`, and `docs/RESTORE_RECOVERY.md`. |
-| CI baseline | Debug assembly, lint, Dependency Review, stable unit/Robolectric test selection, Room schema verification, and unit-test report artifact upload. | `.github/workflows/ci.yml`; current main checks are required before merge. |
+## Integration changes in this branch
 
-## Current release-blocker register
+- Brings six GitHub main commits after the prior local base, including the latest home screen/theme and Room, Retrofit, Google Services, and GitHub Actions updates.
+- Renames production, test and instrumentation packages and the Room schema directory to `com.sevenzenlabs.zenmart`.
+- Sets the Android namespace and application ID to `com.sevenzenlabs.zenmart`; sets the launcher/project name to ZenMart.
+- Updates CI selectors, schema checks, keep rules, and active Firebase/release documentation for the new identity.
+- Removes the copied Firebase client because it targets `com.harrylabs.shreeshyamstore`. Register `com.sevenzenlabs.zenmart` in Firebase and download a matching client before enabling cloud sign-in.
 
-| ID | Priority | Blocker | Planned PR or evidence | Current state |
-|---|---:|---|---|---|
-| APP-29 | P1 | Billing and checkout orchestration remains concentrated in `ShopViewModel`, limiting isolated testing and maintainability. | `refactor/billing-viewmodel`, followed by billing UI migration. | Next implementation slice. |
-| SEC-30 | P0 | New local credentials need a versioned, salted, slow verifier; legacy SHA-256 and weak PIN compatibility paths need a controlled sunset. | `security/credential-kdf-migration`. | PR #30 is a foundation; completion remains pending. |
-| SYNC-36 | P1 | Dead-letter, conflict, cursor, retry, and operator recovery outcomes are not yet exposed through structured redacted status. | `feat/sync-observability-conflicts`. | Planned. |
-| SYNC-37 | P0 | Merchant-to-server synchronization contract needs versioned tenant authorization, replay, cursor, tombstone, and conflict semantics. | `feat/sync-contract-compatibility`; server implementation belongs to Control Plane. | Planned. |
-| REL-38 | P0 | Release signing, versioning, R8/minification, production configuration separation, and artifact provenance are not yet demonstrated. | `release/build-signing-r8`. | Planned. |
-| REL-39 | P0 | Clean-device migration, offline commerce, sync retry/conflict, authenticated backup/restore, recovery point, and rollback rehearsal evidence is missing. | `release/staging-smoke-rehearsal`. | Planned. |
-| OPS-40 | P0 | Redacted production telemetry, crash monitoring, sync-health support procedure, incident ownership, and rollback runbook need operational evidence. | `release/operations-readiness`. | Planned. |
-| CP-01 | P1 | Server-authoritative organization, membership, device enrollment, audit, backup metadata, and sync conflict operations do not yet exist. | New private Control Plane repository. | Future; after Merchant OS release candidate. |
-| MKT-01 | P2 | Pickup Marketplace does not yet exist and must not be built against client-authoritative stock or payment state. | New consumer repository after CP-01 APIs stabilize. | Future. |
+Android treats a different application ID as a separate app and will not carry the earlier package's private Room database into this installation automatically. Before replacing any existing build, export its data using a supported app backup and rehearse restore on a clean device. Do not uninstall an older app until its data is recovered.
 
-## Current maintenance lane
+## Release gates still requiring external evidence
 
-The following Dependabot PRs are open and independent from the feature roadmap: Retrofit 3.0.0 (#13), Firebase BOM 34.17.0 (#12), Room runtime 2.8.4 (#11), `actions/upload-artifact` 7 (#10), Play Services Location 21.4.0 (#9), and OkHttp logging-interceptor 5.4.0 (#8). They should be reviewed and merged separately from commerce, credential, sync, and release feature branches.
+1. Assemble and inspect debug and minified release artifacts under the ZenMart ID; verify signing policy.
+2. Run the configured Android CI suite, including API 35/36 device journeys, after package migration.
+3. Verify Firebase Authentication providers, tenant-scoped database rules, trusted backup endpoint, project region and budget controls in the actual Firebase/hosting consoles.
+4. Rehearse old-package data export, clean installation, restore, and recovery on test data and a separate staging tenant.
+5. Verify offline billing, duplicate-submit safety, process death, low-end hardware, sync retries/conflicts, cloud backup and restore end to end.
+6. Assign support/incident ownership, confirm privacy disclosures and retention, and document a release rollback decision.
 
-Room, Firebase, Retrofit, and OkHttp upgrades require particular care because they can affect migrations, authentication, Firestore background sync, the authenticated backup provider, and future Control Plane adapter compatibility. No dependency PR should widen cloud payloads or weaken the current required CI gate.
+Until these gates have evidence, describe the app as a development/staging candidate, not a production-proven service. Core shop operation should remain available without Firebase or network access. Managed cloud has provider and support costs; do not promise it is permanently free or unlimited.
 
-## Required quality gates
+## Source of truth
 
-Every feature PR must start from updated `main`, preserve the offline-first repository transaction boundary, add deterministic regression coverage, run `git diff --check`, and pass Android CI and Dependency Review. The stable CI gate currently covers security utilities, credential migration, tenant context and authorization, app lock, restore security and recovery, commerce invariants, catalog and migration tests, payment migration, stable sync identity/outbox, and example unit/Robolectric tests.
-
-A production release additionally requires a reproducible signed release artifact, explicit version code and name, release configuration separation, R8 validation, dependency and secret review, schema/migration evidence, clean-device staging rehearsal, offline commerce evidence, sync retry/conflict evidence, authenticated backup/restore evidence, recovery-point verification, and a documented rollback decision.
-
-## Data and security invariants
-
-The following invariants are non-negotiable for future PRs:
-
-1. Password hashes, PIN verifiers, local credentials, bearer tokens, provider secrets, and raw authentication material remain device-local and never enter Firestore, REST backup, outbox JSON, logs, analytics, or crash reports.
-2. All privileged business mutations pass through repository/domain authorization with trusted tenant, actor, membership, device, capability, and freshness context.
-3. Money remains integer paise. New commerce logic must not introduce binary floating-point monetary calculations.
-4. Checkout remains atomic and duplicate-submit safe. Stock, payment, Udhaar, ledger, audit, and receipt behavior must remain consistent on success and failure.
-5. Restore downloads and validates the complete authenticated snapshot before changing local data, preserves device-owned tables, creates a verified local recovery point, and rolls back if replacement fails.
-6. Sync uses stable identity, idempotency, retry/dead-letter semantics, tombstone policy, conflict rules, and redacted operator-visible errors.
-7. The Android client is not authoritative for server tenant scope, role membership, entitlements, prices, marketplace availability, payment verification, or order acceptance.
-
-## Recommended execution sequence
-
-The next code PR is `APP-29`, the billing/cart ViewModel boundary. A documentation-only status update can merge independently. `SEC-30` can proceed in a separate branch because it does not require a billing schema change. After the billing and credential boundaries are stable, implement `SYNC-36`, then `SYNC-37`, then the release build/signing slice `REL-38`, staging/recovery rehearsal `REL-39`, and operations readiness `OPS-40`. Only after those gates are evidenced should the separate private Control Plane repository begin.
-
-## References
-
-[1]: https://github.com/harvindertapper/Shree-shyam-store-/commits/main "Current main history"
-
-[2]: https://github.com/harvindertapper/Shree-shyam-store-/blob/main/.github/workflows/ci.yml "Required Android CI workflow"
-
-[3]: https://github.com/harvindertapper/Shree-shyam-store-/blob/main/docs/BACKUP_PROVIDER.md "Authenticated backup provider boundary"
-
-[4]: https://github.com/harvindertapper/Shree-shyam-store-/blob/main/docs/RESTORE_RECOVERY.md "Restore snapshot and recovery boundary"
-
-[5]: https://github.com/harvindertapper/Shree-shyam-store-/pulls "Open pull requests"
+Use current source and CI on GitHub main for merged changes, then review `codex/zenmart-sync` for package and local workspace integration. August audits are historical snapshots. Tie future status updates to a commit SHA and mark staging facts verified only after the operator records them.

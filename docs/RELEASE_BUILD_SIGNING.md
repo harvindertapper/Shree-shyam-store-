@@ -6,7 +6,7 @@
 
 The app module reads `APP_VERSION_CODE` and `APP_VERSION_NAME` from Gradle properties. The repository defaults are `1` and `1.0.0` in `gradle.properties`; a reviewed build may override them with `-PAPP_VERSION_CODE=<positive-integer>` and `-PAPP_VERSION_NAME=<non-empty-name>`. A production artifact must record the exact values together with the source commit or release tag and checksum.
 
-The application ID remains `com.aistudio.shreeshyamstore.pqwzkb`. Version changes must not be used as a substitute for a database migration or a cloud-contract compatibility decision.
+The application ID is `com.sevenzenlabs.zenmart`. Version changes must not be used as a substitute for a database migration or a cloud-contract compatibility decision. Android treats a change from an earlier application ID as a separate installation; migrate user data through a verified export and restore before replacing an installed build.
 
 Debug cloud scheduling is disabled centrally in `SyncManager`, the background `SyncWorker`, and the ViewModel backup/restore entrypoints. A debug artifact therefore cannot silently enqueue Firestore work or perform authenticated cloud backup/restore. Production release builds are the only profile with `CLOUD_SYNC_ENABLED=true`.
 
