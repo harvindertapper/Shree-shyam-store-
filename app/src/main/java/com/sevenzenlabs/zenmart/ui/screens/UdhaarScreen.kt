@@ -38,6 +38,10 @@ import com.sevenzenlabs.zenmart.viewmodel.ShopViewModel
 // ==========================================
 // 1. UDHAAR LEDGER MASTER SCREEN
 // ==========================================
+/**
+ * Displays customer balances with search and an optional positive-balance filter.
+ * Provides customer creation, ledger navigation, reminders, and CSV export of all customers.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UdhaarScreen(viewModel: ShopViewModel) {
@@ -385,6 +389,10 @@ fun UdhaarScreen(viewModel: ShopViewModel) {
 // ==========================================
 // 2. DETAILED LEAF LEDGER & DEPOSIT LOG BOOK
 // ==========================================
+/**
+ * Displays the ledger and balance for [customerId] and offers reminders, payment entry,
+ * and corrections or reversals with a reason. Validation and mutation errors remain visible.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerDetailScreen(viewModel: ShopViewModel, customerId: Long) {

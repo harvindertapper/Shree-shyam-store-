@@ -43,6 +43,10 @@ class MainActivity : FragmentActivity() {
     private lateinit var inventoryViewModel: InventoryViewModel
     private var wasInBackground = false
 
+    /**
+     * Initializes local storage and view models, then displays the app with session-based routing
+     * and automatic sync configuration. Firebase initialization failures are ignored for offline use.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()

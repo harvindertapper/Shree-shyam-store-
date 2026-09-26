@@ -42,6 +42,11 @@ import com.sevenzenlabs.zenmart.utils.SyncManager
 import com.sevenzenlabs.zenmart.viewmodel.Screen
 import com.sevenzenlabs.zenmart.viewmodel.ShopViewModel
 
+/**
+ * Edits merchant, security, and sync settings and exposes account, backup, and restore actions.
+ * Form changes remain drafts until saved; language changes are persisted immediately.
+ * Restore requires confirmation before the view model is asked to replace local business data.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(viewModel: ShopViewModel) {

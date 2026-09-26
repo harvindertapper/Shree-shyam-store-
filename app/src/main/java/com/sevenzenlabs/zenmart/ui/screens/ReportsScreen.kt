@@ -967,6 +967,7 @@ private enum class ReportDatePickerTarget {
     END
 }
 
+/** Displays a progress indicator and the localized report loading message. */
 @Composable
 fun ReportLoadingState(
     strings: com.sevenzenlabs.zenmart.utils.AppStrings,
@@ -989,6 +990,7 @@ fun ReportLoadingState(
     }
 }
 
+/** Displays a localized report load error and invokes [onRetry] when the retry button is pressed. */
 @Composable
 fun ReportErrorState(
     strings: com.sevenzenlabs.zenmart.utils.AppStrings,
@@ -1048,6 +1050,10 @@ fun ReportEmptyState(
     }
 }
 
+/**
+ * Displays the selected dates and delegates selection and clearing to the supplied callbacks.
+ * Shows a summary for a valid range and hides errors caused solely by a missing endpoint.
+ */
 @Composable
 fun CustomReportRangeSelector(
     strings: com.sevenzenlabs.zenmart.utils.AppStrings,
@@ -1138,6 +1144,11 @@ fun CustomReportRangeSelector(
     }
 }
 
+/**
+ * Shows a start or end date picker initialized from nullable UTC epoch milliseconds.
+ * Confirmation passes the selected UTC epoch milliseconds to [onDateSelected], if any;
+ * the caller is responsible for closing the dialog after selection.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ReportDatePickerDialog(
@@ -1185,6 +1196,7 @@ private fun ReportDatePickerDialog(
     }
 }
 
+/** Returns the localized payment state label, falling back to the unknown label for invalid values. */
 private fun reportPaymentStateLabel(
     paymentState: String,
     strings: com.sevenzenlabs.zenmart.utils.AppStrings

@@ -47,7 +47,10 @@ object AuthManager {
         get() = currentUser != null
 
     /**
-     * Sign In with Google via Android Credential Manager + Firebase Auth
+     * Signs in through Android Credential Manager and Firebase, returning the authenticated user.
+     * Uses the trimmed [serverClientId], falling back to default_web_client_id when null or blank.
+     * Missing configuration, unsupported credentials, cancellation, and other caught exceptions
+     * are returned as Result failures.
      */
     suspend fun signInWithGoogle(
         context: Context,

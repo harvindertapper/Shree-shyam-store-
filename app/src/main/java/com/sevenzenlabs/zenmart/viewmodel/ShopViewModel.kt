@@ -97,9 +97,11 @@ class ShopViewModel(
     }
 
     /**
-     * Reconciles one explicit local session authority with Firebase state.
-     * Local sessions remain usable offline; Firebase sessions are accepted only
-     * when Firebase exposes the same authenticated account.
+     * Resolves the current session, preserving a usable local session even when Firebase is signed in.
+     * Otherwise adopts the current usable Firebase identity, saving it when the provider or UID
+     * differs, or clears a persisted Firebase session when no Firebase user exists. Migrates legacy
+     * logged-in local settings when possible. Returns null if no usable session remains.
+     * Session persistence and uncaught settings read failures propagate.
      */
     suspend fun reconcileIdentitySession(): IdentitySession? {
         val settings = settingsDataStore.settingsFlow.first()
@@ -166,6 +168,7 @@ class ShopViewModel(
         _mutationStatus.value = MutationStatus(MutationStage.SAVING_LOCALLY)
     }
 
+    /** Marks the mutation as saved locally, clears its retry action, and releases the in-flight flag. */
     private fun markMutationSavedLocally() {
         _mutationInFlight.value = false
         retryMutation = null
@@ -187,6 +190,10 @@ class ShopViewModel(
         _mutationStatus.value = MutationStatus(stage, message, canRetry)
     }
 
+    /**
+     * Publishes a localized failure and releases the in-flight flag.
+     * [canRetry] enables retry only for a retryable error; [fallback] is used for unmapped stages.
+     */
     private fun markMutationFailure(error: Throwable, fallback: String, canRetry: Boolean = true) {
         val localizedGateMessage = operatorGateMessage(error).takeIf { it.isNotBlank() }
         val stage = mutationStageFor(error, localizedGateMessage)
@@ -221,6 +228,7 @@ class ShopViewModel(
     private fun operatorGateMessage(error: Throwable): String =
         localizedOperatorGateMessage(error, storeSettings.value.appLanguage).orEmpty()
 
+    /** Returns a localized authorization message when recognized, otherwise [fallback]. */
     private fun safeMutationMessage(fallback: String, error: Throwable): String {
         val gateMessage = operatorGateMessage(error)
         if (gateMessage.isNotBlank()) return gateMessage
@@ -236,10 +244,19 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Attempts Firebase and Credential Manager sign-out when an app context is available.
+     * Sign-out exceptions are swallowed by AuthManager; a missing context is a no-op.
+     */
     private suspend fun clearFirebaseAuthorityForLocalSession() {
         context?.let { com.sevenzenlabs.zenmart.utils.AuthManager.signOut(it) }
     }
 
+    /**
+     * Requests background sync and backup when cloud sync is enabled, a context exists, and saved
+     * settings enable automatic sync for a logged-in user. Scheduling failures are ignored;
+     * settings read failures are not caught in the launched coroutine.
+     */
     fun triggerAutoSync() {
         if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         context?.let { ctx ->
@@ -292,6 +309,7 @@ class ShopViewModel(
             )
         )
 
+    /** Launches persistence of the selected app language in the view model scope. */
     fun setLanguage(language: com.sevenzenlabs.zenmart.utils.AppLanguage) {
         viewModelScope.launch {
             settingsDataStore.updateAppLanguage(language)
@@ -319,6 +337,12 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Validates and asynchronously saves merchant settings, then updates automatic sync scheduling.
+     * A null [newSecurityPin] preserves the existing PIN. Calls [onSuccess] after saving; caught
+     * validation or save exceptions update mutation state and call [onError] with a localized message.
+     * Calls made while another mutation is in flight return without invoking either callback.
+     */
     fun saveMerchantSettings(
         shopName: String,
         ownerName: String,
@@ -567,6 +591,12 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Reauthenticates the current Firebase account before saving [newPin], enabling app lock,
+     * and resetting its failure state. Requires an acceptable PIN and the same UID before and after
+     * Google sign-in. Reports validation or caught operation failures through [onError], and invokes
+     * [onSuccess] after saving in the view model scope.
+     */
     fun recoverAppLockWithFirebase(
         newPin: String,
         onSuccess: () -> Unit,
@@ -613,6 +643,11 @@ class ShopViewModel(
         settingsDataStore.updateAppLockState(AppLockPolicy.recordSuccess(System.currentTimeMillis()))
     }
 
+    /**
+     * Requests a Firebase password reset email after validating and trimming [email].
+     * Reports invalid input and returned auth failures through [onError], or invokes [onSuccess]
+     * in the view model scope. Sending the email does not change the local app lock PIN.
+     */
     fun sendForgotPinEmail(
         email: String,
         onSuccess: () -> Unit,
@@ -780,6 +815,10 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Launches sign-out when a context exists, clears the persisted session, and navigates to login.
+     * Auth cleanup exceptions are ignored by AuthManager; session persistence failures are not caught.
+     */
     fun logoutUser() {
         viewModelScope.launch {
             context?.let { ctx ->
@@ -1052,6 +1091,11 @@ class ShopViewModel(
     }
 
     // Helper functions for clipboard copy text and sharing
+    /**
+     * Returns receipt text using [customSale] and [customItems], each independently falling back
+     * to the last sale or its items when null. Returns "No Invoice Found" if no sale is available.
+     * Uses current shop settings and formats the sale date in English in the device time zone.
+     */
     fun generateInvoiceText(customSale: Sale? = null, customItems: List<SaleItem>? = null): String {
         val sale = customSale ?: lastSale.value ?: return "No Invoice Found"
         val items = customItems ?: lastSaleItems.value
@@ -1082,6 +1126,10 @@ class ShopViewModel(
         Toast.makeText(context, "Bill Copied to Clipboard!", Toast.LENGTH_SHORT).show()
     }
 
+    /**
+     * Shares [generateInvoiceText] output, attempting WhatsApp for a nonblank [phoneNumber]
+     * with an Android share chooser fallback. If sharing and its fallback fail, displays a toast.
+     */
     fun shareInvoiceViaWhatsApp(context: Context, customSale: Sale? = null, customItems: List<SaleItem>? = null, phoneNumber: String? = null) {
         val txt = generateInvoiceText(customSale, customItems)
         com.sevenzenlabs.zenmart.utils.ShareUtils.shareText(
@@ -1092,6 +1140,10 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Shares a reminder for [balance] in paise using current shop details and the customer's phone.
+     * Attempts WhatsApp when possible, with an Android share chooser fallback and a toast on failure.
+     */
     fun sendUdhaarReminder(context: Context, customer: Customer, balance: Long) {
         val settings = storeSettings.value
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper.getStrings(settings.appLanguage)
@@ -1111,6 +1163,10 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Writes the supplied products to a cache CSV and opens sharing, using [categories] for labels.
+     * Empty input and caught export or sharing failures display a toast.
+     */
     fun exportStockCsv(
         context: Context,
         products: List<Product>,
@@ -1128,6 +1184,11 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Exports the supplied customers to a cache CSV and opens sharing.
+     * [balances] maps customer IDs to paise; missing entries use zero. The list is not filtered
+     * for debtors. Empty input and caught export or sharing failures display a toast.
+     */
     fun exportUdhaarCsv(context: Context, debtorCustomers: List<Customer>, balances: Map<Long, Long>) {
         val settings = storeSettings.value
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper.getStrings(settings.appLanguage)
@@ -1140,6 +1201,10 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Returns a dated reorder list for the supplied products using current shop details and category
+     * names. Includes every supplied product without checking whether its stock is low.
+     */
     fun generateReorderText(lowStockList: List<Product>, categories: List<Category>): String {
         val settings = storeSettings.value
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper.getStrings(settings.appLanguage)
@@ -1152,6 +1217,10 @@ class ShopViewModel(
         )
     }
 
+    /**
+     * Shares [generateReorderText] output, attempting WhatsApp for a nonblank [wholesalerPhone]
+     * with an Android share chooser fallback. If sharing and its fallback fail, displays a toast.
+     */
     fun shareReorderListViaWhatsApp(
         context: Context,
         lowStockList: List<Product>,
@@ -1248,6 +1317,14 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Creates a backup client for the active Firebase session and trusted configured host.
+     * May persist a tenant/device mapping. Token retrieval and persistence failures propagate.
+     *
+     * @throws BackupUnauthorizedException if the Firebase identity mismatches or its token is empty.
+     * @throws BackupIncompatibleException if the provider URL or trusted host is invalid.
+     * @throws IllegalArgumentException if the session, tenant mapping, or backup prefix is invalid.
+     */
     private suspend fun authenticatedBackupClient(
         settings: StoreSettings,
         session: IdentitySession
@@ -1281,6 +1358,10 @@ class ShopViewModel(
         return AuthenticatedBackupTableClient(provider)
     }
 
+    /**
+     * Maps backup and snapshot failures to display messages, preserving an IllegalArgumentException's
+     * message when present. This only formats text; it does not verify whether local data changed.
+     */
     private fun backupFailureMessage(error: Throwable): String = when (error) {
         is BackupProviderException -> when (error) {
             is com.sevenzenlabs.zenmart.utils.BackupUnauthorizedException -> "Backup authorization failed. Sign in again."
@@ -1314,6 +1395,12 @@ class ShopViewModel(
         else -> "Restore failed. Local data was not changed."
     }
 
+    /**
+     * Creates, validates, and saves a local recovery envelope for [tenant], allowing an empty snapshot.
+     * Returns the saved envelope. Validation, serialization, and file I/O failures propagate.
+     *
+     * @throws IllegalStateException if local recovery storage is unavailable.
+     */
     private suspend fun saveVerifiedRecoveryPoint(
         snapshot: CloudRestorableSnapshot,
         tenant: com.sevenzenlabs.zenmart.commerce.TenantScope
@@ -1325,6 +1412,11 @@ class ShopViewModel(
         return recoveryEnvelope
     }
 
+    /**
+     * Replaces local business tables with [snapshot]. On a replacement exception, attempts to restore
+     * the validated [recoveryEnvelope] for [tenant], then rethrows the original exception.
+     * Rollback failures are attached as suppressed exceptions; successful rollback is not guaranteed.
+     */
     private suspend fun replaceCloudSnapshotWithRollback(
         snapshot: CloudRestorableSnapshot,
         tenant: com.sevenzenlabs.zenmart.commerce.TenantScope,
@@ -1343,6 +1435,11 @@ class ShopViewModel(
         }.replaceWithRollback(snapshot, tenant, recoveryEnvelope)
     }
 
+    /**
+     * Launches persistence of the cloud URL, prefix, and automatic sync preference, then updates
+     * scheduling when a context exists. Blank trimmed URL or prefix inputs preserve their saved values.
+     * Persistence failures are not caught in the launched coroutine.
+     */
     fun updateFirebaseSettings(url: String, prefix: String, autoSync: Boolean) {
         viewModelScope.launch {
             val current = settingsDataStore.settingsFlow.first()
@@ -1359,6 +1456,12 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Validates and uploads a nonempty business snapshot for an authorized Firebase session.
+     * Updates mutation and sync state and reports success or caught failures through [onResult]
+     * as a success flag and message. Disabled cloud sync reports failure immediately; a call made
+     * while another mutation is in flight returns without invoking [onResult].
+     */
     fun syncAllToCloud(onResult: (Boolean, String) -> Unit) {
         if (!beginMutation { syncAllToCloud(onResult) }) return
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper
@@ -1426,6 +1529,13 @@ class ShopViewModel(
         }
     }
 
+    /**
+     * Downloads and validates a business snapshot for an authorized Firebase session, saves a local
+     * recovery point, then replaces business tables with a rollback attempt on replacement failure.
+     * Updates mutation and sync state and reports success or caught failures through [onResult]
+     * as a success flag and message. Disabled cloud sync reports failure immediately; a call made
+     * while another mutation is in flight returns without invoking [onResult].
+     */
     fun restoreAllFromCloud(onResult: (Boolean, String) -> Unit) {
         if (!beginMutation { restoreAllFromCloud(onResult) }) return
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper

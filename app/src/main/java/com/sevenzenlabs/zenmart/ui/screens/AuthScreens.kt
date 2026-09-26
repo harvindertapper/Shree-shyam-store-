@@ -708,6 +708,11 @@ fun LoginScreen(viewModel: ShopViewModel) {
     }
 }
 
+/**
+ * Shows PIN recovery for [provider], using [registeredEmail] to prefill the account identity.
+ * Successful local or Google verification changes the PIN and invokes [onDismiss]; failures
+ * remain visible in the dialog. A missing provider offers [onSwitchAccount] instead.
+ */
 @Composable
 fun ForgotPinDialog(
     viewModel: ShopViewModel,

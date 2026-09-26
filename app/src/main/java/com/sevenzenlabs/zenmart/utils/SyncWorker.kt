@@ -16,6 +16,13 @@ class SyncWorker(
     appContext: Context,
     workerParams: WorkerParameters
 ) : CoroutineWorker(appContext, workerParams) {
+    /**
+     * Pushes local changes, then pulls remote changes and persists sync status and the applied cursor.
+     * Returns success without syncing when cloud sync is disabled, no session is usable, or a
+     * Firebase session does not match the current user. Sync failures and caught exceptions return
+     * retry while [runAttemptCount] is below 3, then failure. Errors writing failure status from a
+     * catch block propagate instead of being converted to a worker result.
+     */
     override suspend fun doWork(): Result {
         if (!com.sevenzenlabs.zenmart.BuildConfig.CLOUD_SYNC_ENABLED) {
             Log.d(TAG, "Background sync skipped because this build disables cloud sync")

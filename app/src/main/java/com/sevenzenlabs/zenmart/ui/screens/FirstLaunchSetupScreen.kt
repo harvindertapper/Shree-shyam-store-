@@ -29,6 +29,10 @@ import com.sevenzenlabs.zenmart.utils.LocaleHelper
 import com.sevenzenlabs.zenmart.utils.SecurityUtils
 import com.sevenzenlabs.zenmart.viewmodel.ShopViewModel
 
+/**
+ * Collects the initial shop profile and PIN, prefilling owner details from settings or Google.
+ * Valid submission saves the profile, then requests app lock setup and onboarding completion.
+ */
 @Composable
 fun FirstLaunchSetupScreen(viewModel: ShopViewModel) {
     val context = LocalContext.current

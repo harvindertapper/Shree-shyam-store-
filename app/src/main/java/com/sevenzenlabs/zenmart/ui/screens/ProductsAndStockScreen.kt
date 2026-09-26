@@ -1944,6 +1944,7 @@ fun LowStockReorderDialog(
 }
 
 
+/** Returns a localized field validation message, including [unit] when fractions are disallowed. */
 private fun productFormErrorMessage(
     field: ProductFormField,
     error: ProductFormError,

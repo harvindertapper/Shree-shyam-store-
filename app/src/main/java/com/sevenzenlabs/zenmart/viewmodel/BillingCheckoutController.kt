@@ -239,6 +239,13 @@ class BillingCheckoutController(
         }
     }
 
+    /**
+     * Starts checkout for the current cart, ignoring empty carts and submissions while checkout is busy.
+     * For udhaar, uses [customerId] or finds or creates a customer from [customerName] and [customerPhone].
+     * [receivedAmount] is in paise; null delegates the default to the repository's payment policy.
+     * After saving and loading the sale, clears the cart and invokes sync and success callbacks.
+     * Caught exceptions are published through checkout error and mutation state.
+     */
     fun completeBill(
         paymentMode: String,
         customerId: Long? = null,
