@@ -70,13 +70,13 @@ The owner still needs to decide the production application ID/package identity, 
 
 ## ADR-009: Use the configured production application namespace
 
-**Status:** Implemented on `feat/rename-production-package` for review
+**Status:** Implemented on `codex/zenmart-sync`; package aligned with the supplied Firebase Android client.
 
-**Decision:** Use `com.aistudio.shreeshyamstore.pqwzkb` as both the Android namespace and application ID. Kotlin production, unit-test, and instrumentation sources are organized under the matching package path, and CI selectors use the renamed fully qualified test classes.
+**Decision:** Use `com.sevenzenlabs.zenmart` as both the Android namespace and application ID. The launcher name is ZenMart. Kotlin production, unit-test, and instrumentation sources are organized under the matching package path, and CI selectors use the renamed fully qualified test classes. The supplied Firebase file targets a different application ID and must be replaced with a client registered for ZenMart before cloud sign-in is enabled.
 
-**Safety scope:** This is a source/build identity change only. Room database name, schema version, table names, cloud business-document identifiers, DataStore keys, sync global IDs, and Firebase shop namespace derivation are unchanged. Relative manifest component names and the `${applicationId}.fileprovider` authority continue to resolve from the configured application ID.
+**Safety scope:** This is a source/build identity change only. Room database name, schema version, table names, cloud business-document identifiers, DataStore keys, sync global IDs, and Firebase shop namespace derivation are unchanged. Relative manifest component names and the `${applicationId}.fileprovider` authority continue to resolve from the configured application ID. Existing installations under a different application ID remain separate and require explicit export/restore; Android will not upgrade them in place.
 
-**Release limitation:** Package identity alignment does not by itself complete release readiness. Signing ownership, release keystore handling, versioning, minification/R8 validation, Firebase project configuration, Play/App distribution, privacy disclosures, and migration/restore rehearsal remain separate gates. A rollback is a code/build revert before distributing an artifact under the renamed ID; already-installed builds under the old ID are not treated as an in-place upgrade without an explicit product migration plan.
+**Release limitation:** Package identity alignment does not by itself complete release readiness. Signing ownership, release keystore handling, versioning, minification/R8 validation, Firebase server rules/provider deployment, Play/App distribution, privacy disclosures, and migration/restore rehearsal remain separate gates. A rollback is a code/build revert before distributing an artifact under this ID; already-installed builds under an old ID are not treated as an in-place upgrade.
 
 ## ADR-010: Bound local app-lock attempts and require strong biometric fallback
 

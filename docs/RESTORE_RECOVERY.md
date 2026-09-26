@@ -69,7 +69,7 @@ The next integration step after PR #34 is merged is to make the authenticated ba
 
 ## References
 
-[1]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/data/ShopRepository.kt "Transactional cloud-restorable replacement"
-[2]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/utils/FirebaseSyncService.kt "Transitional snapshot transport"
-[3]: ../app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/utils/CloudSyncPolicy.kt "Cloud business-table allowlist"
-[4]: ../app/src/test/java/com/aistudio/shreeshyamstore/pqwzkb/RestoreSecurityTest.kt "Restore privacy and device-owned data regression tests"
+[1]: ../app/src/main/java/com/sevenzenlabs/zenmart/data/ShopRepository.kt "Transactional cloud-restorable replacement"
+[2]: ../app/src/main/java/com/sevenzenlabs/zenmart/utils/FirebaseSyncService.kt "Transitional snapshot transport"
+[3]: ../app/src/main/java/com/sevenzenlabs/zenmart/utils/CloudSyncPolicy.kt "Cloud business-table allowlist"
+[4]: ../app/src/test/java/com/sevenzenlabs/zenmart/RestoreSecurityTest.kt "Restore privacy and device-owned data regression tests"

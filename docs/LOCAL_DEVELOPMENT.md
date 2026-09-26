@@ -41,7 +41,7 @@ Run these commands from the repository root:
 ./gradlew assembleDebug
 ./gradlew lintDebug
 ./gradlew testDebugUnitTest
-./gradlew testDebugUnitTest --tests com.aistudio.shreeshyamstore.pqwzkb.SecurityUtilsTest --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
+./gradlew testDebugUnitTest --tests com.sevenzenlabs.zenmart.SecurityUtilsTest --tests com.sevenzenlabs.zenmart.RestoreSecurityTest
 ./gradlew clean assembleDebug
 ```
 

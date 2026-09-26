@@ -28,7 +28,7 @@ The recommended modernization strategy is **incremental hardening**, beginning w
 
 The application is built with Kotlin and Jetpack Compose. The module uses Android Gradle Plugin 9.1.1, Kotlin 2.4.0, Compose Material 3, Room 2.7.0, WorkManager 2.10.0, Firebase Auth/Firestore, Android Credentials and Google ID, CameraX and ML Kit barcode scanning, DataStore Preferences, Moshi, OkHttp, Retrofit, Robolectric, and Roborazzi. The compile and target SDK are 36, while the minimum SDK is 24. The CI workflow runs Java 21 and installs Gradle 9.7.0, whereas the project compiles application code for Java/Kotlin 11.
 
-The app namespace is `com.example` and the application ID is `com.aistudio.shreeshyamstore.pqwzkb`. These values are prototype/AI-Studio identifiers rather than a stable production identity. The release build has `isMinifyEnabled = false`, uses environment-provided signing credentials, and relies on a release keystore path that is not documented as part of a release runbook.
+The app namespace is `com.example` and the application ID is `com.sevenzenlabs.zenmart`. These values are prototype/AI-Studio identifiers rather than a stable production identity. The release build has `isMinifyEnabled = false`, uses environment-provided signing credentials, and relies on a release keystore path that is not documented as part of a release runbook.
 
 | Component | Current location | Production implication |
 | --- | --- | --- |

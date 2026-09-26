@@ -60,11 +60,11 @@ ksp {
 }
 
 android {
-  namespace = "com.aistudio.shreeshyamstore.pqwzkb"
+  namespace = "com.sevenzenlabs.zenmart"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.shreeshyamstore.pqwzkb"
+    applicationId = "com.sevenzenlabs.zenmart"
     minSdk = 24
     targetSdk = 36
     versionCode = appVersionCode

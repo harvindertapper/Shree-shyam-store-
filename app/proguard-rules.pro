@@ -22,13 +22,13 @@
 
 # RestoreSnapshotCodec uses Moshi Kotlin reflection for these versioned snapshot models.
 # Keep field names and constructors stable for authenticated backup/restore compatibility.
--keep class com.aistudio.shreeshyamstore.pqwzkb.utils.CloudRestorableSnapshot { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotTableCounts { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.utils.SnapshotEnvelope { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.Category { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.Product { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.Sale { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.SaleItem { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.Customer { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.UdhaarTransaction { *; }
--keep class com.aistudio.shreeshyamstore.pqwzkb.data.StockAdjustment { *; }
+-keep class com.sevenzenlabs.zenmart.utils.CloudRestorableSnapshot { *; }
+-keep class com.sevenzenlabs.zenmart.utils.SnapshotTableCounts { *; }
+-keep class com.sevenzenlabs.zenmart.utils.SnapshotEnvelope { *; }
+-keep class com.sevenzenlabs.zenmart.data.Category { *; }
+-keep class com.sevenzenlabs.zenmart.data.Product { *; }
+-keep class com.sevenzenlabs.zenmart.data.Sale { *; }
+-keep class com.sevenzenlabs.zenmart.data.SaleItem { *; }
+-keep class com.sevenzenlabs.zenmart.data.Customer { *; }
+-keep class com.sevenzenlabs.zenmart.data.UdhaarTransaction { *; }
+-keep class com.sevenzenlabs.zenmart.data.StockAdjustment { *; }

@@ -88,53 +88,53 @@ jobs:
       - name: Run stable unit and Robolectric tests
         run: >-
           ./gradlew --no-daemon --stacktrace testDebugUnitTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SecurityUtilsTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.CredentialMigrationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.TenantDeviceContextTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.TenantDeviceContextMigrationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.TenantAuthorizationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.AppLockRecoveryPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.OperatorActionPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.AppDropdownMenuTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.BusinessRelationshipPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreSecurityTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.AuthenticatedBackupProviderTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.RestoreRecoveryEnvelopeTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.CheckoutInvariantsTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.CommerceValidationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.BillingCartStateTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.BillingCheckoutControllerTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.MutationStatusTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsValidationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsLocaleContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsDataStoreTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SettingsControlCenterTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogRepositoryTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryLocaleContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue54LocaleContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.LocalizationSourceContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue54BilingualSemanticsTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.ReportPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue55ReportLocaleContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue55ReportSemanticsTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue56JourneyCoverageContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.Issue56JourneySemanticsTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.InventoryCatalogMigrationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.PaymentStateMigrationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.StableSyncMigrationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncOutboxTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncConflictPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncPullCoordinatorTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncContractTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.OperationsReadinessTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.BuildConfigurationTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.StagingEvidenceTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.SyncObservabilityTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.AutomaticSyncPolicyTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleUnitTest
-          --tests com.aistudio.shreeshyamstore.pqwzkb.ExampleRobolectricTest
+          --tests com.sevenzenlabs.zenmart.SecurityUtilsTest
+          --tests com.sevenzenlabs.zenmart.CredentialMigrationTest
+          --tests com.sevenzenlabs.zenmart.TenantDeviceContextTest
+          --tests com.sevenzenlabs.zenmart.TenantDeviceContextMigrationTest
+          --tests com.sevenzenlabs.zenmart.TenantAuthorizationTest
+          --tests com.sevenzenlabs.zenmart.AppLockPolicyTest
+          --tests com.sevenzenlabs.zenmart.AppLockRecoveryPolicyTest
+          --tests com.sevenzenlabs.zenmart.OperatorActionPolicyTest
+          --tests com.sevenzenlabs.zenmart.AppDropdownMenuTest
+          --tests com.sevenzenlabs.zenmart.BusinessRelationshipPolicyTest
+          --tests com.sevenzenlabs.zenmart.RestoreSecurityTest
+          --tests com.sevenzenlabs.zenmart.AuthenticatedBackupProviderTest
+          --tests com.sevenzenlabs.zenmart.RestoreRecoveryEnvelopeTest
+          --tests com.sevenzenlabs.zenmart.CheckoutInvariantsTest
+          --tests com.sevenzenlabs.zenmart.CommerceValidationTest
+          --tests com.sevenzenlabs.zenmart.BillingCartStateTest
+          --tests com.sevenzenlabs.zenmart.BillingCheckoutControllerTest
+          --tests com.sevenzenlabs.zenmart.MutationStatusTest
+          --tests com.sevenzenlabs.zenmart.SettingsValidationTest
+          --tests com.sevenzenlabs.zenmart.SettingsLocaleContractTest
+          --tests com.sevenzenlabs.zenmart.SettingsDataStoreTest
+          --tests com.sevenzenlabs.zenmart.SettingsControlCenterTest
+          --tests com.sevenzenlabs.zenmart.InventoryCatalogTest
+          --tests com.sevenzenlabs.zenmart.InventoryCatalogRepositoryTest
+          --tests com.sevenzenlabs.zenmart.InventoryLocaleContractTest
+          --tests com.sevenzenlabs.zenmart.Issue54LocaleContractTest
+          --tests com.sevenzenlabs.zenmart.LocalizationSourceContractTest
+          --tests com.sevenzenlabs.zenmart.Issue54BilingualSemanticsTest
+          --tests com.sevenzenlabs.zenmart.ReportPolicyTest
+          --tests com.sevenzenlabs.zenmart.Issue55ReportLocaleContractTest
+          --tests com.sevenzenlabs.zenmart.Issue55ReportSemanticsTest
+          --tests com.sevenzenlabs.zenmart.Issue56JourneyCoverageContractTest
+          --tests com.sevenzenlabs.zenmart.Issue56JourneySemanticsTest
+          --tests com.sevenzenlabs.zenmart.InventoryCatalogMigrationTest
+          --tests com.sevenzenlabs.zenmart.PaymentStateMigrationTest
+          --tests com.sevenzenlabs.zenmart.StableSyncMigrationTest
+          --tests com.sevenzenlabs.zenmart.SyncOutboxTest
+          --tests com.sevenzenlabs.zenmart.SyncConflictPolicyTest
+          --tests com.sevenzenlabs.zenmart.SyncPullCoordinatorTest
+          --tests com.sevenzenlabs.zenmart.SyncContractTest
+          --tests com.sevenzenlabs.zenmart.OperationsReadinessTest
+          --tests com.sevenzenlabs.zenmart.BuildConfigurationTest
+          --tests com.sevenzenlabs.zenmart.StagingEvidenceTest
+          --tests com.sevenzenlabs.zenmart.SyncObservabilityTest
+          --tests com.sevenzenlabs.zenmart.AutomaticSyncPolicyTest
+          --tests com.sevenzenlabs.zenmart.ExampleUnitTest
+          --tests com.sevenzenlabs.zenmart.ExampleRobolectricTest
 
       - name: Upload unit test reports
         if: always()
@@ -148,7 +148,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          schema_path="app/schemas/com.aistudio.shreeshyamstore.pqwzkb.data.AppDatabase/11.json"
+          schema_path="app/schemas/com.sevenzenlabs.zenmart.data.AppDatabase/11.json"
           test -f "$schema_path"
 
           if [[ -n "${GITHUB_BASE_REF:-}" ]]; then
@@ -160,7 +160,7 @@ jobs:
           else
             changed_files=""
           fi
-          if grep -Eq '^app/src/main/java/com/aistudio/shreeshyamstore/pqwzkb/data/(AppDatabase|Entities|Daos).*\\.kt$' <<<"$changed_files"; then
+          if grep -Eq '^app/src/main/java/com/sevenzenlabs/zenmart/data/(AppDatabase|Entities|Daos).*\\.kt$' <<<"$changed_files"; then
             grep -Eq '^app/schemas/.*\\.json$' <<<"$changed_files"
           fi
 
