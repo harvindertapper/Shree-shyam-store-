@@ -1,7 +1,9 @@
 package com.sevenzenlabs.zenmart
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -34,9 +36,17 @@ class Issue56MainActivitySmokeTest {
         composeTestRule.onNodeWithTag("google_sign_in_button")
             .performScrollTo()
             .assertIsDisplayed()
-        composeTestRule.onNodeWithText(
+        val englishGoogleSignInLabel =
             LocaleHelper.getStrings(AppLanguage.ENGLISH).continueWithGoogle
-        ).assertIsDisplayed()
+        composeTestRule.waitUntil(timeoutMillis = 5_000) {
+            composeTestRule.onAllNodesWithText(englishGoogleSignInLabel)
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("google_sign_in_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+            .assertTextEquals(englishGoogleSignInLabel)
         composeTestRule.onNodeWithTag("skip_login_button")
             .performScrollTo()
             .assertIsDisplayed()
