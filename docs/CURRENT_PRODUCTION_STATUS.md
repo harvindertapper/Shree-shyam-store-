@@ -1,42 +1,36 @@
 # ZenMart — current engineering and release status
 
-**Reviewed:** 25 September 2026
-**GitHub main reviewed:** `ae426706f29189ed705fac3bbf990c8b9f262d0e`
-**Integration branch:** `codex/zenmart-sync` (local; not pushed)
-**Android application ID and namespace:** `com.sevenzenlabs.zenmart`
-**Launcher name:** ZenMart
+**Reviewed:** 27 September 2026
 
-This replaces the stale August status snapshot. GitHub main contains the latest home/theme refresh and dependency updates through PR #82. The integration branch carries those commits alongside the ZenMart package migration and updated production, test, and schema packages. The supplied Firebase client targets another package and has been removed from the build; a matching ZenMart client is not yet configured.
+**GitHub main:** `e7dfa51d79258dc5fc7ce89ddb55d2400075a479` (PR #83 merged)
 
-## Product that exists
+**Application ID and namespace:** `com.sevenzenlabs.zenmart`
 
-The Android app is an offline-capable merchant product, not a screen-only mockup. It includes Room-backed catalog and inventory, barcode scanning, sales checkout, integer-paise money handling, cash/UPI/Udhaar recording, customer balances, stock adjustments, reports, PDF/CSV sharing, Hindi/English copy, app locking, and local authentication. Database migrations and focused commerce, security, synchronization, and recovery tests are present through Room schema version 11.
+**Release assessment:** development build; controlled-pilot gates remain open.
 
-The app also contains an idempotent synchronization outbox, retry/conflict policies, Firestore client code, authenticated snapshot backup, validated restore and local recovery-point handling, release signing/R8 configuration, and Android CI. These prove implementation exists; they do not prove that production Firebase rules/provider are deployed, a signed release has been distributed, or a real shop has completed backup and restore.
+This page describes checked source, not a deployed service or installed merchant release. The implementation backlog and pending-PR decisions are in [the v1 roadmap](ZENMART_V1_PR_AND_ISSUE_ROADMAP.md) and [tracker #44](https://github.com/harvindertapper/Shree-shyam-store-/issues/44).
 
-Payment recording is not bank settlement verification. Profit reporting is not complete until each sale preserves a valid cost basis. Future multi-store administration and marketplace plans are not shipped capabilities.
+## Present on main
 
-## Integration changes in this branch
+- Kotlin/Compose app with Room-backed catalog, inventory, checkout, cash/UPI/Udhaar recording, customer balances, stock adjustment, basic reports, barcode scanning, PDF/CSV sharing, Hindi/English copy and local lock/authentication.
+- Local transactional commerce, persistent sync outbox, WorkManager retry, direct Firestore business sync, and snapshot backup/restore code. Source capability is not multi-phone or recovery proof.
+- Room schema v11, migrations and focused tests, Android CI, minified release configuration, and ZenMart package migration. The app has min SDK 24, compile SDK 36.1, release cloud-sync flag true and debug flag false.
 
-- Brings six GitHub main commits after the prior local base, including the latest home screen/theme and Room, Retrofit, Google Services, and GitHub Actions updates.
-- Renames production, test and instrumentation packages and the Room schema directory to `com.sevenzenlabs.zenmart`.
-- Sets the Android namespace and application ID to `com.sevenzenlabs.zenmart`; sets the launcher/project name to ZenMart.
-- Updates CI selectors, schema checks, keep rules, and active Firebase/release documentation for the new identity.
-- Removes the copied Firebase client because it targets `com.harrylabs.shreeshyamstore`. Register `com.sevenzenlabs.zenmart` in Firebase and download a matching client before enabling cloud sign-in.
+## Missing or unverified
 
-Android treats a different application ID as a separate app and will not carry the earlier package's private Room database into this installation automatically. Before replacing any existing build, export its data using a supported app backup and rehearse restore on a clean device. Do not uninstall an older app until its data is recovered.
+| Area | Current boundary | Issues |
+| --- | --- | --- |
+| Cloud environments | Matching ZenMart Firebase configuration and isolated staging/production Worker + D1 are not evidenced. | [#85](https://github.com/harvindertapper/Shree-shyam-store-/issues/85) |
+| Multi-phone authority | `FirebaseSyncService` still uses Firestore directly. Worker/D1 prototype `f13e636` is local, outside main, and Android is not wired to it. | [#86](https://github.com/harvindertapper/Shree-shyam-store-/issues/86), [#87](https://github.com/harvindertapper/Shree-shyam-store-/issues/87) |
+| Offline conflict | Local checkout guards tracked stock against negative stock. Two-phone last-unit sale and owner shortage reconciliation are unproven. | [#88](https://github.com/harvindertapper/Shree-shyam-store-/issues/88) |
+| Recovery | Existing sync/snapshot path is not an independent encrypted, read-back-verified SAF export or proven clean-device restore. | [#89](https://github.com/harvindertapper/Shree-shyam-store-/issues/89) |
+| Old shop data | New app ID gets separate private storage; actual old installs, signatures, exports and balances have not been inventoried or migrated. | [#84](https://github.com/harvindertapper/Shree-shyam-store-/issues/84) |
+| Returns/reports | Refund states exist, but linked quantity-limited returns do not. Partial refunds are reported gross; English subtitle still says “Sales & profit.” | [#90](https://github.com/harvindertapper/Shree-shyam-store-/issues/90), [#91](https://github.com/harvindertapper/Shree-shyam-store-/issues/91) |
+| Truthful status/cost | Home can show “Cloud backup active” without a verified backup. Free-tier usage and enrollment thresholds are not operationally proven. | [#58](https://github.com/harvindertapper/Shree-shyam-store-/issues/58), [#93](https://github.com/harvindertapper/Shree-shyam-store-/issues/93) |
+| Release evidence | No signed pilot APK, physical two-phone rehearsal, five-shop pilot or clean-device recovery decision is recorded. | [#57](https://github.com/harvindertapper/Shree-shyam-store-/issues/57), [#92](https://github.com/harvindertapper/Shree-shyam-store-/issues/92) |
 
-## Release gates still requiring external evidence
+The local Worker/D1 prototype has owner/store/device bootstrap, role and token checks, invitations/revocation, payload allowlists, deduplication and cursor reads with local tests. It still needs current-main review, staging deployment, concurrent D1 proof, stock/Udhaar projections, Android integration and operations. Do not call it a shipped backend.
 
-1. Assemble and inspect debug and minified release artifacts under the ZenMart ID; verify signing policy.
-2. Run the configured Android CI suite, including API 35/36 device journeys, after package migration.
-3. Verify Firebase Authentication providers, tenant-scoped database rules, trusted backup endpoint, project region and budget controls in the actual Firebase/hosting consoles.
-4. Rehearse old-package data export, clean installation, restore, and recovery on test data and a separate staging tenant.
-5. Verify offline billing, duplicate-submit safety, process death, low-end hardware, sync retries/conflicts, cloud backup and restore end to end.
-6. Assign support/incident ownership, confirm privacy disclosures and retention, and document a release rollback decision.
+Payment status is merchant-entered, not bank settlement verification. Calculated profit needs a sale-time cost basis and return accounting. A sale stored only on a lost phone before server upload or independent export cannot be recovered; the app must show that risk.
 
-Until these gates have evidence, describe the app as a development/staging candidate, not a production-proven service. Core shop operation should remain available without Firebase or network access. Managed cloud has provider and support costs; do not promise it is permanently free or unlimited.
-
-## Source of truth
-
-Use current source and CI on GitHub main for merged changes, then review `codex/zenmart-sync` for package and local workspace integration. August audits are historical snapshots. Tie future status updates to a commit SHA and mark staging facts verified only after the operator records them.
+To change this status, record exact commit/CI run, signed APK checksum/signing fingerprint, version, staging services, physical device/API, test store, migration/restore counts and balances, failure results, free-tier usage, incidents and owner go/no-go. Merged PR or green CI alone does not establish production readiness.
