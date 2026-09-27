@@ -25,11 +25,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sevenzenlabs.zenmart.BuildConfig
 import com.sevenzenlabs.zenmart.ui.theme.*
 import com.sevenzenlabs.zenmart.utils.AppLanguage
 import com.sevenzenlabs.zenmart.utils.CurrencyUtils
 import com.sevenzenlabs.zenmart.utils.DateTimeUtils
+import com.sevenzenlabs.zenmart.utils.HomeSyncTone
 import com.sevenzenlabs.zenmart.utils.LocaleHelper
+import com.sevenzenlabs.zenmart.utils.homeSyncPresentation
 import com.sevenzenlabs.zenmart.viewmodel.InventoryViewModel
 import com.sevenzenlabs.zenmart.viewmodel.ReportsViewModel
 import com.sevenzenlabs.zenmart.viewmodel.Screen
@@ -44,6 +47,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
+    val syncHealth by viewModel.syncHealthSnapshot.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val sales by reportsViewModel.salesHistory.collectAsState()
     val products by inventoryViewModel.products.collectAsState()
@@ -56,6 +60,10 @@ fun HomeScreen(
             clockTick = System.currentTimeMillis()
         }
     }
+    LaunchedEffect(clockTick, settings.lastSyncTime, settings.lastSyncStatus, settings.isUserLoggedIn) {
+        viewModel.refreshSyncHealth()
+    }
+    val syncPresentation = homeSyncPresentation(settings, syncHealth, BuildConfig.CLOUD_SYNC_ENABLED, strings, clockTick)
 
     // Determine bounds for Today from the current time tick.
     val startOfDay = remember(clockTick) { DateTimeUtils.getStartOfDay() }
@@ -121,23 +129,37 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Row(
-                    modifier = Modifier.clickable {
+                    modifier = if (syncPresentation.canTrigger) Modifier.clickable {
                         viewModel.triggerAutoSync()
                         Toast.makeText(context, strings.homeCloudSyncTriggered, Toast.LENGTH_SHORT).show()
-                    },
+                    } else Modifier,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
                             .size(8.dp)
-                            .background(SuccessGreen, CircleShape)
+                            .background(when (syncPresentation.tone) {
+                                HomeSyncTone.CONFIRMED -> SuccessGreen
+                                HomeSyncTone.PENDING -> SaffronDark
+                                HomeSyncTone.ERROR -> ErrorRed
+                                HomeSyncTone.NEUTRAL -> MaterialTheme.colorScheme.outline
+                            }, CircleShape)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (settings.lastSyncTime.isNotEmpty() && settings.lastSyncTime != "Never Synced") settings.lastSyncTime else strings.homeCloudBackupActive,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        Text(
+                            text = syncPresentation.label,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        syncPresentation.lastConfirmed?.let { lastConfirmed ->
+                            Text(
+                                text = lastConfirmed,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
         }
