@@ -114,6 +114,7 @@ jobs:
           --tests com.sevenzenlabs.zenmart.InventoryCatalogRepositoryTest
           --tests com.sevenzenlabs.zenmart.InventoryLocaleContractTest
           --tests com.sevenzenlabs.zenmart.Issue54LocaleContractTest
+          --tests com.sevenzenlabs.zenmart.HomeSyncPresentationTest
           --tests com.sevenzenlabs.zenmart.LocalizationSourceContractTest
           --tests com.sevenzenlabs.zenmart.Issue54BilingualSemanticsTest
           --tests com.sevenzenlabs.zenmart.ReportPolicyTest
