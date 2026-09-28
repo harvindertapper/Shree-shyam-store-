@@ -6,6 +6,7 @@ import com.sevenzenlabs.zenmart.data.AppDatabase
 import com.sevenzenlabs.zenmart.data.SyncOutbox
 import com.sevenzenlabs.zenmart.data.SyncOutboxState
 import com.sevenzenlabs.zenmart.utils.SyncIdentity
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -34,6 +35,30 @@ class SyncOutboxTest {
     @After
     fun tearDown() {
         database.close()
+    }
+
+    @Test
+    fun observedSummaryReflectsPendingAndInFlightRows() = runBlocking {
+        val dao = database.syncOutboxDao()
+        assertEquals(0, dao.observeSummary().first().pendingCount)
+        val now = 1_000L
+        val id = dao.insert(SyncOutbox(
+            tableName = "products",
+            globalId = "global-live-status",
+            localId = 1L,
+            mutationVersion = 1L,
+            mutationDeviceId = "device-a",
+            idempotencyKey = SyncIdentity.idempotencyKey("products", "global-live-status", 1L),
+            payloadJson = "{}",
+            tombstone = false,
+            nextAttemptAt = now
+        ))
+        assertEquals(1, dao.observeSummary().first().pendingCount)
+
+        assertEquals(1, dao.claim(id, now, now + 60_000L))
+        val inFlight = dao.observeSummary().first()
+        assertEquals(0, inFlight.pendingCount)
+        assertEquals(1, inFlight.inFlightCount)
     }
 
     @Test

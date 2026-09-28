@@ -1290,6 +1290,9 @@ class ShopViewModel(
     private val _syncHealthSnapshot = MutableStateFlow(SyncHealthSnapshot.empty())
     val syncHealthSnapshot: StateFlow<SyncHealthSnapshot> = _syncHealthSnapshot.asStateFlow()
 
+    val syncOutboxSummary: StateFlow<SyncOutboxSummary?> = repository.observeSyncOutboxSummary()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     /** Refreshes only redacted counts and the legacy local cursor; no payload leaves the repository. */
     fun refreshSyncHealth() {
         viewModelScope.launch {

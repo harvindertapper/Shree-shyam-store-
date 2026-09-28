@@ -32,6 +32,8 @@ import com.sevenzenlabs.zenmart.utils.CurrencyUtils
 import com.sevenzenlabs.zenmart.utils.DateTimeUtils
 import com.sevenzenlabs.zenmart.utils.HomeSyncTone
 import com.sevenzenlabs.zenmart.utils.LocaleHelper
+import com.sevenzenlabs.zenmart.utils.SyncCursor
+import com.sevenzenlabs.zenmart.utils.SyncHealthSnapshot
 import com.sevenzenlabs.zenmart.utils.homeSyncPresentation
 import com.sevenzenlabs.zenmart.viewmodel.InventoryViewModel
 import com.sevenzenlabs.zenmart.viewmodel.ReportsViewModel
@@ -47,7 +49,7 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val settings by viewModel.storeSettings.collectAsState()
-    val syncHealth by viewModel.syncHealthSnapshot.collectAsState()
+    val outboxSummary by viewModel.syncOutboxSummary.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
     val sales by reportsViewModel.salesHistory.collectAsState()
     val products by inventoryViewModel.products.collectAsState()
@@ -60,8 +62,15 @@ fun HomeScreen(
             clockTick = System.currentTimeMillis()
         }
     }
-    LaunchedEffect(clockTick, settings.lastSyncTime, settings.lastSyncStatus, settings.isUserLoggedIn) {
-        viewModel.refreshSyncHealth()
+    val syncHealth = remember(outboxSummary, settings.lastSyncTime, settings.lastSyncStatus, clockTick) {
+        outboxSummary?.let { summary ->
+            SyncHealthSnapshot.from(
+                nowEpochMs = clockTick,
+                lastSyncEpochMs = SyncCursor.parse(settings.lastSyncTime),
+                outbox = summary,
+                lastSyncStatus = settings.lastSyncStatus
+            )
+        } ?: SyncHealthSnapshot.empty()
     }
     val syncPresentation = homeSyncPresentation(settings, syncHealth, BuildConfig.CLOUD_SYNC_ENABLED, strings, clockTick)
 

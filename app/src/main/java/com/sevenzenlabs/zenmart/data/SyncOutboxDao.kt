@@ -4,9 +4,24 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SyncOutboxDao {
+    @Query(
+        """
+        SELECT
+          COUNT(CASE WHEN state = 'PENDING' THEN 1 END) AS pendingCount,
+          COUNT(CASE WHEN state = 'IN_FLIGHT' THEN 1 END) AS inFlightCount,
+          COUNT(CASE WHEN state = 'RETRYABLE' THEN 1 END) AS retryableCount,
+          COUNT(CASE WHEN state = 'DEAD_LETTER' THEN 1 END) AS deadLetterCount,
+          COUNT(CASE WHEN state = 'DEAD_LETTER' AND LOWER(COALESCE(lastError, '')) LIKE '%conflict%' THEN 1 END) AS conflictCount,
+          MIN(CASE WHEN state = 'RETRYABLE' AND nextAttemptAt > 0 THEN nextAttemptAt END) AS nextRetryAtEpochMs
+        FROM sync_outbox
+        """
+    )
+    fun observeSummary(): Flow<SyncOutboxSummary>
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(outbox: SyncOutbox): Long
 
