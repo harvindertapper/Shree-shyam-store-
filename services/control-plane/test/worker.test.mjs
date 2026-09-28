@@ -324,6 +324,52 @@ test("payload secrets and unknown fields are rejected", async () => {
   assert.deepEqual(await response.json(), { error: { code: "invalid_event" } });
 });
 
+test("schema v2 rejects local row IDs and requires stable relationship references", async () => {
+  const headers = authHeaders(await idToken());
+  for (const [type, invalidField] of [
+    ["products", "categoryId"], ["sales", "customerId"],
+    ["sale_items", "saleId"], ["udhaar_transactions", "customerId"],
+    ["stock_adjustments", "productId"]
+  ]) {
+    const event = relatedEvent(type);
+    event.payload[invalidField] = 42;
+    const response = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/events", {
+      method: "POST", headers, body: JSON.stringify({ events: [event] })
+    }), env());
+    assert.equal(response.status, 400, type);
+  }
+  const item = relatedEvent("sale_items");
+  delete item.payload.saleGlobalId;
+  const missing = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/events", {
+    method: "POST", headers, body: JSON.stringify({ events: [item] })
+  }), env());
+  assert.equal(missing.status, 400);
+  const legacy = categoryEvent();
+  legacy.schemaVersion = 1;
+  const legacyResponse = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/events", {
+    method: "POST", headers, body: JSON.stringify({ events: [legacy] })
+  }), env());
+  assert.equal(legacyResponse.status, 400);
+});
+
+test("schema v2 accepts global references for every related event type", async () => {
+  const db = new MemoryDb();
+  const events = ["products", "sales", "sale_items", "udhaar_transactions", "stock_adjustments"].map(relatedEvent);
+  const response = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/events", {
+    method: "POST", headers: authHeaders(await idToken()), body: JSON.stringify({ events })
+  }), env(db));
+  assert.equal(response.status, 200, JSON.stringify({ result: await response.clone().json(), events }));
+  assert.equal(db.events.length, events.length);
+  const pulled = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/changes?after=0&deviceId=device-12345678", {
+    headers: authHeaders(await idToken())
+  }), env(db));
+  const changes = (await pulled.json()).events;
+  assert.equal(changes.length, events.length);
+  for (const change of changes) {
+    assert.deepEqual(change.payload, events.find(event => event.eventId === change.eventId).payload);
+  }
+});
+
 test("invalid cursor is rejected after authentication", async () => {
   const response = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/changes?after=-1&deviceId=device-12345678", {
     headers: authHeaders(await idToken())
@@ -357,14 +403,14 @@ function categoryEvent(type = "categories") {
   const payload = type === "stock_adjustments" ? {
     globalId: "category-global-1", mutationVersion: 1, mutationDeviceId: "device-12345678",
     idempotencyKey: "stock_adjustments/category-global-1/1", updatedAt: 1000,
-    productId: 42, oldStock: 1, newStock: 0, difference: -1, reason: "sale"
+    productGlobalId: "product-global-1", oldStock: 1, newStock: 0, difference: -1, reason: "sale"
   } : {
-    id: 1, globalId: "category-global-1", mutationVersion: 1, mutationDeviceId: "device-12345678",
+    globalId: "category-global-1", mutationVersion: 1, mutationDeviceId: "device-12345678",
     idempotencyKey: "categories/category-global-1/1", updatedAt: 1000, createdAt: 1000,
     name: "Grocery", isDeleted: false
   };
   return {
-    eventId: "event-12345678", deviceId: "device-12345678", schemaVersion: 1,
+    eventId: "event-12345678", deviceId: "device-12345678", schemaVersion: 2,
     idempotencyKey: payload.idempotencyKey, eventType: type, payload, createdAt: 1000
   };
 }
@@ -374,12 +420,47 @@ function udhaarEvent() {
   event.eventType = "udhaar_transactions";
   event.idempotencyKey = "udhaar_transactions/ledger-global-1/1";
   event.payload = {
-    id: 1, globalId: "ledger-global-1", eventId: "ledger-event-1", customerId: 42,
+    globalId: "ledger-global-1", eventId: "ledger-event-1", customerGlobalId: "customer-global-1",
     type: "CREDIT", amount: 100, balanceEffect: 100,
     actorUid: "owner-uid", actorName: "Cashier", actorRole: "CASHIER", actorDeviceId: event.deviceId,
     createdAt: 1000, updatedAt: 1000, isDeleted: false, mutationVersion: 1,
     mutationDeviceId: event.deviceId, idempotencyKey: event.idempotencyKey
   };
+  return event;
+}
+
+function relatedEvent(type) {
+  if (type === "udhaar_transactions") {
+    const event = udhaarEvent();
+    event.payload.actorRole = "OWNER";
+    return event;
+  }
+  const event = categoryEvent();
+  event.eventType = type;
+  event.eventId = `event-${type}-12345678`;
+  const globalId = `${type}-global-1`;
+  event.idempotencyKey = `${type}/${globalId}/1`;
+  event.payload = {
+    globalId, mutationVersion: 1, mutationDeviceId: event.deviceId,
+    idempotencyKey: event.idempotencyKey, updatedAt: 1000, isDeleted: false
+  };
+  if (type === "products") Object.assign(event.payload, {
+    name: "Tea", categoryGlobalId: "category-global-1", mrp: 100,
+    currentStock: 2, unit: "PCS", trackStock: true, lowStockAlertQty: 1,
+    barcode: "tea-1", isActive: true, createdAt: 1000
+  });
+  if (type === "sales") Object.assign(event.payload, {
+    billNumber: "B-1", totalAmount: 100, paymentMode: "CASH", paymentState: "RECEIVED",
+    customerGlobalId: "customer-global-1", createdAt: 1000
+  });
+  if (type === "sale_items") Object.assign(event.payload, {
+    saleGlobalId: "sales-global-1", productGlobalId: "products-global-1",
+    productNameSnapshot: "Tea", quantity: 1, unit: "PCS", unitPrice: 100, lineTotal: 100
+  });
+  if (type === "stock_adjustments") Object.assign(event.payload, {
+    productGlobalId: "products-global-1", oldStock: 2, newStock: 1,
+    difference: -1, reason: "count", createdAt: 1000
+  });
   return event;
 }
 
