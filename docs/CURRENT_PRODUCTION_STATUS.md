@@ -21,7 +21,7 @@ This page describes checked source, not a deployed service or installed merchant
 | Area | Current boundary | Issues |
 | --- | --- | --- |
 | Cloud environments | Matching ZenMart Firebase configuration and isolated staging/production Worker + D1 are not evidenced. | [#85](https://github.com/harvindertapper/Shree-shyam-store-/issues/85) |
-| Multi-phone authority | `FirebaseSyncService` still uses Firestore directly. Worker/D1 prototype `f13e636` is local, outside main, and Android is not wired to it. | [#86](https://github.com/harvindertapper/Shree-shyam-store-/issues/86), [#87](https://github.com/harvindertapper/Shree-shyam-store-/issues/87) |
+| Multi-phone authority | `FirebaseSyncService` still uses Firestore directly. A Worker/D1 API foundation exists in source, but it retains local integer relationship IDs, is not deployed, and Android is not wired to it. | [#86](https://github.com/harvindertapper/Shree-shyam-store-/issues/86), [#87](https://github.com/harvindertapper/Shree-shyam-store-/issues/87) |
 | Offline conflict | Local checkout guards tracked stock against negative stock. Two-phone last-unit sale and owner shortage reconciliation are unproven. | [#88](https://github.com/harvindertapper/Shree-shyam-store-/issues/88) |
 | Recovery | Existing sync/snapshot path is not an independent encrypted, read-back-verified SAF export or proven clean-device restore. | [#89](https://github.com/harvindertapper/Shree-shyam-store-/issues/89) |
 | Old shop data | New app ID gets separate private storage; actual old installs, signatures, exports and balances have not been inventoried or migrated. | [#84](https://github.com/harvindertapper/Shree-shyam-store-/issues/84) |
@@ -29,7 +29,7 @@ This page describes checked source, not a deployed service or installed merchant
 | Truthful status/cost | Home can show “Cloud backup active” without a verified backup. Free-tier usage and enrollment thresholds are not operationally proven. | [#58](https://github.com/harvindertapper/Shree-shyam-store-/issues/58), [#93](https://github.com/harvindertapper/Shree-shyam-store-/issues/93) |
 | Release evidence | No signed pilot APK, physical two-phone rehearsal, five-shop pilot or clean-device recovery decision is recorded. | [#57](https://github.com/harvindertapper/Shree-shyam-store-/issues/57), [#92](https://github.com/harvindertapper/Shree-shyam-store-/issues/92) |
 
-The local Worker/D1 prototype has owner/store/device bootstrap, role and token checks, invitations/revocation, payload allowlists, deduplication and cursor reads with local tests. It still needs current-main review, staging deployment, concurrent D1 proof, stock/Udhaar projections, Android integration and operations. Do not call it a shipped backend.
+The Worker/D1 source foundation has owner/store/device bootstrap, role and token checks, invitations/revocation, payload allowlists, deduplication and cursor reads with local tests. It still needs stable cross-phone references, additional-device enrollment, rate/usage controls, staging deployment, concurrent D1 proof, stock/Udhaar projections, Android integration and operations. Do not call it a shipped backend.
 
 Payment status is merchant-entered, not bank settlement verification. Calculated profit needs a sale-time cost basis and return accounting. A sale stored only on a lost phone before server upload or independent export cannot be recovered; the app must show that risk.
 

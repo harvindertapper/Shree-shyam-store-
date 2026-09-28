@@ -16,7 +16,7 @@ Use separate staging and production Firebase and Cloudflare free-plan resources.
 | --- | --- | --- |
 | 0 | [#57 signed release](https://github.com/harvindertapper/Shree-shyam-store-/issues/57), [#58 truthful status](https://github.com/harvindertapper/Shree-shyam-store-/issues/58) | Existing issues revised for post-#83 state; remove false status claims and define artifact evidence. |
 | 1 | [#84 old-data migration](https://github.com/harvindertapper/Shree-shyam-store-/issues/84), [#85 environment isolation](https://github.com/harvindertapper/Shree-shyam-store-/issues/85) | Inspect real installs/signers/exports; provision distinct staging/production IDs and services. |
-| 2 | [#86 event API](https://github.com/harvindertapper/Shree-shyam-store-/issues/86) | Port local `f13e636` prototype after review; tenant/role/device checks, replay protection, cursors and D1 tests. |
+| 2 | [#86 event API](https://github.com/harvindertapper/Shree-shyam-store-/issues/86) | Harden the ported Worker foundation with stable references, additional-device enrollment, quota controls, projections, concurrent replay and deployed D1 proof. |
 | 3 | [#87 Android event adapter](https://github.com/harvindertapper/Shree-shyam-store-/issues/87) | Sale plus queue transaction, stable references, Worker push/pull, no mixed Firestore protocol. |
 | 4 | [#88 stock reconciliation](https://github.com/harvindertapper/Shree-shyam-store-/issues/88) | Both last-unit offline bills survive; shortage and owner resolution are auditable. |
 | 5 | [#89 encrypted recovery](https://github.com/harvindertapper/Shree-shyam-store-/issues/89) | SAF folder, recovery phrase, read-back verification, seven daily/four weekly copies and clean-device restore. |
@@ -46,7 +46,7 @@ Do not merge old drafts wholesale across the package migration. #75/#76/#77 shou
 
 1. **Docs/status and truth fixes:** this roadmap, #58 backup/status wording and #91 profit label. Keep behavior changes separate from docs.
 2. **Environment and migration discovery:** #85 configuration boundaries and #84 actual-install inventory; establish signed APK identity and recovery path before moving merchant data.
-3. **Server contract:** port and harden local Worker/D1 prototype for #86. Verify signed tokens, cross-store denial, revocation, concurrent replay and staging D1 before app traffic.
+3. **Server contract:** complete the Worker/D1 foundation for #86. Verify signed tokens, cross-store denial, revocation, stable references, concurrent replay and staging D1 before app traffic.
 4. **Android outbox/cutover:** #87 stable IDs, Room migrations, atomic sale+event and Worker adapter. Upgrade whole test store together; retire Firestore business writes after fresh-device sync succeeds.
 5. **Reconciliation/accounting:** #88 owner deficits, #90 returns, #91 report reconciliation. Preserve append-only sale/ledger history.
 6. **Independent recovery/operations:** #89 encrypted SAF copies/restore, #58/#93 honest status and capacity alerting; rehearse quota outage.
