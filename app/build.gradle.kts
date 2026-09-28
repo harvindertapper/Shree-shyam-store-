@@ -51,6 +51,10 @@ plugins {
 // generates google_app_id/default_web_client_id resources for Google Sign-In.
 if (file("google-services.json").isFile) {
   apply(plugin = "com.google.gms.google-services")
+  // Local-only staging must not consume the production Firebase client file.
+  tasks.matching { it.name == "processStagingGoogleServices" }.configureEach {
+    enabled = false
+  }
 }
 
 ksp {
