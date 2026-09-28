@@ -34,7 +34,8 @@ CREATE TABLE invitations (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL,
   redeemed_by_uid TEXT,
-  redeemed_at INTEGER
+  redeemed_at INTEGER,
+  redemption_nonce TEXT
 );
 
 CREATE INDEX invitations_store_status ON invitations(store_id,status,expires_at);

@@ -169,13 +169,15 @@ async function redeemInvite(request, env, storeId, identity) {
   if (!invitation) return error(404, "invitation_not_found_or_expired");
   const now = Date.now();
   const deviceId = crypto.randomUUID().replaceAll("-", "");
+  const redemptionNonce = crypto.randomUUID();
   try {
     const results = await env.DB.batch([
-      env.DB.prepare("UPDATE invitations SET status='REDEEMED',redeemed_by_uid=?,redeemed_at=? WHERE store_id=? AND token_hash=? AND email=? AND status='PENDING' AND expires_at>?").bind(identity.uid, now, storeId, tokenHash, identity.email.toLowerCase(), now),
-      env.DB.prepare("INSERT INTO memberships (store_id,firebase_uid,role,status,created_at) SELECT store_id,?,role,'ACTIVE',? FROM invitations WHERE store_id=? AND token_hash=? AND redeemed_by_uid=? AND status='REDEEMED'").bind(identity.uid, now, storeId, tokenHash, identity.uid),
-      env.DB.prepare("INSERT INTO enrolled_devices (id,store_id,assigned_uid,enrolled_by_uid,status,created_at,last_seen_at) SELECT ?,store_id,?,invited_by_uid,'ACTIVE',?,? FROM invitations WHERE store_id=? AND token_hash=? AND redeemed_by_uid=? AND status='REDEEMED'").bind(deviceId, identity.uid, now, now, storeId, tokenHash, identity.uid)
+      env.DB.prepare("UPDATE invitations SET status='REDEEMED',redeemed_by_uid=?,redeemed_at=?,redemption_nonce=? WHERE store_id=? AND token_hash=? AND email=? AND status='PENDING' AND expires_at>? AND NOT EXISTS (SELECT 1 FROM memberships WHERE store_id=? AND firebase_uid=? AND status='ACTIVE')").bind(identity.uid, now, redemptionNonce, storeId, tokenHash, identity.email.toLowerCase(), now, storeId, identity.uid),
+      env.DB.prepare("INSERT INTO memberships (store_id,firebase_uid,role,status,created_at) SELECT store_id,?,role,'ACTIVE',? FROM invitations WHERE store_id=? AND token_hash=? AND redeemed_by_uid=? AND redemption_nonce=? AND status='REDEEMED' ON CONFLICT(store_id,firebase_uid) DO UPDATE SET role=excluded.role,status='ACTIVE' WHERE memberships.status='REVOKED'").bind(identity.uid, now, storeId, tokenHash, identity.uid, redemptionNonce),
+      env.DB.prepare("INSERT INTO enrolled_devices (id,store_id,assigned_uid,enrolled_by_uid,status,created_at,last_seen_at) SELECT ?,store_id,?,invited_by_uid,'ACTIVE',?,? FROM invitations WHERE store_id=? AND token_hash=? AND redeemed_by_uid=? AND redemption_nonce=? AND status='REDEEMED'").bind(deviceId, identity.uid, now, now, storeId, tokenHash, identity.uid, redemptionNonce)
     ]);
     if (!results[0]?.meta?.changes) return error(409, "invitation_already_used");
+    if (!results[1]?.meta?.changes || !results[2]?.meta?.changes) return error(409, "membership_conflict");
   } catch {
     return error(409, "membership_conflict");
   }

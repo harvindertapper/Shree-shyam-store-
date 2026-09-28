@@ -222,6 +222,42 @@ test("a verified owner can invite a member once and bind that member's device", 
   assert.equal(replay.status, 404);
 });
 
+test("a new invitation reactivates a revoked cashier without changing an active owner", async () => {
+  const db = new MemoryDb();
+  db.memberships.set("store-a/cashier-uid", { role: "CASHIER", status: "REVOKED" });
+  const headers = authHeaders(await idToken());
+  const invite = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/invites", {
+    method: "POST", headers,
+    body: JSON.stringify({ email: "cashier@example.com", memberRole: "MANAGER" })
+  }), env(db));
+  const token = (await invite.json()).token;
+  const redeemed = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/invites/redeem", {
+    method: "POST", headers: authHeaders(await idToken({ uid: "cashier-uid", email: "cashier@example.com" })),
+    body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(redeemed.status, 201);
+  assert.deepEqual(db.memberships.get("store-a/cashier-uid"), { role: "MANAGER", status: "ACTIVE" });
+  assert.deepEqual(db.memberships.get("store-a/owner-uid"), { role: "OWNER", status: "ACTIVE" });
+});
+
+test("an active membership cannot redeem another invitation to change its role", async () => {
+  const db = new MemoryDb();
+  db.memberships.set("store-a/cashier-uid", { role: "CASHIER", status: "ACTIVE" });
+  const invite = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/invites", {
+    method: "POST", headers: authHeaders(await idToken()),
+    body: JSON.stringify({ email: "cashier@example.com", memberRole: "MANAGER" })
+  }), env(db));
+  const token = (await invite.json()).token;
+  const redeemed = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/invites/redeem", {
+    method: "POST", headers: authHeaders(await idToken({ uid: "cashier-uid", email: "cashier@example.com" })),
+    body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(redeemed.status, 409);
+  assert.deepEqual(db.memberships.get("store-a/cashier-uid"), { role: "CASHIER", status: "ACTIVE" });
+  assert.equal(db.invitations.size, 1);
+  assert.equal([...db.invitations.values()][0].status, "PENDING");
+});
+
 test("unverified email cannot bootstrap a store or redeem a staff invitation", async () => {
   const response = await worker.fetch(new Request("https://worker.test/v1/stores", {
     method: "POST", headers: authHeaders(await idToken({ emailVerified: false })), body: "{}"
@@ -404,12 +440,16 @@ class MemoryDb {
   }
   async batch(statements) {
     if (statements[0]?.query.includes("UPDATE invitations")) {
-      const [uid, redeemedAt, storeId, tokenHash, email, now] = statements[0].params;
+      const [uid, redeemedAt, nonce, storeId, tokenHash, email, now] = statements[0].params;
       const invitation = this.invitations.get(tokenHash);
       if (!invitation || invitation.storeId !== storeId || invitation.email !== email || invitation.status !== "PENDING" || invitation.expiresAt <= now) {
         return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }, { meta: { changes: 0 } }];
       }
-      invitation.status = "REDEEMED"; invitation.redeemedByUid = uid; invitation.redeemedAt = redeemedAt;
+      const existing = this.memberships.get(`${storeId}/${uid}`);
+      if (existing?.status === "ACTIVE") {
+        return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }, { meta: { changes: 0 } }];
+      }
+      invitation.status = "REDEEMED"; invitation.redeemedByUid = uid; invitation.redeemedAt = redeemedAt; invitation.redemptionNonce = nonce;
       const memberRole = invitation.role;
       this.memberships.set(`${storeId}/${uid}`, { role: memberRole, status: "ACTIVE" });
       const deviceId = statements[2].params[0];
