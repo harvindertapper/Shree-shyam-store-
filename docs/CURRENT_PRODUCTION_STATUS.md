@@ -20,7 +20,7 @@ This page describes checked source, not a deployed service or installed merchant
 
 | Area | Current boundary | Issues |
 | --- | --- | --- |
-| Cloud environments | Matching ZenMart Firebase configuration and isolated staging/production Worker + D1 are not evidenced. | [#85](https://github.com/harvindertapper/Shree-shyam-store-/issues/85) |
+| Cloud environments | A `.staging` app ID exists for a local-only staging build. Matching separate Firebase configurations and deployed staging/production Worker + D1 are not evidenced. | [#85](https://github.com/harvindertapper/Shree-shyam-store-/issues/85) |
 | Multi-phone authority | `FirebaseSyncService` still uses Firestore directly. Worker/D1 prototype `f13e636` is local, outside main, and Android is not wired to it. | [#86](https://github.com/harvindertapper/Shree-shyam-store-/issues/86), [#87](https://github.com/harvindertapper/Shree-shyam-store-/issues/87) |
 | Offline conflict | Local checkout guards tracked stock against negative stock. Two-phone last-unit sale and owner shortage reconciliation are unproven. | [#88](https://github.com/harvindertapper/Shree-shyam-store-/issues/88) |
 | Recovery | Existing sync/snapshot path is not an independent encrypted, read-back-verified SAF export or proven clean-device restore. | [#89](https://github.com/harvindertapper/Shree-shyam-store-/issues/89) |

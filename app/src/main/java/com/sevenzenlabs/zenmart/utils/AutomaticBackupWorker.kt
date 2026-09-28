@@ -27,6 +27,8 @@ class AutomaticBackupWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
+        // A queued job can survive an app update or a build/environment switch.
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return Result.success()
         return try {
             val settingsStore = SettingsDataStore(applicationContext)
             val settings = settingsStore.settingsFlow.first()

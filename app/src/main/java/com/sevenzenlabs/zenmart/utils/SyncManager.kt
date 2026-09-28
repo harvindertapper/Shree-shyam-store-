@@ -49,10 +49,11 @@ object SyncManager {
      * available through triggerImmediateSync().
      */
     fun configureAutomaticSync(context: Context, enabled: Boolean) {
-        automaticSyncEnabled = enabled
+        val cloudAllowed = enabled && BuildConfig.CLOUD_SYNC_ENABLED
+        automaticSyncEnabled = cloudAllowed
         try {
             val workManager = WorkManager.getInstance(context)
-            if (enabled) {
+            if (cloudAllowed) {
                 registerNetworkCallback(context.applicationContext)
                 schedulePeriodicSync(context.applicationContext)
                 schedulePeriodicBackup(context.applicationContext)
@@ -138,6 +139,7 @@ object SyncManager {
 
     /** Enqueues a latest-snapshot backup after a successful local mutation. */
     fun triggerAutomaticBackup(context: Context) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -159,6 +161,7 @@ object SyncManager {
 
     /** Schedules periodic authenticated snapshot backups every six hours. */
     fun schedulePeriodicBackup(context: Context) {
+        if (!BuildConfig.CLOUD_SYNC_ENABLED) return
         try {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
