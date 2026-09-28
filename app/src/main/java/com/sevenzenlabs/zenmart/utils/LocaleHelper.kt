@@ -479,7 +479,8 @@ interface AppStrings {
     val billingHistory: String
 
     val homeCloudSyncTriggered: String
-    val homeCloudBackupActive: String
+    val homeSyncUnavailable: String
+    val homeSyncPaused: String
     val homeBillsCreated: (Int) -> String
     val homeRestockNeeded: (Int) -> String
     val homeStockSafe: String
@@ -865,7 +866,7 @@ object HindiStrings : AppStrings {
     override val settingsSyncSection = "सिंक और बैकअप"
     override val settingsSyncHealth = "सिंक स्वास्थ्य"
     override val settingsLastAttempt = "अंतिम प्रयास"
-    override val settingsLastSuccess = "अंतिम सफल पुष्टि"
+    override val settingsLastSuccess = "अंतिम लागू क्लाउड बदलाव"
     override val settingsLastAttemptUnavailable = "अलग अंतिम प्रयास समय अभी दर्ज नहीं है।"
     override val settingsHealthHealthy = "सिंक ठीक है"
     override val settingsHealthNever = "हाल की सफल सिंक उपलब्ध नहीं"
@@ -985,8 +986,9 @@ object HindiStrings : AppStrings {
     override val billingCopyInvoice = "बिल कॉपी करें"
     override val billingHistory = "इतिहास"
 
-    override val homeCloudSyncTriggered = "⚡ क्लाउड सिंक शुरू हुआ"
-    override val homeCloudBackupActive = "क्लाउड बैकअप सक्रिय ⚡"
+    override val homeCloudSyncTriggered = "सिंक का प्रयास किया जा रहा है; स्थिति जाँचें"
+    override val homeSyncUnavailable = "क्लाउड सिंक उपलब्ध नहीं · डेटा इस फ़ोन पर है"
+    override val homeSyncPaused = "ऑटो सिंक बंद है · बदलाव इस फ़ोन पर हैं"
     override val homeBillsCreated: (Int) -> String = { count -> "$count बिल बने" }
     override val homeRestockNeeded: (Int) -> String = { count -> "$count सामान जल्द ख़त्म होने वाले हैं।" }
     override val homeStockSafe = "दुकान का स्टॉक सुरक्षित है"
@@ -1372,7 +1374,7 @@ object EnglishStrings : AppStrings {
     override val settingsSyncSection = "Sync & backup"
     override val settingsSyncHealth = "Sync health"
     override val settingsLastAttempt = "Last attempt"
-    override val settingsLastSuccess = "Last successful acknowledgement"
+    override val settingsLastSuccess = "Last applied cloud change"
     override val settingsLastAttemptUnavailable = "A separate last-attempt time is not recorded yet."
     override val settingsHealthHealthy = "Sync is healthy"
     override val settingsHealthNever = "No recent successful sync"
@@ -1492,8 +1494,9 @@ object EnglishStrings : AppStrings {
     override val billingCopyInvoice = "Copy invoice"
     override val billingHistory = "History"
 
-    override val homeCloudSyncTriggered = "⚡ Cloud sync triggered"
-    override val homeCloudBackupActive = "Cloud backup active ⚡"
+    override val homeCloudSyncTriggered = "Trying to sync; check the status"
+    override val homeSyncUnavailable = "Cloud sync unavailable · data is on this phone"
+    override val homeSyncPaused = "Auto-sync is off · changes stay on this phone"
     override val homeBillsCreated: (Int) -> String = { count -> "$count bills created" }
     override val homeRestockNeeded: (Int) -> String = { count -> "$count items need restock." }
     override val homeStockSafe = "Store stock is optimal"
@@ -1501,7 +1504,7 @@ object EnglishStrings : AppStrings {
     override val homeBillingSubtitle = "Cash / UPI / Udhaar"
     override val homeInventorySubtitle = "Stock inventory"
     override val homeUdhaarSubtitle = "Ledger & WhatsApp"
-    override val homeReportsSubtitle = "Sales & profit"
+    override val homeReportsSubtitle = "Sales reports"
 
     override val reportsTotalSalesTitle = "Total sales"
     override val reportsBillsGenerated: (Int) -> String = { count -> "$count bills generated" }
