@@ -72,6 +72,17 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/staging/app-staging.apk \
             | grep -F "package: name='com.sevenzenlabs.zenmart.staging'"
 
+      - name: Keep production Firebase config out of local staging
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f app/google-services.json' EXIT
+          cat > app/google-services.json <<'JSON'
+          {"project_info":{"project_number":"123456789012","project_id":"zenmart-production-test","storage_bucket":"zenmart-production-test.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:123456789012:android:abcdef0123456789","android_client_info":{"package_name":"com.sevenzenlabs.zenmart"}},"api_key":[{"current_key":"not-a-real-key"}]}],"configuration_version":"1"}
+          JSON
+          ./gradlew --no-daemon --stacktrace :app:assembleStaging
+          test ! -e app/build/generated/res/google-services/staging/values/values.xml
+
       - name: Verify release configuration
         run: ./gradlew --no-daemon --stacktrace :app:verifyReleaseConfiguration
 
