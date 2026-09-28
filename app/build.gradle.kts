@@ -143,7 +143,7 @@ val stagingBuildEnvironment = android.buildTypes.getByName("staging")
   .buildConfigFields["BUILD_ENVIRONMENT"]?.value
 val stagingCloudSyncFlag = android.buildTypes.getByName("staging")
   .buildConfigFields["CLOUD_SYNC_ENABLED"]?.value
-val stagingApplicationId = android.defaultConfig.applicationId.orEmpty() +
+val configuredStagingApplicationId = android.defaultConfig.applicationId.orEmpty() +
   android.buildTypes.getByName("staging").applicationIdSuffix.orEmpty()
 
 abstract class VerifyReleaseConfigurationTask : DefaultTask() {
@@ -235,7 +235,7 @@ tasks.register<VerifyReleaseConfigurationTask>("verifyReleaseConfiguration") {
   debugCloudSyncEnabled.set(debugCloudSyncFlag)
   stagingEnvironment.set(stagingBuildEnvironment)
   stagingCloudSyncEnabled.set(stagingCloudSyncFlag)
-  stagingApplicationId.set(stagingApplicationId)
+  stagingApplicationId.set(configuredStagingApplicationId)
   signingRequired.set(releaseSigningRequired)
   signingConfigured.set(releaseSigningConfigured)
   keystorePath.set(releaseKeystorePath)
