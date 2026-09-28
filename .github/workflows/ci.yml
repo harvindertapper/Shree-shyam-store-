@@ -64,6 +64,14 @@ jobs:
       - name: Assemble debug APK
         run: ./gradlew --no-daemon --stacktrace assembleDebug
 
+      - name: Assemble isolated staging APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --stacktrace assembleStaging
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging app/build/outputs/apk/staging/app-staging.apk \
+            | grep -F "package: name='com.sevenzenlabs.zenmart.staging'"
+
       - name: Verify release configuration
         run: ./gradlew --no-daemon --stacktrace :app:verifyReleaseConfiguration
 

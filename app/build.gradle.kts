@@ -107,6 +107,17 @@ android {
       buildConfigField("Boolean", "CLOUD_SYNC_ENABLED", "false")
       signingConfig = signingConfigs.getByName("debugConfig")
     }
+    create("staging") {
+      initWith(getByName("release"))
+      applicationIdSuffix = ".staging"
+      versionNameSuffix = "-staging"
+      buildConfigField("String", "BUILD_ENVIRONMENT", "\"staging\"")
+      // Keep this build local-only until #85/#87 provide an isolated Firebase
+      // client and Worker adapter. It must never use direct Firestore writes.
+      buildConfigField("Boolean", "CLOUD_SYNC_ENABLED", "false")
+      signingConfig = signingConfigs.getByName("debugConfig")
+      matchingFallbacks += listOf("release")
+    }
   }
   compileOptions {
     sourceCompatibility = JavaVersion.VERSION_11
@@ -128,6 +139,12 @@ val debugBuildEnvironment = android.buildTypes.getByName("debug")
   .buildConfigFields["BUILD_ENVIRONMENT"]?.value
 val debugCloudSyncFlag = android.buildTypes.getByName("debug")
   .buildConfigFields["CLOUD_SYNC_ENABLED"]?.value
+val stagingBuildEnvironment = android.buildTypes.getByName("staging")
+  .buildConfigFields["BUILD_ENVIRONMENT"]?.value
+val stagingCloudSyncFlag = android.buildTypes.getByName("staging")
+  .buildConfigFields["CLOUD_SYNC_ENABLED"]?.value
+val stagingApplicationId = android.defaultConfig.applicationId.orEmpty() +
+  android.buildTypes.getByName("staging").applicationIdSuffix.orEmpty()
 
 abstract class VerifyReleaseConfigurationTask : DefaultTask() {
   @get:Input
@@ -150,6 +167,15 @@ abstract class VerifyReleaseConfigurationTask : DefaultTask() {
 
   @get:Input
   abstract val debugCloudSyncEnabled: Property<String>
+
+  @get:Input
+  abstract val stagingEnvironment: Property<String>
+
+  @get:Input
+  abstract val stagingCloudSyncEnabled: Property<String>
+
+  @get:Input
+  abstract val stagingApplicationId: Property<String>
 
   @get:Input
   abstract val signingRequired: Property<Boolean>
@@ -177,6 +203,15 @@ abstract class VerifyReleaseConfigurationTask : DefaultTask() {
     check(debugCloudSyncEnabled.get() == "false") {
       "Debug cloud sync must be disabled"
     }
+    check(stagingEnvironment.get() == "\"staging\"") {
+      "Staging must be marked as staging"
+    }
+    check(stagingApplicationId.get() == "com.sevenzenlabs.zenmart.staging") {
+      "Staging must have a separate application ID"
+    }
+    check(stagingCloudSyncEnabled.get() == "false") {
+      "Staging cloud sync must stay disabled until the isolated Worker adapter is ready"
+    }
     if (signingRequired.get()) {
       check(signingConfigured.get()) {
         "Release signing is required but RELEASE_KEYSTORE_PATH and release secret variables are incomplete"
@@ -198,6 +233,9 @@ tasks.register<VerifyReleaseConfigurationTask>("verifyReleaseConfiguration") {
   releaseCloudSyncEnabled.set(releaseCloudSyncFlag)
   debugEnvironment.set(debugBuildEnvironment)
   debugCloudSyncEnabled.set(debugCloudSyncFlag)
+  stagingEnvironment.set(stagingBuildEnvironment)
+  stagingCloudSyncEnabled.set(stagingCloudSyncFlag)
+  stagingApplicationId.set(stagingApplicationId)
   signingRequired.set(releaseSigningRequired)
   signingConfigured.set(releaseSigningConfigured)
   keystorePath.set(releaseKeystorePath)
