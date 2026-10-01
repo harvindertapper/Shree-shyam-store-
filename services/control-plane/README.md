@@ -8,11 +8,14 @@ Run `node --test` from this directory (or `npm test`). Install Wrangler locally 
 
 `POST /v1/stores` lets a verified Firebase account create a store and its first device. The owner can issue a role-limited, one-use invitation to a verified email; redemption creates that member's device. Only the owner can revoke a member or device. Invite tokens are returned once and only their SHA-256 digest is stored. Keep staging and production Worker/D1 bindings separate, and do not add a billing account to the free-tier pilot projects.
 
+An owner can approve another phone for any active member, including the owner, with `POST /v1/stores/{storeId}/devices/invites` and `{ "memberUid": "...", "approverDeviceId": "..." }`. The approver device must itself be active and assigned to that owner. The API returns a one-use token valid for 15 minutes. The intended member signs in with their own verified Firebase account on the new phone and redeems it with `POST /v1/stores/{storeId}/devices/enroll` and `{ "token": "..." }`. A token is bound to that Firebase UID and store; replays, other accounts, and revoked members cannot enroll. The owner passes the token to the member outside the API. This endpoint does not yet bind a hardware attestation or provide a device-management UI.
+
 ## API
 
 - `POST /v1/stores/{storeId}/events` accepts `{events:[{eventId,deviceId,schemaVersion:2,idempotencyKey,eventType,payload,createdAt}]}`. Version 1 is rejected because its Room-local relationship IDs cannot identify the same record on another phone.
 - `GET /v1/stores/{storeId}/changes?after={cursor}&deviceId={deviceId}` returns an ordered page of at most 100 append-only events and a monotonic cursor. The requesting installation must identify an active enrolled device.
 - `POST /v1/stores` creates the initial owner/store/device. `POST /v1/stores/{storeId}/invites` creates a manager/cashier invite; `POST /v1/stores/{storeId}/invites/redeem` enrolls the matching verified account and returns its device ID.
+- `POST /v1/stores/{storeId}/devices/invites` and `POST /v1/stores/{storeId}/devices/enroll` approve and enroll an additional phone for an already active member.
 - `DELETE /v1/stores/{storeId}/members/{uid}` and `DELETE /v1/stores/{storeId}/devices/{deviceId}` revoke access. Revoked membership blocks every store route; revoked devices cannot upload or download.
 - Every business route requires `Authorization: Bearer <Firebase ID token>`. Membership and device enrollment come from D1, never request headers.
 

@@ -49,7 +49,7 @@ export default {
       if (request.method === "POST" && url.pathname === "/v1/stores") {
         return await createStore(request, env, identity);
       }
-      const match = url.pathname.match(/^\/v1\/stores\/([A-Za-z0-9_-]{1,128})\/(events|changes|invites|invites\/redeem|devices\/[A-Za-z0-9_-]{8,128}|members\/[A-Za-z0-9_-]{1,128})$/);
+      const match = url.pathname.match(/^\/v1\/stores\/([A-Za-z0-9_-]{1,128})\/(events|changes|invites|invites\/redeem|devices\/invites|devices\/enroll|devices\/[A-Za-z0-9_-]{8,128}|members\/[A-Za-z0-9_-]{1,128})$/);
       if (!match) return error(404, "not_found");
       const [, storeId, resource] = match;
       if (resource === "invites/redeem" && request.method === "POST") {
@@ -61,6 +61,13 @@ export default {
       if (!member) return error(403, "store_access_denied");
       if (resource === "invites" && request.method === "POST") {
         return await createInvite(request, env, storeId, identity, member.role);
+      }
+      if (resource === "devices/invites" && request.method === "POST") {
+        if (member.role !== "OWNER") return error(403, "role_denied");
+        return await createDeviceInvite(request, env, storeId, identity);
+      }
+      if (resource === "devices/enroll" && request.method === "POST") {
+        return await redeemDeviceInvite(request, env, storeId, identity, member.role);
       }
       if (resource.startsWith("devices/") && request.method === "DELETE") {
         if (member.role !== "OWNER") return error(403, "role_denied");
@@ -227,6 +234,54 @@ async function sha256(value) {
 }
 
 const INVITATION_TTL_MS = 48 * 60 * 60 * 1000;
+const DEVICE_INVITATION_TTL_MS = 15 * 60 * 1000;
+
+async function createDeviceInvite(request, env, storeId, identity) {
+  if (!identity.emailVerified) return error(403, "verified_email_required");
+  const body = await readJson(request);
+  if (body.error) return body.error;
+  const memberUid = body.value.memberUid;
+  const approverDeviceId = body.value.approverDeviceId;
+  if (Object.keys(body.value).length !== 2 || typeof memberUid !== "string" ||
+      memberUid.length < 1 || memberUid.length > 128 ||
+      typeof approverDeviceId !== "string" || !/^[A-Za-z0-9_-]{8,128}$/.test(approverDeviceId)) {
+    return error(400, "invalid_device_invitation");
+  }
+  const approverDevice = await env.DB.prepare(
+    "SELECT id FROM enrolled_devices WHERE id = ? AND store_id = ? AND assigned_uid = ? AND status = 'ACTIVE'"
+  ).bind(approverDeviceId, storeId, identity.uid).first();
+  if (!approverDevice) return error(403, "device_not_enrolled");
+  const target = await env.DB.prepare(
+    "SELECT role FROM memberships WHERE store_id = ? AND firebase_uid = ? AND status = 'ACTIVE'"
+  ).bind(storeId, memberUid).first();
+  if (!target) return error(404, "member_not_found");
+  const token = randomToken();
+  const now = Date.now();
+  await env.DB.prepare(
+    "INSERT INTO device_invitations (token_hash,store_id,assigned_uid,invited_by_uid,status,created_at,expires_at) VALUES (?,?,?,?,'PENDING',?,?)"
+  ).bind(await sha256(token), storeId, memberUid, identity.uid, now, now + DEVICE_INVITATION_TTL_MS).run();
+  return json({ token, memberUid, expiresAt: now + DEVICE_INVITATION_TTL_MS }, 201);
+}
+
+async function redeemDeviceInvite(request, env, storeId, identity, role) {
+  if (!identity.emailVerified) return error(403, "verified_email_required");
+  const body = await readJson(request);
+  if (body.error) return body.error;
+  if (Object.keys(body.value).length !== 1 || typeof body.value.token !== "string" ||
+      body.value.token.length < 32 || body.value.token.length > 256) return error(400, "invalid_device_invitation");
+  const tokenHash = await sha256(body.value.token);
+  const now = Date.now();
+  const deviceId = crypto.randomUUID().replaceAll("-", "");
+  const nonce = crypto.randomUUID();
+  const results = await env.DB.batch([
+    env.DB.prepare("UPDATE device_invitations SET status='REDEEMED',redeemed_at=?,redemption_nonce=? WHERE token_hash=? AND store_id=? AND assigned_uid=? AND status='PENDING' AND expires_at>? AND EXISTS (SELECT 1 FROM memberships WHERE store_id=? AND firebase_uid=? AND status='ACTIVE')")
+      .bind(now, nonce, tokenHash, storeId, identity.uid, now, storeId, identity.uid),
+    env.DB.prepare("INSERT INTO enrolled_devices (id,store_id,assigned_uid,enrolled_by_uid,status,created_at,last_seen_at) SELECT ?,store_id,assigned_uid,invited_by_uid,'ACTIVE',?,? FROM device_invitations WHERE token_hash=? AND store_id=? AND assigned_uid=? AND status='REDEEMED' AND redemption_nonce=? AND EXISTS (SELECT 1 FROM memberships WHERE store_id=? AND firebase_uid=? AND status='ACTIVE')")
+      .bind(deviceId, now, now, tokenHash, storeId, identity.uid, nonce, storeId, identity.uid)
+  ]);
+  if (!results[0]?.meta?.changes || !results[1]?.meta?.changes) return error(404, "device_invitation_not_found_or_expired");
+  return json({ storeId, deviceId, role }, 201);
+}
 
 async function appendEvents(request, env, storeId, role, uid) {
   const bodyResult = await readJson(request);
