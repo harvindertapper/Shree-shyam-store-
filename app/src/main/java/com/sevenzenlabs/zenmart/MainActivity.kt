@@ -98,6 +98,7 @@ class MainActivity : FragmentActivity() {
                 val currentScreen by viewModel.currentScreen.collectAsState()
                 val settings by viewModel.storeSettings.collectAsState()
                 val context = LocalContext.current
+                var isStartupResolving by remember { mutableStateOf(true) }
                 val strings = remember(settings.appLanguage) { com.sevenzenlabs.zenmart.utils.LocaleHelper.getStrings(settings.appLanguage) }
 
                 LaunchedEffect(settings.isUserLoggedIn, settings.autoSyncEnabled) {
@@ -130,9 +131,13 @@ class MainActivity : FragmentActivity() {
                         // User is logged in & App Lock is disabled -> Direct to HomeScreen
                         viewModel.navigateTo(Screen.Home)
                     }
+                    isStartupResolving = false
                 }
 
-                Scaffold(
+                if (isStartupResolving) {
+                    StartupScreen()
+                } else {
+                    Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         // Do not show bottom nav drawer in welcome, login, or onboarding setup flows
@@ -245,6 +250,7 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+}
 
     override fun onStop() {
         super.onStop()
