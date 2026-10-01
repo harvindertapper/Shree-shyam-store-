@@ -240,6 +240,96 @@ test("a new invitation reactivates a revoked cashier without changing an active 
   assert.deepEqual(db.memberships.get("store-a/owner-uid"), { role: "OWNER", status: "ACTIVE" });
 });
 
+test("owner approves a second phone for an active member and token is one use", async () => {
+  const db = new MemoryDb();
+  db.memberships.set("store-a/cashier-uid", { role: "CASHIER", status: "ACTIVE" });
+  const inviteResponse = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/invites", {
+    method: "POST", headers: authHeaders(await idToken()),
+    body: JSON.stringify({ memberUid: "cashier-uid", approverDeviceId: "device-12345678" })
+  }), env(db));
+  assert.equal(inviteResponse.status, 201);
+  const invitation = await inviteResponse.json();
+  assert.ok(!db.deviceInvitations.has(invitation.token));
+
+  const wrongAccount = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers: authHeaders(await idToken()),
+    body: JSON.stringify({ token: invitation.token })
+  }), env(db));
+  assert.equal(wrongAccount.status, 404);
+
+  const cashierHeaders = authHeaders(await idToken({ uid: "cashier-uid", email: "cashier@example.com" }));
+  const enrolled = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers: cashierHeaders, body: JSON.stringify({ token: invitation.token })
+  }), env(db));
+  assert.equal(enrolled.status, 201);
+  const device = await enrolled.json();
+  assert.equal(device.role, "CASHIER");
+  assert.equal(db.devices.get(`store-a/${device.deviceId}`).assignedUid, "cashier-uid");
+  const replay = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers: cashierHeaders, body: JSON.stringify({ token: invitation.token })
+  }), env(db));
+  assert.equal(replay.status, 404);
+  assert.equal([...db.devices.values()].filter(row => row.assignedUid === "cashier-uid").length, 1);
+});
+
+test("cashier cannot approve devices and revoked members cannot enroll", async () => {
+  const db = new MemoryDb({ role: "CASHIER" });
+  const denied = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/invites", {
+    method: "POST", headers: authHeaders(await idToken()), body: JSON.stringify({ memberUid: "owner-uid", approverDeviceId: "device-12345678" })
+  }), env(db));
+  assert.equal(denied.status, 403);
+
+  db.memberships.get("store-a/owner-uid").role = "OWNER";
+  db.memberships.set("store-a/cashier-uid", { role: "CASHIER", status: "ACTIVE" });
+  const invited = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/invites", {
+    method: "POST", headers: authHeaders(await idToken()), body: JSON.stringify({ memberUid: "cashier-uid", approverDeviceId: "device-12345678" })
+  }), env(db));
+  const token = (await invited.json()).token;
+  db.memberships.get("store-a/cashier-uid").status = "REVOKED";
+  const revoked = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers: authHeaders(await idToken({ uid: "cashier-uid", email: "cashier@example.com" })),
+    body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(revoked.status, 403);
+});
+
+test("owner must approve from an already enrolled device", async () => {
+  const db = new MemoryDb();
+  const response = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/invites", {
+    method: "POST", headers: authHeaders(await idToken()),
+    body: JSON.stringify({ memberUid: "owner-uid", approverDeviceId: "other-device-123" })
+  }), env(db));
+  assert.equal(response.status, 403);
+  assert.equal(db.deviceInvitations.size, 0);
+});
+
+test("owner may enroll a second phone, while expired or other-store tokens fail", async () => {
+  const db = new MemoryDb();
+  const headers = authHeaders(await idToken());
+  const created = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/invites", {
+    method: "POST", headers, body: JSON.stringify({ memberUid: "owner-uid", approverDeviceId: "device-12345678" })
+  }), env(db));
+  assert.equal(created.status, 201);
+  const token = (await created.json()).token;
+  const otherStore = await worker.fetch(new Request("https://worker.test/v1/stores/other-store/devices/enroll", {
+    method: "POST", headers, body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(otherStore.status, 403);
+
+  const hash = [...db.deviceInvitations.keys()][0];
+  db.deviceInvitations.get(hash).expiresAt = Date.now() - 1;
+  const expired = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers, body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(expired.status, 404);
+  db.deviceInvitations.get(hash).expiresAt = Date.now() + 60_000;
+  const enrolled = await worker.fetch(new Request("https://worker.test/v1/stores/store-a/devices/enroll", {
+    method: "POST", headers, body: JSON.stringify({ token })
+  }), env(db));
+  assert.equal(enrolled.status, 201);
+  assert.equal((await enrolled.json()).role, "OWNER");
+});
+
 test("an active membership cannot redeem another invitation to change its role", async () => {
   const db = new MemoryDb();
   db.memberships.set("store-a/cashier-uid", { role: "CASHIER", status: "ACTIVE" });
@@ -474,6 +564,7 @@ class MemoryDb {
     this.memberships = new Map();
     this.devices = new Map();
     this.invitations = new Map();
+    this.deviceInvitations = new Map();
     if (memberStore) this.memberships.set(`${memberStore}/owner-uid`, { role, status: "ACTIVE" });
     if (deviceStore) this.devices.set(`${deviceStore}/device-12345678`, { assignedUid: "owner-uid", status: "ACTIVE" });
   }
@@ -509,6 +600,11 @@ class MemoryDb {
         this.invitations.set(tokenHash, { storeId, email, role, invitedByUid, createdAt, expiresAt, status: "PENDING" });
         return { meta: { changes: 1 } };
       }
+      if (query.includes("INSERT INTO device_invitations")) {
+        const [tokenHash, storeId, assignedUid, invitedByUid, createdAt, expiresAt] = p;
+        this.deviceInvitations.set(tokenHash, { storeId, assignedUid, invitedByUid, createdAt, expiresAt, status: "PENDING" });
+        return { meta: { changes: 1 } };
+      }
       if (query.includes("UPDATE enrolled_devices")) {
         const device = this.devices.get(`${p[0]}/${p[1]}`);
         if (!device || device.status !== "ACTIVE") return { meta: { changes: 0 } };
@@ -520,6 +616,19 @@ class MemoryDb {
     return statement;
   }
   async batch(statements) {
+    if (statements[0]?.query.includes("UPDATE device_invitations")) {
+      const [redeemedAt, nonce, tokenHash, storeId, assignedUid, now] = statements[0].params;
+      const invite = this.deviceInvitations.get(tokenHash);
+      const member = this.memberships.get(`${storeId}/${assignedUid}`);
+      if (!invite || invite.storeId !== storeId || invite.assignedUid !== assignedUid ||
+          invite.status !== "PENDING" || invite.expiresAt <= now || member?.status !== "ACTIVE") {
+        return [{ meta: { changes: 0 } }, { meta: { changes: 0 } }];
+      }
+      invite.status = "REDEEMED"; invite.redeemedAt = redeemedAt; invite.redemptionNonce = nonce;
+      const deviceId = statements[1].params[0];
+      this.devices.set(`${storeId}/${deviceId}`, { assignedUid, status: "ACTIVE" });
+      return [{ meta: { changes: 1 } }, { meta: { changes: 1 } }];
+    }
     if (statements[0]?.query.includes("UPDATE invitations")) {
       const [uid, redeemedAt, nonce, storeId, tokenHash, email, now] = statements[0].params;
       const invitation = this.invitations.get(tokenHash);
