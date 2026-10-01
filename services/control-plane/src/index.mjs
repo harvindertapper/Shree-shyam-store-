@@ -5,26 +5,27 @@ const EVENT_TYPES = new Set([
   "udhaar_transactions", "stock_adjustments"
 ]);
 const PAYLOAD_FIELDS = Object.freeze({
-  categories: new Set(["id", "globalId", "name", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  products: new Set(["id", "globalId", "name", "categoryId", "mrp", "sellingPrice", "purchasePrice", "moneyScale", "currentStock", "unit", "trackStock", "lowStockAlertQty", "barcode", "barcodeKey", "isActive", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  sales: new Set(["id", "globalId", "billNumber", "totalAmount", "moneyScale", "paymentMode", "paymentState", "receivedAmount", "customerId", "note", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  sale_items: new Set(["id", "globalId", "saleId", "productId", "productNameSnapshot", "quantity", "unit", "unitPrice", "lineTotal", "moneyScale", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  customers: new Set(["id", "globalId", "name", "phone", "creditLimit", "moneyScale", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  udhaar_transactions: new Set(["id", "globalId", "eventId", "customerId", "saleId", "type", "amount", "balanceEffect", "moneyScale", "note", "correctsEventId", "correctionReason", "actorUid", "actorName", "actorRole", "actorDeviceId", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
-  stock_adjustments: new Set(["id", "globalId", "productId", "oldStock", "newStock", "difference", "reason", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"])
+  categories: new Set(["globalId", "name", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  products: new Set(["globalId", "name", "categoryGlobalId", "mrp", "sellingPrice", "purchasePrice", "moneyScale", "currentStock", "unit", "trackStock", "lowStockAlertQty", "barcode", "barcodeKey", "isActive", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  sales: new Set(["globalId", "billNumber", "totalAmount", "moneyScale", "paymentMode", "paymentState", "receivedAmount", "customerGlobalId", "note", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  sale_items: new Set(["globalId", "saleGlobalId", "productGlobalId", "productNameSnapshot", "quantity", "unit", "unitPrice", "lineTotal", "moneyScale", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  customers: new Set(["globalId", "name", "phone", "creditLimit", "moneyScale", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  udhaar_transactions: new Set(["globalId", "eventId", "customerGlobalId", "saleGlobalId", "type", "amount", "balanceEffect", "moneyScale", "note", "correctsEventId", "correctionReason", "actorUid", "actorName", "actorRole", "actorDeviceId", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]),
+  stock_adjustments: new Set(["globalId", "productGlobalId", "oldStock", "newStock", "difference", "reason", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"])
 });
 const REQUIRED_PAYLOAD_FIELDS = Object.freeze({
-  categories: ["id", "globalId", "name", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  products: ["id", "globalId", "name", "categoryId", "mrp", "currentStock", "unit", "trackStock", "lowStockAlertQty", "barcode", "isActive", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  sales: ["id", "globalId", "billNumber", "totalAmount", "paymentMode", "paymentState", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  sale_items: ["id", "globalId", "saleId", "productId", "productNameSnapshot", "quantity", "unit", "unitPrice", "lineTotal", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  customers: ["id", "globalId", "name", "creditLimit", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  udhaar_transactions: ["id", "globalId", "eventId", "customerId", "type", "amount", "balanceEffect", "actorUid", "actorName", "actorRole", "actorDeviceId", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
-  stock_adjustments: ["id", "globalId", "productId", "oldStock", "newStock", "difference", "reason", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]
+  categories: ["globalId", "name", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  products: ["globalId", "name", "mrp", "currentStock", "unit", "trackStock", "lowStockAlertQty", "barcode", "isActive", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  sales: ["globalId", "billNumber", "totalAmount", "paymentMode", "paymentState", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  sale_items: ["globalId", "saleGlobalId", "productGlobalId", "productNameSnapshot", "quantity", "unit", "unitPrice", "lineTotal", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  customers: ["globalId", "name", "creditLimit", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  udhaar_transactions: ["globalId", "eventId", "customerGlobalId", "type", "amount", "balanceEffect", "actorUid", "actorName", "actorRole", "actorDeviceId", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"],
+  stock_adjustments: ["globalId", "productGlobalId", "oldStock", "newStock", "difference", "reason", "createdAt", "updatedAt", "isDeleted", "mutationVersion", "mutationDeviceId", "idempotencyKey"]
 });
-const STRING_FIELDS = new Set(["globalId", "name", "unit", "barcode", "barcodeKey", "billNumber", "paymentMode", "paymentState", "note", "productNameSnapshot", "phone", "eventId", "type", "correctsEventId", "correctionReason", "actorUid", "actorName", "actorRole", "actorDeviceId", "reason", "mutationDeviceId", "idempotencyKey"]);
+const GLOBAL_REFERENCE_FIELDS = new Set(["categoryGlobalId", "customerGlobalId", "saleGlobalId", "productGlobalId"]);
+const STRING_FIELDS = new Set(["globalId", ...GLOBAL_REFERENCE_FIELDS, "name", "unit", "barcode", "barcodeKey", "billNumber", "paymentMode", "paymentState", "note", "productNameSnapshot", "phone", "eventId", "type", "correctsEventId", "correctionReason", "actorUid", "actorName", "actorRole", "actorDeviceId", "reason", "mutationDeviceId", "idempotencyKey"]);
 const BOOLEAN_FIELDS = new Set(["isDeleted", "trackStock", "isActive"]);
-const INTEGER_FIELDS = new Set(["id", "categoryId", "saleId", "productId", "mrp", "sellingPrice", "purchasePrice", "moneyScale", "totalAmount", "receivedAmount", "customerId", "unitPrice", "lineTotal", "creditLimit", "amount", "balanceEffect", "createdAt", "updatedAt", "mutationVersion"]);
+const INTEGER_FIELDS = new Set(["mrp", "sellingPrice", "purchasePrice", "moneyScale", "totalAmount", "receivedAmount", "unitPrice", "lineTotal", "creditLimit", "amount", "balanceEffect", "createdAt", "updatedAt", "mutationVersion"]);
 const NUMBER_FIELDS = new Set(["currentStock", "lowStockAlertQty", "quantity", "oldStock", "newStock", "difference"]);
 const WRITE_ROLES = Object.freeze({
   categories: new Set(["OWNER", "MANAGER"]),
@@ -288,7 +289,7 @@ function isValidEvent(e, role, uid) {
       Object.keys(e).some(key => !["eventId", "deviceId", "schemaVersion", "idempotencyKey", "eventType", "payload", "createdAt"].includes(key))) return false;
   if (!(e && typeof e === "object" && typeof e.eventId === "string" && e.eventId.length >= 8 && e.eventId.length <= 128 &&
     typeof e.deviceId === "string" && e.deviceId.length >= 8 && e.deviceId.length <= 128 &&
-    Number.isSafeInteger(e.schemaVersion) && e.schemaVersion === 1 &&
+    Number.isSafeInteger(e.schemaVersion) && e.schemaVersion === 2 &&
     typeof e.idempotencyKey === "string" && e.idempotencyKey.length >= 8 && e.idempotencyKey.length <= 200 &&
     EVENT_TYPES.has(e.eventType) && Number.isSafeInteger(e.createdAt) && e.createdAt > 0 && e.createdAt <= Date.now() + 5 * 60_000 &&
     e.payload && typeof e.payload === "object" && !Array.isArray(e.payload))) return false;
@@ -306,9 +307,10 @@ function isValidEvent(e, role, uid) {
       continue;
     }
     if (STRING_FIELDS.has(field) && (typeof value !== "string" || value.length > 4096)) return false;
+    if (GLOBAL_REFERENCE_FIELDS.has(field) && (value.length < 1 || value.length > 128)) return false;
     if (BOOLEAN_FIELDS.has(field) && typeof value !== "boolean") return false;
     if (INTEGER_FIELDS.has(field) && (!Number.isSafeInteger(value) ||
-        (["sellingPrice", "purchasePrice", "receivedAmount", "customerId", "saleId"].includes(field) && value < 0))) return false;
+        (["sellingPrice", "purchasePrice", "receivedAmount"].includes(field) && value < 0))) return false;
     if (NUMBER_FIELDS.has(field) && (typeof value !== "number" || !Number.isFinite(value))) return false;
     if (!STRING_FIELDS.has(field) && !BOOLEAN_FIELDS.has(field) && !INTEGER_FIELDS.has(field) && !NUMBER_FIELDS.has(field)) return false;
   }
