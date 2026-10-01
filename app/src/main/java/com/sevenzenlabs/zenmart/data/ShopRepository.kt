@@ -16,6 +16,7 @@ import com.sevenzenlabs.zenmart.utils.BusinessRelationshipPolicy
 import com.sevenzenlabs.zenmart.utils.SyncIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 
 class ShopRepository(
     private val categoryDao: CategoryDao,
@@ -30,6 +31,9 @@ class ShopRepository(
     private val settingsDataStore: SettingsDataStore? = null,
     private val authorizationContextProvider: (suspend () -> Pair<TenantScope, PlatformActor>)? = null
 ) {
+    fun observeSyncOutboxSummary(): Flow<SyncOutboxSummary> =
+        database?.syncOutboxDao()?.observeSummary() ?: flowOf(SyncOutboxSummary())
+
     // Categories
     val allCategories: Flow<List<Category>> = categoryDao.getAllCategories()
     
