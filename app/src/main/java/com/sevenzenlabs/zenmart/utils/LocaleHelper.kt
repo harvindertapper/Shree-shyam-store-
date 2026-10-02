@@ -347,6 +347,29 @@ interface AppStrings {
     val settingsRestoreWarningTitle: String
     val settingsRestoreWarningMessage: String
     val settingsRestoreConfirmAction: String
+    val settingsSafBackupTitle: String
+    val settingsSafBackupHint: String
+    val settingsSafFolderLabel: String
+    val settingsSafFolderSelect: String
+    val settingsSafFolderNotSelected: String
+    val settingsSafRecoveryPhraseTitle: String
+    val settingsSafRecoveryPhraseSetup: String
+    val settingsSafRecoveryPhraseConfigured: String
+    val settingsSafRecoveryPhraseDialogTitle: String
+    val settingsSafRecoveryPhraseDialogWarning: String
+    val settingsSafRecoveryPhraseConfirmPrompt: String
+    val settingsSafExportNow: String
+    val settingsSafRestoreFromFile: String
+    val settingsSafLastVerifiedExport: String
+    val settingsSafStatusVerified: String
+    val settingsSafStatusNeeded: String
+    val settingsSafStatusFailed: String
+    val settingsSafEnterPhrasePrompt: String
+    val settingsSafRestoreConfirmMsg: String
+    val settingsSafPhraseCopied: String
+    val settingsSafVerifyAndSave: String
+    val settingsSafEnterPhraseTitle: String
+    val settingsSafFolderChange: String
     val settingsBillingSection: String
     val settingsManualUpiSettlement: String
     val settingsManualUpiSettlementHint: String
@@ -887,6 +910,29 @@ object HindiStrings : AppStrings {
     override val settingsRestoreWarningTitle = "डेटा बदलने की चेतावनी"
     override val settingsRestoreWarningMessage = "क्लाउड snapshot आपके डिवाइस के cloud-owned डेटा को बदलेगा। पहले snapshot जाँचा जाएगा और recovery point बनाया जाएगा।"
     override val settingsRestoreConfirmAction = "हाँ, रिस्टोर करें"
+    override val settingsSafBackupTitle = "अलग से सुरक्षित बैकअप (SAF)"
+    override val settingsSafBackupHint = "अपने Google Drive या मेमोरी कार्ड में एन्क्रिप्टेड बैकअप सुरक्षित रखें।"
+    override val settingsSafFolderLabel = "बैकअप फ़ोल्डर"
+    override val settingsSafFolderSelect = "फ़ोल्डर चुनें"
+    override val settingsSafFolderNotSelected = "कोई फ़ोल्डर नहीं चुना गया"
+    override val settingsSafRecoveryPhraseTitle = "12-शब्द रिकवरी की (Phrase)"
+    override val settingsSafRecoveryPhraseSetup = "रिकवरी की सेट करें"
+    override val settingsSafRecoveryPhraseConfigured = "रिकवरी की सुरक्षित रूप से सेट है"
+    override val settingsSafRecoveryPhraseDialogTitle = "आपकी 12-शब्द सीक्रेट रिकवरी की"
+    override val settingsSafRecoveryPhraseDialogWarning = "इन 12 शब्दों को कागज़ पर लिख कर सुरक्षित रखें। नया फोन आने पर इसी की से बैकअप खुलेगा। इसे किसी को न दिखाएँ।"
+    override val settingsSafRecoveryPhraseConfirmPrompt = "पुष्टि के लिए सभी 12 शब्द दर्ज करें:"
+    override val settingsSafExportNow = "फ़ोल्डर में बैकअप लें"
+    override val settingsSafRestoreFromFile = "फ़ाइल से रिस्टोर करें"
+    override val settingsSafLastVerifiedExport = "अंतिम जाँचा गया बैकअप"
+    override val settingsSafStatusVerified = "बैकअप सुरक्षित है"
+    override val settingsSafStatusNeeded = "बैकअप आवश्यक"
+    override val settingsSafStatusFailed = "बैकअप विफल"
+    override val settingsSafEnterPhrasePrompt = "बैकअप खोलने के लिए 12-शब्द रिकवरी की दर्ज करें:"
+    override val settingsSafRestoreConfirmMsg = "यह बैकअप फ़ाइल वर्तमान डेटा को बदलेगी। पहले सुरक्षा के लिए रिकवरी पॉइंट बनेगा।"
+    override val settingsSafPhraseCopied = "रिकवरी की कॉपी हो गई"
+    override val settingsSafVerifyAndSave = "सत्यापित करें और सहेजें"
+    override val settingsSafEnterPhraseTitle = "रिकवरी की दर्ज करें"
+    override val settingsSafFolderChange = "फ़ोल्डर बदलें"
     override val settingsBillingSection = "बिलिंग और भुगतान"
     override val settingsManualUpiSettlement = "UPI भुगतान की पुष्टि"
     override val settingsManualUpiSettlementHint = "UPI भुगतान को बिल में दर्ज करें और वास्तविक settlement अपने बैंक/UPI ऐप में मैन्युअली जाँचें।"
@@ -1426,6 +1472,29 @@ object EnglishStrings : AppStrings {
     override val settingsRestoreWarningTitle = "Data replacement warning"
     override val settingsRestoreWarningMessage = "The cloud snapshot will replace cloud-owned data on this device. The snapshot will be validated and a recovery point will be created first."
     override val settingsRestoreConfirmAction = "Yes, restore"
+    override val settingsSafBackupTitle = "Independent Safe Backup (SAF)"
+    override val settingsSafBackupHint = "Save strongly encrypted backups to your Google Drive or SD card."
+    override val settingsSafFolderLabel = "Backup folder"
+    override val settingsSafFolderSelect = "Select folder"
+    override val settingsSafFolderNotSelected = "No folder selected"
+    override val settingsSafRecoveryPhraseTitle = "12-word recovery phrase"
+    override val settingsSafRecoveryPhraseSetup = "Set up recovery phrase"
+    override val settingsSafRecoveryPhraseConfigured = "Recovery phrase configured securely"
+    override val settingsSafRecoveryPhraseDialogTitle = "Your 12-word secret recovery phrase"
+    override val settingsSafRecoveryPhraseDialogWarning = "Write down these 12 words on paper and keep them safe. On a new device, you will need this phrase to decrypt your backup. Never share it with anyone."
+    override val settingsSafRecoveryPhraseConfirmPrompt = "Enter all 12 words to confirm:"
+    override val settingsSafExportNow = "Export to folder"
+    override val settingsSafRestoreFromFile = "Restore from file"
+    override val settingsSafLastVerifiedExport = "Last verified backup"
+    override val settingsSafStatusVerified = "Backup is safe"
+    override val settingsSafStatusNeeded = "Backup needed"
+    override val settingsSafStatusFailed = "Backup failed"
+    override val settingsSafEnterPhrasePrompt = "Enter 12-word recovery phrase to decrypt backup:"
+    override val settingsSafRestoreConfirmMsg = "This backup file will replace local business records. A pre-restore recovery point will be created first."
+    override val settingsSafPhraseCopied = "Recovery phrase copied"
+    override val settingsSafVerifyAndSave = "Verify and save"
+    override val settingsSafEnterPhraseTitle = "Enter recovery phrase"
+    override val settingsSafFolderChange = "Change folder"
     override val settingsBillingSection = "Billing & payments"
     override val settingsManualUpiSettlement = "UPI payment confirmation"
     override val settingsManualUpiSettlementHint = "Record UPI payment in the bill and verify actual settlement manually in your bank or UPI app."

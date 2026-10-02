@@ -63,7 +63,15 @@ data class StoreSettings(
     val lastSyncTime: String = "Never Synced",
     val lastSyncStatus: SyncRunStatus = SyncRunStatus.UNKNOWN,
     val autoSyncEnabled: Boolean = true,
-    val appLanguage: AppLanguage = AppLanguage.HINDI
+    val appLanguage: AppLanguage = AppLanguage.HINDI,
+    val safBackupFolderUri: String = "",
+    val safBackupProviderName: String = "",
+    val recoveryPhraseFingerprint: String = "",
+    val isRecoveryPhraseConfigured: Boolean = false,
+    val lastVerifiedExportEpochMs: Long = 0L,
+    val lastVerifiedExportFilename: String = "",
+    val lastExportStatus: String = "NEVER",
+    val lastExportErrorMessage: String? = null
 )
 
 class SettingsDataStore(private val context: Context) {
@@ -101,6 +109,14 @@ class SettingsDataStore(private val context: Context) {
         private val LAST_SYNC_STATUS = stringPreferencesKey("last_sync_status")
         private val AUTO_SYNC_ENABLED = booleanPreferencesKey("auto_sync_enabled")
         private val APP_LANGUAGE = stringPreferencesKey("app_language")
+        private val SAF_BACKUP_FOLDER_URI = stringPreferencesKey("saf_backup_folder_uri")
+        private val SAF_BACKUP_PROVIDER_NAME = stringPreferencesKey("saf_backup_provider_name")
+        private val RECOVERY_PHRASE_FINGERPRINT = stringPreferencesKey("recovery_phrase_fingerprint")
+        private val IS_RECOVERY_PHRASE_CONFIGURED = booleanPreferencesKey("is_recovery_phrase_configured")
+        private val LAST_VERIFIED_EXPORT_EPOCH_MS = longPreferencesKey("last_verified_export_epoch_ms")
+        private val LAST_VERIFIED_EXPORT_FILENAME = stringPreferencesKey("last_verified_export_filename")
+        private val LAST_EXPORT_STATUS = stringPreferencesKey("last_export_status")
+        private val LAST_EXPORT_ERROR_MESSAGE = stringPreferencesKey("last_export_error_message")
     }
 
     val settingsFlow: Flow<StoreSettings> = context.dataStore.data
@@ -164,9 +180,48 @@ class SettingsDataStore(private val context: Context) {
                     ?.let { value -> runCatching { SyncRunStatus.valueOf(value) }.getOrDefault(SyncRunStatus.UNKNOWN) }
                     ?: SyncRunStatus.UNKNOWN,
                 autoSyncEnabled = preferences[AUTO_SYNC_ENABLED] ?: true,
-                appLanguage = language
+                appLanguage = language,
+                safBackupFolderUri = preferences[SAF_BACKUP_FOLDER_URI].orEmpty(),
+                safBackupProviderName = preferences[SAF_BACKUP_PROVIDER_NAME].orEmpty(),
+                recoveryPhraseFingerprint = preferences[RECOVERY_PHRASE_FINGERPRINT].orEmpty(),
+                isRecoveryPhraseConfigured = preferences[IS_RECOVERY_PHRASE_CONFIGURED] ?: false,
+                lastVerifiedExportEpochMs = preferences[LAST_VERIFIED_EXPORT_EPOCH_MS] ?: 0L,
+                lastVerifiedExportFilename = preferences[LAST_VERIFIED_EXPORT_FILENAME].orEmpty(),
+                lastExportStatus = preferences[LAST_EXPORT_STATUS] ?: "NEVER",
+                lastExportErrorMessage = preferences[LAST_EXPORT_ERROR_MESSAGE]
             )
         }
+
+    suspend fun updateSafFolder(folderUri: String, providerName: String) = context.dataStore.edit {
+        it[SAF_BACKUP_FOLDER_URI] = folderUri
+        it[SAF_BACKUP_PROVIDER_NAME] = providerName
+    }
+
+    suspend fun configureRecoveryPhrase(fingerprint: String) = context.dataStore.edit {
+        it[RECOVERY_PHRASE_FINGERPRINT] = fingerprint
+        it[IS_RECOVERY_PHRASE_CONFIGURED] = true
+    }
+
+    suspend fun clearRecoveryPhrase() = context.dataStore.edit {
+        it.remove(RECOVERY_PHRASE_FINGERPRINT)
+        it[IS_RECOVERY_PHRASE_CONFIGURED] = false
+    }
+
+    suspend fun updateSafExportStatus(
+        status: String,
+        lastEpochMs: Long,
+        filename: String,
+        errorMsg: String?
+    ) = context.dataStore.edit {
+        it[LAST_EXPORT_STATUS] = status
+        if (status == "SUCCESS") {
+            it[LAST_VERIFIED_EXPORT_EPOCH_MS] = lastEpochMs
+            it[LAST_VERIFIED_EXPORT_FILENAME] = filename
+            it.remove(LAST_EXPORT_ERROR_MESSAGE)
+        } else if (errorMsg != null) {
+            it[LAST_EXPORT_ERROR_MESSAGE] = errorMsg
+        }
+    }
 
     suspend fun updateAppLanguage(language: AppLanguage) = context.dataStore.edit {
         it[APP_LANGUAGE] = language.name

@@ -11,6 +11,18 @@ interface ReturnDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertReturnItems(items: List<ReturnItem>)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReturnsForRestore(returns: List<Return>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllReturnItemsForRestore(items: List<ReturnItem>)
+
+    @Query("SELECT * FROM returns ORDER BY id ASC")
+    suspend fun getAllReturnsList(): List<Return>
+
+    @Query("SELECT * FROM return_items ORDER BY id ASC")
+    suspend fun getAllReturnItemsList(): List<ReturnItem>
+
     @Query("SELECT * FROM returns WHERE isDeleted = 0 ORDER BY createdAt DESC")
     fun getAllReturns(): Flow<List<Return>>
 
