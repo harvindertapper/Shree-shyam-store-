@@ -326,7 +326,7 @@ object RestoreSnapshotValidator {
             if (rItem.id <= 0L || (returnIds.isNotEmpty() && rItem.returnId !in returnIds) ||
                 (saleItemIds.isNotEmpty() && rItem.saleItemId !in saleItemIds) ||
                 rItem.productId !in productIds || !rItem.quantityReturned.isFinite() || rItem.quantityReturned <= 0.0 ||
-                rItem.refundAmount < 0L
+                rItem.lineRefundTotal < 0L
             ) {
                 throw SnapshotReferentialIntegrityException("Invalid return item record ${rItem.globalId}")
             }

@@ -72,7 +72,16 @@ data class StoreSettings(
     val lastVerifiedExportFilename: String = "",
     val lastExportStatus: String = "NEVER",
     val lastExportErrorMessage: String? = null
-)
+) {
+    val recoveryPhraseConfigured: Boolean get() = isRecoveryPhraseConfigured
+    val safLastExportStatus: String get() = lastExportStatus
+    val safLastExportFilename: String get() = lastVerifiedExportFilename
+    val safLastExportTime: String
+        get() = if (lastVerifiedExportEpochMs > 0L) {
+            val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US)
+            sdf.format(java.util.Date(lastVerifiedExportEpochMs))
+        } else ""
+}
 
 class SettingsDataStore(private val context: Context) {
     companion object {
