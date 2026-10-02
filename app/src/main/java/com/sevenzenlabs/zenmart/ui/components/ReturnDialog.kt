@@ -489,11 +489,12 @@ fun ReturnDialog(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val parsed = editingQuantityText.toDoubleOrNull() ?: 0.0
+                        val parsed = editingQuantityText.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
                         val rounded = java.math.BigDecimal.valueOf(parsed)
                             .setScale(2, java.math.RoundingMode.HALF_UP)
                             .toDouble()
-                        val maxRoundedRemaining = java.math.BigDecimal.valueOf(remaining)
+                        val validRemaining = remaining.takeIf { it.isFinite() && it >= 0.0 } ?: 0.0
+                        val maxRoundedRemaining = java.math.BigDecimal.valueOf(validRemaining)
                             .setScale(2, java.math.RoundingMode.FLOOR)
                             .toDouble()
                         selectedQuantities[targetItem.id] = rounded.coerceIn(0.0, maxRoundedRemaining)
