@@ -4,6 +4,11 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.sevenzenlabs.zenmart.commerce.CommandMetadata
+import com.sevenzenlabs.zenmart.data.ItemReturnRequest
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
+import com.sevenzenlabs.zenmart.data.ReturnResult
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.SettingsDataStore
@@ -66,6 +71,36 @@ class ReportsViewModel(
 
     fun getSaleItems(saleId: Long): Flow<List<SaleItem>> =
         repository.getSaleItemsForSale(saleId)
+
+    fun getReturnsForSale(saleId: Long): Flow<List<Return>> =
+        repository.getReturnsForSale(saleId)
+
+    fun getReturnItemsForReturn(returnId: Long): Flow<List<ReturnItem>> =
+        repository.getReturnItemsForReturn(returnId)
+
+    suspend fun getRemainingReturnableQuantities(saleId: Long): Map<Long, Double> =
+        repository.getRemainingReturnableQuantities(saleId)
+
+    suspend fun processReturn(
+        saleId: Long,
+        itemsToReturn: List<ItemReturnRequest>,
+        refundMode: String,
+        reason: String,
+        note: String? = null,
+        commandMetadataProvider: suspend () -> CommandMetadata
+    ): ReturnResult {
+        val command = commandMetadataProvider()
+        val result = repository.processReturn(
+            saleId = saleId,
+            itemsToReturn = itemsToReturn,
+            refundMode = refundMode,
+            reason = reason,
+            note = note,
+            command = command
+        )
+        refreshSalesHistory()
+        return result
+    }
 
     fun exportSalesCsv(
         context: Context,

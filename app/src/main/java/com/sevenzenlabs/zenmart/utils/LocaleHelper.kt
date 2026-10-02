@@ -505,6 +505,29 @@ interface AppStrings {
     val reportsTotal: String
     val reportsWeeklyTrend: String
 
+    // Returns & Refunds
+    val returnAction: String
+    val returnDialogTitle: String
+    val returnReasonLabel: String
+    val returnRefundModeLabel: String
+    val returnSelectItemsPrompt: String
+    val returnTotalRefund: String
+    val returnConfirmButton: String
+    val returnSuccessMessage: String
+    val returnFailedMessage: String
+    val returnDisclaimerNotice: String
+    val returnAlreadyRefunded: String
+    val returnRemainingQuantity: (Double, String) -> String
+    val returnReasonDefective: String
+    val returnReasonCustomerRequest: String
+    val returnReasonWrongItem: String
+    val returnReasonExpired: String
+    val returnReasonOther: String
+    val returnModeCash: String
+    val returnModeUpi: String
+    val returnModeUdhaarReversal: String
+    val returnHistoryTitle: String
+
     val udhaarDebtorsOnly: String
     val udhaarNoCustomerFound: String
     val udhaarSaveCustomer: String
@@ -1013,6 +1036,29 @@ object HindiStrings : AppStrings {
     override val reportsTotal = "कुल बिक्री"
     override val reportsWeeklyTrend = "पिछले 7 दिनों की बिक्री"
 
+    // Returns & Refunds
+    override val returnAction = "वापसी / रिफंड"
+    override val returnDialogTitle = "सामान वापसी (Return & Refund)"
+    override val returnReasonLabel = "वापसी का कारण:"
+    override val returnRefundModeLabel = "रिफंड का तरीका:"
+    override val returnSelectItemsPrompt = "वापस करने वाले सामान और मात्रा चुनें"
+    override val returnTotalRefund = "कुल रिफंड राशि:"
+    override val returnConfirmButton = "वापसी दर्ज करें"
+    override val returnSuccessMessage = "वापसी सफलतापूर्वक दर्ज की गई"
+    override val returnFailedMessage = "वापसी दर्ज करने में विफल"
+    override val returnDisclaimerNotice = "रिफंड दुकान के बहीखाते में दर्ज होगा। नकद/UPI भुगतान दुकानदार द्वारा किया गया माना जाएगा।"
+    override val returnAlreadyRefunded = "यह बिल पूरी तरह रिफंड हो चुका है"
+    override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "शेष वापसी योग्य: $qty $unit" }
+    override val returnReasonDefective = "खराब सामान (Defective)"
+    override val returnReasonCustomerRequest = "ग्राहक की इच्छा (Customer Request)"
+    override val returnReasonWrongItem = "गलत सामान दिया गया (Wrong Item)"
+    override val returnReasonExpired = "एक्सपायर्ड सामान (Expired)"
+    override val returnReasonOther = "अन्य (Other)"
+    override val returnModeCash = "नकद (Cash)"
+    override val returnModeUpi = "UPI"
+    override val returnModeUdhaarReversal = "उधार खाते में कटौती (Udhaar Reversal)"
+    override val returnHistoryTitle = "वापसी का इतिहास"
+
     override val udhaarDebtorsOnly = "बकाया वाले"
     override val udhaarNoCustomerFound = "कोई ग्राहक नहीं मिला!"
     override val udhaarSaveCustomer = "खाता खोलें"
@@ -1520,6 +1566,29 @@ object EnglishStrings : AppStrings {
     override val reportsPaymentModeSplit = "Payment mode split"
     override val reportsTotal = "Total"
     override val reportsWeeklyTrend = "Weekly sales trend"
+
+    // Returns & Refunds
+    override val returnAction = "Return / Refund"
+    override val returnDialogTitle = "Return & Refund"
+    override val returnReasonLabel = "Return reason:"
+    override val returnRefundModeLabel = "Refund mode:"
+    override val returnSelectItemsPrompt = "Select items and quantity to return"
+    override val returnTotalRefund = "Total refund amount:"
+    override val returnConfirmButton = "Record Return"
+    override val returnSuccessMessage = "Return recorded successfully"
+    override val returnFailedMessage = "Failed to record return"
+    override val returnDisclaimerNotice = "Refund is recorded in store books. Cash/UPI settlement is entered by merchant."
+    override val returnAlreadyRefunded = "This bill is fully refunded"
+    override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "Remaining returnable: $qty $unit" }
+    override val returnReasonDefective = "Defective / Damaged"
+    override val returnReasonCustomerRequest = "Customer Request"
+    override val returnReasonWrongItem = "Wrong Item"
+    override val returnReasonExpired = "Expired"
+    override val returnReasonOther = "Other"
+    override val returnModeCash = "Cash"
+    override val returnModeUpi = "UPI"
+    override val returnModeUdhaarReversal = "Udhaar Balance Reversal"
+    override val returnHistoryTitle = "Return History"
 
     override val udhaarDebtorsOnly = "Debtors only"
     override val udhaarNoCustomerFound = "No customer found!"

@@ -9,7 +9,8 @@ enum class TenantCapability(
     PAYMENT_RECONCILIATION(setOf(LedgerRole.OWNER, LedgerRole.MANAGER)),
     LEDGER_RECORD(setOf(LedgerRole.OWNER, LedgerRole.MANAGER, LedgerRole.CASHIER)),
     LEDGER_CORRECTION(setOf(LedgerRole.OWNER, LedgerRole.MANAGER)),
-    INVENTORY_ADJUSTMENT(setOf(LedgerRole.OWNER, LedgerRole.MANAGER))
+    INVENTORY_ADJUSTMENT(setOf(LedgerRole.OWNER, LedgerRole.MANAGER)),
+    RETURN_PROCESSING(setOf(LedgerRole.OWNER, LedgerRole.MANAGER, LedgerRole.CASHIER))
 }
 
 /**

@@ -45,9 +45,13 @@ import com.sevenzenlabs.zenmart.utils.MoneyUtils
 import com.sevenzenlabs.zenmart.viewmodel.ReportsViewModel
 import com.sevenzenlabs.zenmart.viewmodel.Screen
 import com.sevenzenlabs.zenmart.viewmodel.ShopViewModel
+import android.widget.Toast
+import com.sevenzenlabs.zenmart.ui.components.ReturnDialog
+import com.sevenzenlabs.zenmart.utils.OperatorAction
 import java.util.Locale
 import java.util.TimeZone
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,6 +69,18 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
     var customEndPickerMillis by rememberSaveable { mutableStateOf<Long?>(null) }
     var datePickerTarget by remember { mutableStateOf<ReportDatePickerTarget?>(null) }
     var exportResult by remember { mutableStateOf<SalesExportResult?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
+    var returnTargetSale by remember { mutableStateOf<Sale?>(null) }
+    var remainingReturnables by remember { mutableStateOf<Map<Long, Double>>(emptyMap()) }
+    var isProcessingReturn by remember { mutableStateOf(false) }
+
+    LaunchedEffect(returnTargetSale) {
+        val target = returnTargetSale
+        if (target != null) {
+            remainingReturnables = reportsViewModel.getRemainingReturnableQuantities(target.id)
+        }
+    }
     val selectedInterval = remember(selectedIntervalName) {
         runCatching { ReportInterval.valueOf(selectedIntervalName) }
             .getOrDefault(ReportInterval.TODAY)
@@ -612,6 +628,39 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                             }
                         }
 
+                        val saleReturns by reportsViewModel.getReturnsForSale(sale.id).collectAsState(initial = emptyList())
+                        if (saleReturns.isNotEmpty()) {
+                            HorizontalDivider()
+                            Text(strings.returnHistoryTitle, fontWeight = FontWeight.Black, fontSize = 12.sp, color = ErrorRed)
+                            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                saleReturns.forEach { ret ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text("${ret.returnNumber} (${ret.reason})", fontSize = 11.sp, color = TextMediumGray)
+                                        Text("-${CurrencyUtils.formatRupees(ret.totalRefundAmount)}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = ErrorRed)
+                                    }
+                                }
+                            }
+                        }
+
+                        if (sale.paymentState != PaymentState.REFUNDED.wireValue) {
+                            OutlinedButton(
+                                onClick = { returnTargetSale = sale },
+                                border = BorderStroke(1.2.dp, SaffronPrimary),
+                                shape = RoundedCornerShape(10.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SaffronDark),
+                                modifier = Modifier.fillMaxWidth().height(44.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AssignmentReturn, null, tint = SaffronDark, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(strings.returnAction, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                }
+                            }
+                        }
+
                         Button(
                             onClick = { selectedViewSale = null },
                             colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary, contentColor = Color.White),
@@ -624,6 +673,40 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                     }
                 }
             }
+        }
+
+        returnTargetSale?.let { currentReturnSale ->
+            val returnSaleItems by reportsViewModel.getSaleItems(currentReturnSale.id).collectAsState(initial = emptyList())
+            ReturnDialog(
+                sale = currentReturnSale,
+                saleItems = returnSaleItems,
+                remainingReturnables = remainingReturnables,
+                strings = strings,
+                isProcessing = isProcessingReturn,
+                onDismiss = { returnTargetSale = null },
+                onConfirmReturn = { itemsToReturn, refundMode, reason, note ->
+                    coroutineScope.launch {
+                        isProcessingReturn = true
+                        try {
+                            reportsViewModel.processReturn(
+                                saleId = currentReturnSale.id,
+                                itemsToReturn = itemsToReturn,
+                                refundMode = refundMode,
+                                reason = reason,
+                                note = note,
+                                commandMetadataProvider = { viewModel.currentCommandMetadata(OperatorAction.RETURN_PROCESSING) }
+                            )
+                            Toast.makeText(context, strings.returnSuccessMessage, Toast.LENGTH_SHORT).show()
+                            returnTargetSale = null
+                            selectedViewSale = null
+                        } catch (e: Exception) {
+                            Toast.makeText(context, e.message ?: strings.returnFailedMessage, Toast.LENGTH_LONG).show()
+                        } finally {
+                            isProcessingReturn = false
+                        }
+                    }
+                }
+            )
         }
     }
 }

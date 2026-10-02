@@ -6,6 +6,8 @@ import com.sevenzenlabs.zenmart.data.Customer
 import com.sevenzenlabs.zenmart.commerce.InventoryValidation
 import com.sevenzenlabs.zenmart.commerce.PaymentState
 import com.sevenzenlabs.zenmart.data.Product
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.SettingsDataStore
@@ -70,6 +72,8 @@ class FirebaseSyncService(
             database.categoryDao().getUnsyncedCategories().forEach { add(SyncOutboxDraft("categories", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
             database.udhaarDao().getUnsyncedTransactions().forEach { add(SyncOutboxDraft("udhaar_transactions", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
             database.stockAdjustmentDao().getUnsyncedAdjustments().forEach { add(SyncOutboxDraft("stock_adjustments", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.returnDao().getUnsyncedReturns().forEach { add(SyncOutboxDraft("returns", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
+            database.returnDao().getUnsyncedReturnItems().forEach { add(SyncOutboxDraft("return_items", it.id, it.globalId, it.mutationVersion, it.mutationDeviceId, it.isDeleted, it.toCloudMap())) }
         }
         val now = System.currentTimeMillis()
         entries.forEach { draft ->
@@ -155,6 +159,8 @@ class FirebaseSyncService(
             "customers" -> database.customerDao().markCustomerSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
             "udhaar_transactions" -> database.udhaarDao().markTransactionSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
             "stock_adjustments" -> database.stockAdjustmentDao().markAdjustmentSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "returns" -> database.returnDao().markReturnSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
+            "return_items" -> database.returnDao().markReturnItemSyncedIfVersion(entry.localId, entry.mutationVersion, entry.mutationDeviceId)
         }
     }
 
@@ -585,6 +591,24 @@ class FirebaseSyncService(
         "createdAt" to createdAt, "updatedAt" to updatedAt, "isDeleted" to isDeleted,
         "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
         "idempotencyKey" to SyncIdentity.idempotencyKey("stock_adjustments", globalId, mutationVersion)
+    )
+
+    private fun Return.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "globalId" to globalId, "returnNumber" to returnNumber, "saleId" to saleId,
+        "originalBillNumber" to originalBillNumber, "customerId" to customerId,
+        "totalRefundAmount" to totalRefundAmount, "refundMode" to refundMode, "refundState" to refundState,
+        "reason" to reason, "note" to note, "createdAt" to createdAt, "updatedAt" to updatedAt,
+        "isDeleted" to isDeleted, "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("returns", globalId, mutationVersion)
+    )
+
+    private fun ReturnItem.toCloudMap(): Map<String, Any?> = mapOf(
+        "id" to id, "globalId" to globalId, "returnId" to returnId, "saleItemId" to saleItemId,
+        "productId" to productId, "productNameSnapshot" to productNameSnapshot,
+        "quantityReturned" to quantityReturned, "unit" to unit, "unitPrice" to unitPrice,
+        "lineRefundTotal" to lineRefundTotal, "moneyScale" to 2L, "updatedAt" to updatedAt,
+        "isDeleted" to isDeleted, "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
+        "idempotencyKey" to SyncIdentity.idempotencyKey("return_items", globalId, mutationVersion)
     )
 
     companion object {
