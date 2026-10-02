@@ -316,6 +316,9 @@ class ShopRepository(
         val ledgerActor = authorizedCommand.toLedgerActor()
 
         require(itemsToReturn.isNotEmpty()) { "Return must contain at least one item" }
+        require(itemsToReturn.map { it.saleItemId }.toSet().size == itemsToReturn.size) {
+            "Duplicate line items in return request"
+        }
         require(reason.isNotBlank()) { "Return reason is required" }
         require(refundMode.isNotBlank()) { "Refund mode is required" }
 
@@ -373,7 +376,8 @@ class ShopRepository(
 
             require(totalRefundPaise >= 0L) { "Total refund amount cannot be negative" }
 
-            val returnNumber = "RET-${sale.billNumber}-${System.currentTimeMillis() % 100000}"
+            val returnSuffix = java.util.UUID.randomUUID().toString().take(6).uppercase()
+            val returnNumber = "RET-${sale.billNumber}-$returnSuffix"
             val returnRecord = Return(
                 returnNumber = returnNumber,
                 saleId = sale.id,
@@ -413,8 +417,8 @@ class ShopRepository(
                 )
             }
 
-            // If sale was UDHAAR or refundMode is UDHAAR reversal, post UdhaarTransaction REVERSAL
-            if ((sale.paymentMode == PaymentMode.UDHAAR.name || refundMode == "UDHAAR_CREDIT" || refundMode == "UDHAAR_REVERSAL") && sale.customerId != null) {
+            // If sale was UDHAAR and customer is attached, post UdhaarTransaction REVERSAL
+            if (sale.paymentMode.equals(PaymentMode.UDHAAR.name, ignoreCase = true) && sale.customerId != null) {
                 val customerId = sale.customerId
                 val reversalTx = UdhaarTransaction(
                     globalId = SyncIdentity.newGlobalId(),
@@ -459,13 +463,14 @@ class ShopRepository(
                 maxOf(0L, prevReceived - totalRefundPaise)
             }
 
-            saleDao.updatePaymentStateIfActive(
+            val updatedRows = saleDao.updatePaymentStateIfActive(
                 saleId = sale.id,
                 paymentState = updatedPaymentState.wireValue,
                 receivedAmount = newReceived,
                 updatedAt = now,
                 mutationDeviceId = deviceId
             )
+            check(updatedRows == 1) { "Failed to update sale payment state for sale ${sale.id}" }
 
             ReturnResult(
                 returnId = returnId,

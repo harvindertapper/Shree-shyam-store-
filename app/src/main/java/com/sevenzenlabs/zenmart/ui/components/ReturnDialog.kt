@@ -243,7 +243,7 @@ fun ReturnDialog(
                                         }
                                     } else {
                                         Text(
-                                            text = strings.returnAlreadyRefunded,
+                                            text = strings.returnItemAlreadyReturned,
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = TextMutedGray

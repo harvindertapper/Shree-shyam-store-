@@ -105,6 +105,7 @@ class ReturnPolicyTest {
             ),
             listOf(
                 SaleItem(
+                    saleId = 0L,
                     productId = productId,
                     productNameSnapshot = "Aashirvaad Atta 5kg",
                     quantity = 2.0,
@@ -186,6 +187,7 @@ class ReturnPolicyTest {
             ),
             listOf(
                 SaleItem(
+                    saleId = 0L,
                     productId = productId,
                     productNameSnapshot = "Amul Milk 1L",
                     quantity = 5.0,
@@ -230,6 +232,23 @@ class ReturnPolicyTest {
             fail("Expected IllegalArgumentException on over-return")
         } catch (e: IllegalArgumentException) {
             assertTrue(e.message!!.contains("only 3.0 remaining"))
+        }
+
+        // Attempt duplicate line items in same request
+        try {
+            repository.processReturn(
+                saleId = saleId,
+                itemsToReturn = listOf(
+                    ItemReturnRequest(lineItem.id, 1.0),
+                    ItemReturnRequest(lineItem.id, 1.0)
+                ),
+                refundMode = "UPI",
+                reason = "Duplicate attempt",
+                command = command()
+            )
+            fail("Expected IllegalArgumentException on duplicate line item request")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("Duplicate line items"))
         }
 
         // Return remaining 3 units -> should transition to REFUNDED
@@ -283,6 +302,7 @@ class ReturnPolicyTest {
             ),
             listOf(
                 SaleItem(
+                    saleId = 0L,
                     productId = productId,
                     productNameSnapshot = "Haldiram Bhujia 400g",
                     quantity = 3.0,
@@ -352,6 +372,7 @@ class ReturnPolicyTest {
             ),
             listOf(
                 SaleItem(
+                    saleId = 0L,
                     productId = productId,
                     productNameSnapshot = "Ghee 1L",
                     quantity = 1.0,

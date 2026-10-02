@@ -517,6 +517,7 @@ interface AppStrings {
     val returnFailedMessage: String
     val returnDisclaimerNotice: String
     val returnAlreadyRefunded: String
+    val returnItemAlreadyReturned: String
     val returnRemainingQuantity: (Double, String) -> String
     val returnReasonDefective: String
     val returnReasonCustomerRequest: String
@@ -1048,6 +1049,7 @@ object HindiStrings : AppStrings {
     override val returnFailedMessage = "वापसी दर्ज करने में विफल"
     override val returnDisclaimerNotice = "रिफंड दुकान के बहीखाते में दर्ज होगा। नकद/UPI भुगतान दुकानदार द्वारा किया गया माना जाएगा।"
     override val returnAlreadyRefunded = "यह बिल पूरी तरह रिफंड हो चुका है"
+    override val returnItemAlreadyReturned = "यह आइटम पूरा वापस हो चुका है"
     override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "शेष वापसी योग्य: $qty $unit" }
     override val returnReasonDefective = "खराब सामान (Defective)"
     override val returnReasonCustomerRequest = "ग्राहक की इच्छा (Customer Request)"
@@ -1579,6 +1581,7 @@ object EnglishStrings : AppStrings {
     override val returnFailedMessage = "Failed to record return"
     override val returnDisclaimerNotice = "Refund is recorded in store books. Cash/UPI settlement is entered by merchant."
     override val returnAlreadyRefunded = "This bill is fully refunded"
+    override val returnItemAlreadyReturned = "Item fully returned"
     override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "Remaining returnable: $qty $unit" }
     override val returnReasonDefective = "Defective / Damaged"
     override val returnReasonCustomerRequest = "Customer Request"

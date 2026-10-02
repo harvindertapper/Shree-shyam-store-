@@ -596,7 +596,7 @@ class FirebaseSyncService(
     private fun Return.toCloudMap(): Map<String, Any?> = mapOf(
         "id" to id, "globalId" to globalId, "returnNumber" to returnNumber, "saleId" to saleId,
         "originalBillNumber" to originalBillNumber, "customerId" to customerId,
-        "totalRefundAmount" to totalRefundAmount, "refundMode" to refundMode, "refundState" to refundState,
+        "totalRefundAmount" to totalRefundAmount, "moneyScale" to 2L, "refundMode" to refundMode, "refundState" to refundState,
         "reason" to reason, "note" to note, "createdAt" to createdAt, "updatedAt" to updatedAt,
         "isDeleted" to isDeleted, "mutationVersion" to mutationVersion, "mutationDeviceId" to mutationDeviceId,
         "idempotencyKey" to SyncIdentity.idempotencyKey("returns", globalId, mutationVersion)

@@ -8,7 +8,7 @@ interface ReturnDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertReturn(returnRecord: Return): Long
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertReturnItems(items: List<ReturnItem>)
 
     @Query("SELECT * FROM returns WHERE isDeleted = 0 ORDER BY createdAt DESC")
