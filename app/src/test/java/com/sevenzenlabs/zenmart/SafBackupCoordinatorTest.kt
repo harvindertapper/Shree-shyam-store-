@@ -17,6 +17,7 @@ import com.sevenzenlabs.zenmart.data.SettingsDataStore
 import com.sevenzenlabs.zenmart.data.ShopRepository
 import com.sevenzenlabs.zenmart.data.StockAdjustment
 import com.sevenzenlabs.zenmart.data.UdhaarTransaction
+import com.sevenzenlabs.zenmart.recovery.BackupDecryptionException
 import com.sevenzenlabs.zenmart.recovery.BackupEnvelopeMalformedException
 import com.sevenzenlabs.zenmart.recovery.BackupRetentionPolicy
 import com.sevenzenlabs.zenmart.recovery.RecoveryCryptoPolicy
@@ -297,7 +298,7 @@ class SafBackupCoordinatorTest {
             "\"ciphertextHex\":\"00"
         )
 
-        assertThrows(Exception::class.java) {
+        assertThrows(BackupDecryptionException::class.java) {
             runBlocking {
                 coordinator.restoreEncryptedBackup(fileUri, validPhrase, tenant)
             }
@@ -464,6 +465,62 @@ class SafBackupCoordinatorTest {
         val restoredReturnItems = cleanRepository.getAllReturnItemsList()
         assertEquals(1, restoredReturnItems.size)
         assertEquals(2000L, restoredReturnItems.first().lineRefundTotal)
+
+        cleanDatabase.close()
+        cleanRecoveryDir.deleteRecursively()
+    }
+
+    @Test
+    fun restoreToCleanDeviceWithoutPriorTenantAdoptsArchiveTenant() = runBlocking {
+        val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
+
+        val cat = Category(id = 1L, globalId = "cat-1", name = "Groceries")
+        database.categoryDao().insert(cat)
+
+        val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
+        assertTrue(exportResult.success)
+
+        val fileUri = fakeStorage.files.keys.first()
+
+        // Clean second device without any prior tenant setup (expectedTenant = null)
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val cleanDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val cleanRepository = ShopRepository(
+            categoryDao = cleanDatabase.categoryDao(),
+            productDao = cleanDatabase.productDao(),
+            saleDao = cleanDatabase.saleDao(),
+            customerDao = cleanDatabase.customerDao(),
+            udhaarDao = cleanDatabase.udhaarDao(),
+            stockAdjustmentDao = cleanDatabase.stockAdjustmentDao(),
+            userDao = cleanDatabase.userDao(),
+            database = cleanDatabase,
+            shopProfileDao = cleanDatabase.shopProfileDao(),
+            returnDao = cleanDatabase.returnDao()
+        )
+        val cleanRecoveryDir = File.createTempFile("identity-less-recovery", "").apply {
+            delete()
+            mkdirs()
+        }
+        val cleanRecoveryStore = LocalRecoveryPointStore(cleanRecoveryDir)
+        val cleanSettingsDataStore = SettingsDataStore(context)
+        val cleanCoordinator = SafBackupCoordinator(
+            safStorage = fakeStorage,
+            settingsDataStore = cleanSettingsDataStore,
+            repository = cleanRepository,
+            recoveryPointStore = cleanRecoveryStore
+        )
+
+        // Restore without passing an expected tenant
+        val restoreResult = cleanCoordinator.restoreEncryptedBackup(
+            fileUri = fileUri,
+            phraseWords = validPhrase,
+            expectedTenant = null
+        )
+        assertTrue(restoreResult.success)
+        assertEquals(1, cleanRepository.allCategories.first().size)
+        assertEquals("Groceries", cleanRepository.allCategories.first().first().name)
 
         cleanDatabase.close()
         cleanRecoveryDir.deleteRecursively()

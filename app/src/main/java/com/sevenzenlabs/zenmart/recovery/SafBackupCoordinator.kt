@@ -136,7 +136,23 @@ class SafBackupCoordinator(
         val sdf = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US)
         val filename = "zenmart_backup_${sdf.format(Date(nowEpochMs))}.zmb"
 
-        val fileUri = safStorage.writeBackupFile(treeUri, filename, envelopeJson)
+        val fileUri: Uri = try {
+            safStorage.writeBackupFile(treeUri, filename, envelopeJson)
+        } catch (e: Exception) {
+            val errorMsg = "Failed to write backup file: ${e.message}"
+            settingsDataStore.updateSafExportStatus(
+                status = "FAILED",
+                lastEpochMs = nowEpochMs,
+                filename = filename,
+                errorMsg = errorMsg
+            )
+            return SafExportResult(
+                success = false,
+                filename = filename,
+                timestampEpochMs = nowEpochMs,
+                message = errorMsg
+            )
+        }
 
         // Read-back verification
         try {
@@ -226,7 +242,9 @@ class SafBackupCoordinator(
     suspend fun restoreEncryptedBackup(
         fileUri: Uri,
         phraseWords: List<String>,
-        currentTenant: TenantScope
+        expectedTenant: TenantScope? = null,
+        deviceId: String = expectedTenant?.deviceId ?: "local_device",
+        appInstallationId: String = expectedTenant?.appInstallationId ?: "local_install"
     ): SafRestoreResult {
         if (!RecoveryCryptoPolicy.validateMnemonic(phraseWords)) {
             throw IllegalArgumentException("Invalid recovery phrase")
@@ -235,8 +253,8 @@ class SafBackupCoordinator(
         val rawText = safStorage.readBackupFile(fileUri)
         val envelope = EncryptedBackupCodec.decode(rawText)
 
-        if (currentTenant.storeId.isNotBlank() && envelope.storeId != currentTenant.storeId) {
-            throw SnapshotTenantMismatchException("Backup belongs to store ${envelope.storeId}, not active store ${currentTenant.storeId}")
+        if (expectedTenant != null && envelope.storeId != expectedTenant.storeId) {
+            throw SnapshotTenantMismatchException("Backup belongs to store ${envelope.storeId}, not active store ${expectedTenant.storeId}")
         }
 
         val salt = envelope.saltHex.hexToByteArray()
@@ -246,12 +264,12 @@ class SafBackupCoordinator(
         val decryptedJson = RecoveryCryptoPolicy.decrypt(EncryptedPayload(iv, ciphertext), key)
 
         val snapshotEnvelope = RestoreSnapshotCodec.decode(decryptedJson)
-        val effectiveTenant = if (currentTenant.storeId.isNotBlank()) currentTenant else TenantScope(
+        val effectiveTenant = expectedTenant ?: TenantScope(
             organizationId = snapshotEnvelope.organizationId,
             storeId = snapshotEnvelope.storeId,
             membershipId = snapshotEnvelope.membershipId,
-            deviceId = currentTenant.deviceId,
-            appInstallationId = currentTenant.appInstallationId
+            deviceId = deviceId.ifBlank { "local_device" },
+            appInstallationId = appInstallationId.ifBlank { "local_install" }
         )
 
         val validatedSnapshot = RestoreSnapshotValidator.validate(

@@ -1730,16 +1730,23 @@ class ShopViewModel(
             try {
                 val settings = settingsDataStore.settingsFlow.first()
                 val identitySession = reconcileIdentitySession()
-                val tenant = if (identitySession != null) {
-                    settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
-                } else {
-                    TenantScope(
-                        organizationId = settings.organizationId,
-                        storeId = settings.storeId,
-                        membershipId = settings.membershipId,
-                        deviceId = settings.deviceId.ifBlank { "local_device" },
-                        appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
-                    )
+                val expectedTenant = identitySession?.let {
+                    settingsDataStore.getOrCreateTenantDeviceContext(it).toTenantScope()
+                } ?: run {
+                    val hasExistingTenant = settings.organizationId.isNotBlank() &&
+                        settings.storeId.isNotBlank() &&
+                        settings.membershipId.isNotBlank()
+                    if (hasExistingTenant) {
+                        TenantScope(
+                            organizationId = settings.organizationId,
+                            storeId = settings.storeId,
+                            membershipId = settings.membershipId,
+                            deviceId = settings.deviceId.ifBlank { "local_device" },
+                            appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
+                        )
+                    } else {
+                        null
+                    }
                 }
 
                 _syncInProgress.value = true
@@ -1753,7 +1760,9 @@ class ShopViewModel(
                 val result = coordinator.restoreEncryptedBackup(
                     fileUri = fileUri,
                     phraseWords = phraseWords,
-                    currentTenant = tenant
+                    expectedTenant = expectedTenant,
+                    deviceId = settings.deviceId.ifBlank { "local_device" },
+                    appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
                 )
 
                 if (result.success) {

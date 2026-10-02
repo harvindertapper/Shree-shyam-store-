@@ -31,11 +31,6 @@ interface SafStorageClient {
 class AndroidSafStorageClient(private val context: Context) : SafStorageClient {
 
     override fun verifyAndPersistFolder(treeUri: Uri): SafFolderVerification = try {
-        context.contentResolver.takePersistableUriPermission(
-            treeUri,
-            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-        )
-
         val treeDocId = DocumentsContract.getTreeDocumentId(treeUri)
         val parentDocUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, treeDocId)
         val probeName = ".zenmart_probe_${System.currentTimeMillis()}.tmp"
@@ -66,6 +61,10 @@ class AndroidSafStorageClient(private val context: Context) : SafStorageClient {
         if (readBack != probeContent) {
             SafFolderVerification(false, "", "Probe read-back content mismatch")
         } else {
+            context.contentResolver.takePersistableUriPermission(
+                treeUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
             val providerName = getProviderDisplayName(treeUri)
             SafFolderVerification(true, providerName, null)
         }
