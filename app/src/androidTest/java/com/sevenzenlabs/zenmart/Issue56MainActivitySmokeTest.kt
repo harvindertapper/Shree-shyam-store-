@@ -3,6 +3,7 @@ package com.sevenzenlabs.zenmart
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -22,6 +23,11 @@ class Issue56MainActivitySmokeTest {
 
     @Test
     fun signedOutStartupExposesLanguageSignInAndLocalContinuation() {
+        composeTestRule.waitUntil(timeoutMillis = 15_000) {
+            composeTestRule.onAllNodesWithTag("language_switcher_pill")
+                .fetchSemanticsNodes()
+                .isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("language_switcher_pill").assertIsDisplayed()
         composeTestRule.onNodeWithTag("google_sign_in_button")
             .performScrollTo()
