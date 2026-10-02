@@ -38,11 +38,20 @@ class ReportsViewModel(
     private val _salesHistory = MutableStateFlow<List<Sale>>(emptyList())
     val salesHistory: StateFlow<List<Sale>> = _salesHistory
 
+    private val _returnsHistory = MutableStateFlow<List<Return>>(emptyList())
+    val returnsHistory: StateFlow<List<Return>> = _returnsHistory
+
     private val _isSalesHistoryLoading = MutableStateFlow(true)
     val isSalesHistoryLoading: StateFlow<Boolean> = _isSalesHistoryLoading
 
     private val _salesHistoryHasError = MutableStateFlow(false)
     val salesHistoryHasError: StateFlow<Boolean> = _salesHistoryHasError
+
+    private val _isReturnsHistoryLoading = MutableStateFlow(true)
+    val isReturnsHistoryLoading: StateFlow<Boolean> = _isReturnsHistoryLoading
+
+    private val _returnsHistoryHasError = MutableStateFlow(false)
+    val returnsHistoryHasError: StateFlow<Boolean> = _returnsHistoryHasError
 
     private var salesHistoryJob: Job? = null
 
@@ -54,18 +63,33 @@ class ReportsViewModel(
         salesHistoryJob?.cancel()
         _isSalesHistoryLoading.value = true
         _salesHistoryHasError.value = false
+        _isReturnsHistoryLoading.value = true
+        _returnsHistoryHasError.value = false
         salesHistoryJob = viewModelScope.launch {
-            repository.allSales
-                .catch {
-                    _isSalesHistoryLoading.value = false
-                    _salesHistoryHasError.value = true
-                    emit(emptyList())
-                }
-                .collect { sales ->
-                    _salesHistory.value = sales
-                    _isSalesHistoryLoading.value = false
-                    _salesHistoryHasError.value = false
-                }
+            launch {
+                repository.allSales
+                    .catch {
+                        _isSalesHistoryLoading.value = false
+                        _salesHistoryHasError.value = true
+                    }
+                    .collect { sales ->
+                        _salesHistory.value = sales
+                        _isSalesHistoryLoading.value = false
+                        _salesHistoryHasError.value = false
+                    }
+            }
+            launch {
+                repository.allReturns
+                    .catch {
+                        _isReturnsHistoryLoading.value = false
+                        _returnsHistoryHasError.value = true
+                    }
+                    .collect { returns ->
+                        _returnsHistory.value = returns
+                        _isReturnsHistoryLoading.value = false
+                        _returnsHistoryHasError.value = false
+                    }
+            }
         }
     }
 
