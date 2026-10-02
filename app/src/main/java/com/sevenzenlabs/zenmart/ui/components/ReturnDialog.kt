@@ -163,7 +163,7 @@ fun ReturnDialog(
                                 shape = RoundedCornerShape(10.dp),
                                 border = BorderStroke(
                                     1.dp,
-                                    if (currentQty > 0.0) SaffronPrimary else BorderSubtle
+                                    if (currentQty > 0.0) SaffronPrimary else SurfaceCardBorder
                                 ),
                                 color = if (canReturn) Color.White else Color(0xFFF9F9F9),
                                 modifier = Modifier.fillMaxWidth()
