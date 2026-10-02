@@ -347,7 +347,9 @@ class SafBackupCoordinatorTest {
         assertTrue(restoreResult.success)
 
         // Pre-restore point was saved in recoveryPointStore
-        assertTrue(recoveryPointStore.list().isNotEmpty())
+        val preRestorePoint = recoveryPointStore.read()
+        assertNotNull(preRestorePoint)
+        assertEquals(2, preRestorePoint?.tableCounts?.get("categories"))
     }
 
     @Test
