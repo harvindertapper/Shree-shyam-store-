@@ -122,7 +122,7 @@ class AndroidSafStorageClient(private val context: Context) : SafStorageClient {
                 val name = if (nameCol >= 0) cursor.getString(nameCol) else null
                 val lastMod = if (modCol >= 0) cursor.getLong(modCol) else 0L
                 val size = if (sizeCol >= 0) cursor.getLong(sizeCol) else 0L
-                if (docId != null && name != null && (name.startsWith("zenmart_backup_") || name.endsWith(".zmb"))) {
+                if (docId != null && name != null && name.startsWith("zenmart_backup_") && name.endsWith(".zmb")) {
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
                     results.add(SafBackupFileEntry(name, docUri, lastMod, size))
                 }

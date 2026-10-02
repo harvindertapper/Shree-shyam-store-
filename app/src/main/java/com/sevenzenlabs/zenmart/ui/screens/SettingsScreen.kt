@@ -21,11 +21,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import com.sevenzenlabs.zenmart.recovery.RecoveryCryptoPolicy
 import androidx.compose.ui.text.input.KeyboardType
@@ -103,8 +100,6 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     LaunchedEffect(settings.lastSyncTime, settings.lastSyncStatus, settings.isUserLoggedIn) {
         viewModel.refreshSyncHealth()
     }
-
-    val clipboardManager = LocalClipboardManager.current
 
     // Modern Secure Gallery Photo Picker launcher
     val photoPickerLauncher = rememberLauncherForActivityResult(
@@ -1292,7 +1287,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.testTag("settings_saf_last_export_text")
                             )
                             val statusText = when (settings.safLastExportStatus) {
-                                "VERIFIED" -> strings.settingsSafStatusVerified
+                                "SUCCESS", "VERIFIED" -> strings.settingsSafStatusVerified
                                 "FAILED" -> strings.settingsSafStatusFailed
                                 else -> strings.settingsSafStatusNeeded
                             }
@@ -1301,7 +1296,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = when (settings.safLastExportStatus) {
-                                    "VERIFIED" -> SuccessGreen
+                                    "SUCCESS", "VERIFIED" -> SuccessGreen
                                     "FAILED" -> Color(0xFFB3261E)
                                     else -> TextMediumGray
                                 },
@@ -1522,15 +1517,14 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    setupPhraseWords.chunked(3).forEach { rowWords ->
+                                    setupPhraseWords.mapIndexed { index, word -> index to word }.chunked(3).forEach { rowWords ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth(),
                                             horizontalArrangement = Arrangement.SpaceBetween
                                         ) {
-                                            rowWords.forEach { word ->
-                                                val index = setupPhraseWords.indexOf(word) + 1
+                                            rowWords.forEach { (index, word) ->
                                                 Text(
-                                                    text = "$index. $word",
+                                                    text = "${index + 1}. $word",
                                                     fontSize = 12.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = SaffronDark
@@ -1538,24 +1532,6 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                             }
                                         }
                                     }
-                                }
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                TextButton(
-                                    onClick = {
-                                        clipboardManager.setText(AnnotatedString(setupPhraseWords.joinToString(" ")))
-                                        settingsNotice = strings.settingsSafPhraseCopied
-                                        settingsNoticeIsError = false
-                                    },
-                                    modifier = Modifier.testTag("settings_saf_copy_phrase_button")
-                                ) {
-                                    Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(strings.reportsCopy, fontWeight = FontWeight.Bold)
                                 }
                             }
 
@@ -1589,7 +1565,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                     }
                                     showSafPhraseSetupDialog = false
                                 } else {
-                                    settingsNotice = strings.settingsSafStatusFailed
+                                    settingsNotice = strings.settingsSafPhraseMismatch
                                     settingsNoticeIsError = true
                                 }
                             },
@@ -1650,7 +1626,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                         settingsNoticeIsError = !success
                                     }
                                 } else {
-                                    settingsNotice = strings.settingsSafStatusFailed
+                                    settingsNotice = strings.settingsSafPhraseMismatch
                                     settingsNoticeIsError = true
                                 }
                             },
@@ -1723,7 +1699,7 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                                         settingsNoticeIsError = !success
                                     }
                                 } else {
-                                    settingsNotice = strings.settingsSafStatusFailed
+                                    settingsNotice = strings.settingsSafPhraseMismatch
                                     settingsNoticeIsError = true
                                 }
                             },

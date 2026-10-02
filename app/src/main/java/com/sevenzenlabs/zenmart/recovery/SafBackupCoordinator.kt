@@ -181,8 +181,15 @@ class SafBackupCoordinator(
         // Apply retention pruning
         try {
             val existingFiles = safStorage.listBackupFiles(treeUri)
+            val filenameSdf = SimpleDateFormat("yyyy-MM-dd_HHmmss", Locale.US)
             val records = existingFiles.map { file ->
-                BackupFileRecord(file.filename, file.lastModifiedEpochMs, file.uri.toString())
+                val parsedTimestamp = runCatching {
+                    val rawDatePart = file.filename
+                        .removePrefix("zenmart_backup_")
+                        .removeSuffix(".zmb")
+                    filenameSdf.parse(rawDatePart)?.time
+                }.getOrNull()
+                BackupFileRecord(file.filename, parsedTimestamp ?: file.lastModifiedEpochMs, file.uri.toString())
             }
             val retention = BackupRetentionPolicy.evaluateRetention(records)
             for (toPrune in retention.filesToPrune) {

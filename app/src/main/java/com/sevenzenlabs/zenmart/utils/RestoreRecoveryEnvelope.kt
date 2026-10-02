@@ -323,8 +323,8 @@ object RestoreSnapshotValidator {
             }
         }
         snapshot.returnItems.forEach { rItem ->
-            if (rItem.id <= 0L || (returnIds.isNotEmpty() && rItem.returnId !in returnIds) ||
-                (saleItemIds.isNotEmpty() && rItem.saleItemId !in saleItemIds) ||
+            if (rItem.id <= 0L || rItem.returnId !in returnIds ||
+                rItem.saleItemId !in saleItemIds ||
                 rItem.productId !in productIds || !rItem.quantityReturned.isFinite() || rItem.quantityReturned <= 0.0 ||
                 rItem.lineRefundTotal < 0L
             ) {

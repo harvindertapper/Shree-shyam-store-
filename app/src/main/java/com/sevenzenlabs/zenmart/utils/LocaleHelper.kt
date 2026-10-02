@@ -370,6 +370,7 @@ interface AppStrings {
     val settingsSafVerifyAndSave: String
     val settingsSafEnterPhraseTitle: String
     val settingsSafFolderChange: String
+    val settingsSafPhraseMismatch: String
     val settingsBillingSection: String
     val settingsManualUpiSettlement: String
     val settingsManualUpiSettlementHint: String
@@ -915,11 +916,11 @@ object HindiStrings : AppStrings {
     override val settingsSafFolderLabel = "बैकअप फ़ोल्डर"
     override val settingsSafFolderSelect = "फ़ोल्डर चुनें"
     override val settingsSafFolderNotSelected = "कोई फ़ोल्डर नहीं चुना गया"
-    override val settingsSafRecoveryPhraseTitle = "12-शब्द रिकवरी की (Phrase)"
-    override val settingsSafRecoveryPhraseSetup = "रिकवरी की सेट करें"
-    override val settingsSafRecoveryPhraseConfigured = "रिकवरी की सुरक्षित रूप से सेट है"
-    override val settingsSafRecoveryPhraseDialogTitle = "आपकी 12-शब्द सीक्रेट रिकवरी की"
-    override val settingsSafRecoveryPhraseDialogWarning = "इन 12 शब्दों को कागज़ पर लिख कर सुरक्षित रखें। नया फोन आने पर इसी की से बैकअप खुलेगा। इसे किसी को न दिखाएँ।"
+    override val settingsSafRecoveryPhraseTitle = "12-शब्द रिकवरी फ़्रेज़"
+    override val settingsSafRecoveryPhraseSetup = "रिकवरी फ़्रेज़ सेट करें"
+    override val settingsSafRecoveryPhraseConfigured = "रिकवरी फ़्रेज़ सुरक्षित रूप से सेट है"
+    override val settingsSafRecoveryPhraseDialogTitle = "आपका 12-शब्द सीक्रेट रिकवरी फ़्रेज़"
+    override val settingsSafRecoveryPhraseDialogWarning = "इन 12 शब्दों को कागज़ पर लिख कर सुरक्षित रखें। नया फोन आने पर इसी फ़्रेज़ से बैकअप खुलेगा। इसे किसी को न दिखाएँ।"
     override val settingsSafRecoveryPhraseConfirmPrompt = "पुष्टि के लिए सभी 12 शब्द दर्ज करें:"
     override val settingsSafExportNow = "फ़ोल्डर में बैकअप लें"
     override val settingsSafRestoreFromFile = "फ़ाइल से रिस्टोर करें"
@@ -927,12 +928,13 @@ object HindiStrings : AppStrings {
     override val settingsSafStatusVerified = "बैकअप सुरक्षित है"
     override val settingsSafStatusNeeded = "बैकअप आवश्यक"
     override val settingsSafStatusFailed = "बैकअप विफल"
-    override val settingsSafEnterPhrasePrompt = "बैकअप खोलने के लिए 12-शब्द रिकवरी की दर्ज करें:"
+    override val settingsSafEnterPhrasePrompt = "बैकअप खोलने के लिए 12-शब्द रिकवरी फ़्रेज़ दर्ज करें:"
     override val settingsSafRestoreConfirmMsg = "यह बैकअप फ़ाइल वर्तमान डेटा को बदलेगी। पहले सुरक्षा के लिए रिकवरी पॉइंट बनेगा।"
-    override val settingsSafPhraseCopied = "रिकवरी की कॉपी हो गई"
+    override val settingsSafPhraseCopied = "रिकवरी फ़्रेज़ कॉपी हो गया"
     override val settingsSafVerifyAndSave = "सत्यापित करें और सहेजें"
-    override val settingsSafEnterPhraseTitle = "रिकवरी की दर्ज करें"
+    override val settingsSafEnterPhraseTitle = "रिकवरी फ़्रेज़ दर्ज करें"
     override val settingsSafFolderChange = "फ़ोल्डर बदलें"
+    override val settingsSafPhraseMismatch = "रिकवरी फ़्रेज़ मेल नहीं खाता या अमान्य है"
     override val settingsBillingSection = "बिलिंग और भुगतान"
     override val settingsManualUpiSettlement = "UPI भुगतान की पुष्टि"
     override val settingsManualUpiSettlementHint = "UPI भुगतान को बिल में दर्ज करें और वास्तविक settlement अपने बैंक/UPI ऐप में मैन्युअली जाँचें।"
@@ -1495,6 +1497,7 @@ object EnglishStrings : AppStrings {
     override val settingsSafVerifyAndSave = "Verify and save"
     override val settingsSafEnterPhraseTitle = "Enter recovery phrase"
     override val settingsSafFolderChange = "Change folder"
+    override val settingsSafPhraseMismatch = "Recovery phrase does not match or is invalid"
     override val settingsBillingSection = "Billing & payments"
     override val settingsManualUpiSettlement = "UPI payment confirmation"
     override val settingsManualUpiSettlementHint = "Record UPI payment in the bill and verify actual settlement manually in your bank or UPI app."

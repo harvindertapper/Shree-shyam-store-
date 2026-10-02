@@ -64,6 +64,7 @@ class SettingsLocaleContractTest {
             HindiStrings.settingsSafVerifyAndSave to EnglishStrings.settingsSafVerifyAndSave,
             HindiStrings.settingsSafEnterPhraseTitle to EnglishStrings.settingsSafEnterPhraseTitle,
             HindiStrings.settingsSafFolderChange to EnglishStrings.settingsSafFolderChange,
+            HindiStrings.settingsSafPhraseMismatch to EnglishStrings.settingsSafPhraseMismatch,
             HindiStrings.settingsBillingSection to EnglishStrings.settingsBillingSection,
             HindiStrings.settingsManualUpiSettlement to EnglishStrings.settingsManualUpiSettlement,
             HindiStrings.settingsManualUpiSettlementHint to EnglishStrings.settingsManualUpiSettlementHint,

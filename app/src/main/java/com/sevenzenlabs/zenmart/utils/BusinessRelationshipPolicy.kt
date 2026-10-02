@@ -92,10 +92,10 @@ object BusinessRelationshipPolicy {
             val returnIds = returns.map { it.id }.filter { it > 0L }.toSet()
             val saleItemIds = saleItems.map { it.id }.filter { it > 0L }.toSet()
             returnItems.forEach { rItem ->
-                require(rItem.returnId > 0L && (returnIds.isEmpty() || rItem.returnId in returnIds)) {
+                require(rItem.returnId > 0L && rItem.returnId in returnIds) {
                     "Return item references a missing return"
                 }
-                require(rItem.saleItemId > 0L && (saleItemIds.isEmpty() || rItem.saleItemId in saleItemIds)) {
+                require(rItem.saleItemId > 0L && rItem.saleItemId in saleItemIds) {
                     "Return item references a missing sale item"
                 }
                 require(rItem.productId > 0L && rItem.productId in productIds) {

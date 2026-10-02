@@ -31,7 +31,7 @@ object BackupRetentionPolicy {
     }
 
     private fun weekKey(epochMs: Long): String {
-        val sdf = SimpleDateFormat("yyyy-'W'ww", Locale.US)
+        val sdf = SimpleDateFormat("YYYY-'W'ww", Locale.US)
         sdf.timeZone = TimeZone.getTimeZone("UTC")
         return sdf.format(Date(epochMs))
     }

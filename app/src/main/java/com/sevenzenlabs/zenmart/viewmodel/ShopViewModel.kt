@@ -1653,11 +1653,11 @@ class ShopViewModel(
     }
 
     fun exportSafBackup(phraseWords: List<String>, onResult: (Boolean, String) -> Unit) {
-        if (!beginMutation { exportSafBackup(phraseWords, onResult) }) return
         val ctx = context ?: run {
             onResult(false, "Context unavailable")
             return
         }
+        if (!beginMutation { exportSafBackup(phraseWords, onResult) }) return
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper
             .getStrings(storeSettings.value.appLanguage)
         viewModelScope.launch {
@@ -1719,11 +1719,11 @@ class ShopViewModel(
     }
 
     fun restoreSafBackup(fileUri: Uri, phraseWords: List<String>, onResult: (Boolean, String) -> Unit) {
-        if (!beginMutation { restoreSafBackup(fileUri, phraseWords, onResult) }) return
         val ctx = context ?: run {
             onResult(false, "Context unavailable")
             return
         }
+        if (!beginMutation { restoreSafBackup(fileUri, phraseWords, onResult) }) return
         val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper
             .getStrings(storeSettings.value.appLanguage)
         viewModelScope.launch {

@@ -173,9 +173,9 @@ class SafBackupCoordinatorTest {
 
         // Seed initial data
         val cat = Category(id = 1L, globalId = "cat-1", name = "Snacks")
-        database.categoryDao().insertCategory(cat)
-        val prod = Product(id = 1L, globalId = "prod-1", name = "Biscuits", price = 1000L, costPrice = 800L, stock = 50.0, categoryId = 1L)
-        database.productDao().insertProduct(prod)
+        database.categoryDao().insert(cat)
+        val prod = Product(id = 1L, globalId = "prod-1", name = "Biscuits", mrp = 1000L, purchasePrice = 800L, currentStock = 50.0, categoryId = 1L)
+        database.productDao().insert(prod)
 
         val result = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
 
@@ -192,7 +192,7 @@ class SafBackupCoordinatorTest {
         val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
 
         // Seed initial data
-        database.categoryDao().insertCategory(Category(id = 1L, globalId = "cat-1", name = "Snacks"))
+        database.categoryDao().insert(Category(id = 1L, globalId = "cat-1", name = "Snacks"))
 
         fakeStorage.failReadBack = true
         val result = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
@@ -209,7 +209,7 @@ class SafBackupCoordinatorTest {
     fun exportEncryptedBackupDeletesFileWhenReadBackIsCorrupted() = runBlocking {
         val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
 
-        database.categoryDao().insertCategory(Category(id = 1L, globalId = "cat-1", name = "Snacks"))
+        database.categoryDao().insert(Category(id = 1L, globalId = "cat-1", name = "Snacks"))
 
         fakeStorage.corruptReadBack = true
         val result = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
@@ -223,7 +223,7 @@ class SafBackupCoordinatorTest {
     fun restoreEncryptedBackupRejectsWrongStoreId() = runBlocking {
         val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
 
-        database.categoryDao().insertCategory(Category(id = 1L, globalId = "cat-1", name = "Beverages"))
+        database.categoryDao().insert(Category(id = 1L, globalId = "cat-1", name = "Beverages"))
         val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
         assertTrue(exportResult.success)
 
@@ -243,17 +243,17 @@ class SafBackupCoordinatorTest {
 
         // Original database state
         val originalCat = Category(id = 10L, globalId = "cat-original", name = "Original Category")
-        val originalProd = Product(id = 10L, globalId = "prod-original", name = "Original Product", price = 5000L, costPrice = 4000L, stock = 20.0, categoryId = 10L)
-        database.categoryDao().insertCategory(originalCat)
-        database.productDao().insertProduct(originalProd)
+        val originalProd = Product(id = 10L, globalId = "prod-original", name = "Original Product", mrp = 5000L, purchasePrice = 4000L, currentStock = 20.0, categoryId = 10L)
+        database.categoryDao().insert(originalCat)
+        database.productDao().insert(originalProd)
 
         val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
         assertTrue(exportResult.success)
         val fileUri = fakeStorage.files.keys.first()
 
         // Modify local database to simulate new/wiped device
-        database.categoryDao().deleteAllCategories()
-        database.productDao().deleteAllProducts()
+        database.categoryDao().clearAllCategories()
+        database.productDao().clearAllProducts()
 
         assertEquals(0, repository.allCategories.first().size)
         assertEquals(0, repository.allProducts.first().size)

@@ -142,6 +142,9 @@ object RecoveryCryptoPolicy {
     ): SecretKey {
         require(words.size == MNEMONIC_WORD_COUNT) { "Recovery phrase must contain exactly 12 words" }
         require(salt.size >= SALT_LENGTH_BYTES) { "Salt must be at least $SALT_LENGTH_BYTES bytes" }
+        require(iterations in DEFAULT_KDF_ITERATIONS..1_000_000) {
+            "KDF iterations must be between $DEFAULT_KDF_ITERATIONS and 1,000,000"
+        }
         val normalized = normalizePhrase(words)
         val spec = PBEKeySpec(normalized.toCharArray(), salt, iterations, AES_KEY_SIZE_BITS)
         val factory = SecretKeyFactory.getInstance(KDF_ALGORITHM)
