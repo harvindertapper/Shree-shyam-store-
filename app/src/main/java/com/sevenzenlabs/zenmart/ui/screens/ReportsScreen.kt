@@ -133,6 +133,10 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
     }
     val isSalesHistoryLoading by reportsViewModel.isSalesHistoryLoading.collectAsState()
     val salesHistoryHasError by reportsViewModel.salesHistoryHasError.collectAsState()
+    val isReturnsHistoryLoading by reportsViewModel.isReturnsHistoryLoading.collectAsState()
+    val returnsHistoryHasError by reportsViewModel.returnsHistoryHasError.collectAsState()
+    val isReportLoading = isSalesHistoryLoading || isReturnsHistoryLoading
+    val reportHasError = salesHistoryHasError || returnsHistoryHasError
     val exportMessage = exportResult?.let { result ->
         when (result) {
             SalesExportResult.SHARED -> strings.reportsExportReady
@@ -157,7 +161,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 exportResult = result
                             }
                         },
-                        enabled = !isSalesHistoryLoading && !salesHistoryHasError && validRange != null,
+                        enabled = !isReportLoading && !reportHasError && validRange != null,
                         modifier = Modifier.testTag("export_sales_csv_button")
                     ) {
                         Icon(Icons.Default.Download, contentDescription = strings.commonExportSales, tint = SaffronPrimary)
@@ -226,15 +230,15 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 when {
-                    isSalesHistoryLoading -> item {
-                        ReportLoadingState(strings = strings, modifier = Modifier.testTag("report_loading_state"))
-                    }
-                    salesHistoryHasError -> item {
+                    reportHasError -> item {
                         ReportErrorState(
                             strings = strings,
                             onRetry = reportsViewModel::refreshSalesHistory,
                             modifier = Modifier.testTag("report_error_state")
                         )
+                    }
+                    isReportLoading -> item {
+                        ReportLoadingState(strings = strings, modifier = Modifier.testTag("report_loading_state"))
                     }
                     rangeResult is ReportRangeResult.Invalid -> item {
                         ReportEmptyState(
@@ -396,13 +400,25 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        PaymentDistributionDonutChart(
-                            viewModel = viewModel,
-                            cashAmount = reportSummary.cashNetPaise.coerceAtLeast(0L),
-                            upiAmount = reportSummary.upiNetPaise.coerceAtLeast(0L),
-                            udhaarAmount = reportSummary.udhaarNetPaise.coerceAtLeast(0L),
-                            totalAmount = reportSummary.netSalesPaise.coerceAtLeast(0L)
-                        )
+                        if (reportSummary.otherGrossPaise != 0L || reportSummary.otherRefundsPaise != 0L) {
+                            Text(
+                                text = "${strings.reportsOtherMode}: ${CurrencyUtils.formatRupees(reportSummary.otherNetPaise)}",
+                                fontSize = 12.sp,
+                                color = TextMediumGray
+                            )
+                        }
+                        // A non-positive mode or an unknown mode has no truthful pie-share.
+                        if (reportSummary.otherGrossPaise == 0L && reportSummary.otherRefundsPaise == 0L &&
+                            reportSummary.cashNetPaise >= 0L && reportSummary.upiNetPaise >= 0L &&
+                            reportSummary.udhaarNetPaise >= 0L && reportSummary.netSalesPaise > 0L) {
+                            PaymentDistributionDonutChart(
+                                viewModel = viewModel,
+                                cashAmount = reportSummary.cashNetPaise,
+                                upiAmount = reportSummary.upiNetPaise,
+                                udhaarAmount = reportSummary.udhaarNetPaise,
+                                totalAmount = reportSummary.netSalesPaise
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(12.dp))
 
@@ -1029,7 +1045,7 @@ fun WeeklySalesBarChart(
             
             val salesForDay = salesHistory.filter { it.createdAt in startMs..endMs }.sumOf { it.totalAmount }
             val returnsForDay = returnsHistory.filter { !it.isDeleted && it.createdAt in startMs..endMs }.sumOf { it.totalRefundAmount }
-            val totalForDay = (salesForDay - returnsForDay).coerceAtLeast(0L)
+            val totalForDay = salesForDay - returnsForDay
             dayTotals.add(totalForDay)
         }
         Pair(daysList, dayTotals)
@@ -1037,7 +1053,7 @@ fun WeeklySalesBarChart(
 
     val days = last7Days.first
     val totals = last7Days.second
-    val maxVal = remember(totals) { totals.maxOrNull()?.coerceAtLeast(1L) ?: 1L }
+    val maxVal = remember(totals) { totals.maxOfOrNull { kotlin.math.abs(it.toDouble()) }?.coerceAtLeast(1.0) ?: 1.0 }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -1067,22 +1083,22 @@ fun WeeklySalesBarChart(
                 verticalAlignment = Alignment.Bottom
             ) {
                 totals.forEachIndexed { index, total ->
-                    val fraction = (total.toDouble() / maxVal.toDouble()).toFloat().coerceIn(0.04f, 1f)
+                    val fraction = (kotlin.math.abs(total.toDouble()) / maxVal).toFloat().coerceIn(0.04f, 1f)
                     
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.weight(1f)
                     ) {
-                        if (total > 0) {
+                        if (total != 0L) {
                             Text(
                                 text = run {
                                     val rupees = total.toDouble() / 100.0
-                                    if (rupees >= 1000.0) String.format("%.1fk", rupees / 1000.0)
+                                    if (kotlin.math.abs(rupees) >= 1000.0) String.format("%.1fk", rupees / 1000.0)
                                     else MoneyUtils.toInputString(total)
                                 },
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Black,
-                                color = SaffronDark
+                                color = if (total < 0L) ErrorRed else SaffronDark
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                         }
@@ -1093,7 +1109,8 @@ fun WeeklySalesBarChart(
                                 .width(14.dp)
                                 .background(
                                     brush = Brush.verticalGradient(
-                                        colors = listOf(SaffronPrimary, SaffronLight)
+                                        colors = if (total < 0L) listOf(ErrorRed, ErrorRed)
+                                        else listOf(SaffronPrimary, SaffronLight)
                                     ),
                                     shape = RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp)
                                 )

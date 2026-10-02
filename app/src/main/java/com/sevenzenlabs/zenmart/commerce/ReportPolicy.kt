@@ -175,6 +175,11 @@ object ReportPolicy {
         val udhaarRefunds = includedReturns.filter { it.refundMode.startsWith("UDHAAR", ignoreCase = true) }.sumOf { it.totalRefundAmount }
         val udhaarNet = udhaarGross - udhaarRefunds
 
+        // Preserve the reconciliation invariant for imported or legacy payment modes.
+        val otherGross = grossSales - cashGross - upiGross - udhaarGross
+        val otherRefunds = totalRefunds - cashRefunds - upiRefunds - udhaarRefunds
+        val otherNet = otherGross - otherRefunds
+
         return ReportSummary(
             grossSalesPaise = grossSales,
             totalRefundsPaise = totalRefunds,
@@ -188,6 +193,9 @@ object ReportPolicy {
             udhaarGrossPaise = udhaarGross,
             udhaarRefundsPaise = udhaarRefunds,
             udhaarNetPaise = udhaarNet,
+            otherGrossPaise = otherGross,
+            otherRefundsPaise = otherRefunds,
+            otherNetPaise = otherNet,
             billsCount = includedSales.size,
             returnsCount = includedReturns.size
         )
@@ -259,6 +267,9 @@ data class ReportSummary(
     val udhaarGrossPaise: Long,
     val udhaarRefundsPaise: Long,
     val udhaarNetPaise: Long,
+    val otherGrossPaise: Long = 0L,
+    val otherRefundsPaise: Long = 0L,
+    val otherNetPaise: Long = 0L,
     val billsCount: Int,
     val returnsCount: Int = 0,
     val totalRevenuePaise: Long = netSalesPaise,

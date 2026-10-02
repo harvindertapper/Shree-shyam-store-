@@ -239,6 +239,22 @@ class ReportPolicyTest {
     }
 
     @Test
+    fun unknownModesRemainVisibleAndReconcileWithNetSales() {
+        val summary = ReportPolicy.summarize(
+            listOf(sale("legacy", 1L, PaymentState.RECEIVED.wireValue, "LEGACY", 3000L)),
+            listOf(returnRecord("legacy-return", 2L, 1200L, "LEGACY_REFUND"))
+        )
+
+        assertEquals(3000L, summary.otherGrossPaise)
+        assertEquals(1200L, summary.otherRefundsPaise)
+        assertEquals(1800L, summary.otherNetPaise)
+        assertEquals(
+            summary.netSalesPaise,
+            summary.cashNetPaise + summary.upiNetPaise + summary.udhaarNetPaise + summary.otherNetPaise
+        )
+    }
+
+    @Test
     fun crossDateReturnReconcilesCorrectlyAcrossSaleAndReturnDates() {
         val day1Start = localMillis(ReportDate(2026, 8, 25), 0)
         val day1Range = ReportDateRange(day1Start, day1Start + 24 * 60 * 60 * 1000L)

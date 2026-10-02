@@ -509,6 +509,7 @@ interface AppStrings {
     val reportsRefundsTitle: String
     val reportsReturnsCount: (Int) -> String
     val reportsRefundDeduction: (String) -> String
+    val reportsOtherMode: String
 
     // Returns & Refunds
     val returnAction: String
@@ -1047,6 +1048,7 @@ object HindiStrings : AppStrings {
     override val reportsRefundsTitle = "वापसी / रिफंड (Returns)"
     override val reportsReturnsCount: (Int) -> String = { count -> "$count वापसी दर्ज" }
     override val reportsRefundDeduction: (String) -> String = { amount -> "-$amount रिफंड" }
+    override val reportsOtherMode = "अन्य भुगतान माध्यम (शुद्ध)"
 
     // Returns & Refunds
     override val returnAction = "वापसी / रिफंड"
@@ -1585,6 +1587,7 @@ object EnglishStrings : AppStrings {
     override val reportsRefundsTitle = "Returns & refunds"
     override val reportsReturnsCount: (Int) -> String = { count -> "$count returns recorded" }
     override val reportsRefundDeduction: (String) -> String = { amount -> "-$amount refund" }
+    override val reportsOtherMode = "Other payment modes (net)"
 
     // Returns & Refunds
     override val returnAction = "Return / Refund"
