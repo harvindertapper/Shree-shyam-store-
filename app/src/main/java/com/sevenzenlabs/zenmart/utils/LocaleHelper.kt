@@ -519,6 +519,7 @@ interface AppStrings {
     val returnAlreadyRefunded: String
     val returnItemAlreadyReturned: String
     val returnRemainingQuantity: (Double, String) -> String
+    val returnQuantityLabel: (String) -> String
     val returnReasonDefective: String
     val returnReasonCustomerRequest: String
     val returnReasonWrongItem: String
@@ -1051,6 +1052,7 @@ object HindiStrings : AppStrings {
     override val returnAlreadyRefunded = "यह बिल पूरी तरह रिफंड हो चुका है"
     override val returnItemAlreadyReturned = "यह आइटम पूरा वापस हो चुका है"
     override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "शेष वापसी योग्य: $qty $unit" }
+    override val returnQuantityLabel: (String) -> String = { unit -> "वापसी की मात्रा ($unit)" }
     override val returnReasonDefective = "खराब सामान (Defective)"
     override val returnReasonCustomerRequest = "ग्राहक की इच्छा (Customer Request)"
     override val returnReasonWrongItem = "गलत सामान दिया गया (Wrong Item)"
@@ -1583,6 +1585,7 @@ object EnglishStrings : AppStrings {
     override val returnAlreadyRefunded = "This bill is fully refunded"
     override val returnItemAlreadyReturned = "Item fully returned"
     override val returnRemainingQuantity: (Double, String) -> String = { qty, unit -> "Remaining returnable: $qty $unit" }
+    override val returnQuantityLabel: (String) -> String = { unit -> "Return Quantity ($unit)" }
     override val returnReasonDefective = "Defective / Damaged"
     override val returnReasonCustomerRequest = "Customer Request"
     override val returnReasonWrongItem = "Wrong Item"

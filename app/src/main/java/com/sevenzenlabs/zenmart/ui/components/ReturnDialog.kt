@@ -32,6 +32,18 @@ import com.sevenzenlabs.zenmart.ui.theme.*
 import com.sevenzenlabs.zenmart.utils.AppStrings
 import com.sevenzenlabs.zenmart.utils.CurrencyUtils
 
+/**
+ * Interactive dialog allowing merchants to select returned items, fractional quantities,
+ * refund mode, and return reason with real-time refund amount estimation.
+ *
+ * @param sale The original sale being partially or fully returned.
+ * @param saleItems The items belonging to the original sale.
+ * @param remainingReturnables Map of item ID to remaining returnable quantity.
+ * @param strings Localized strings provider.
+ * @param isProcessing Whether a return submission is currently underway.
+ * @param onDismiss Callback invoked when the user cancels or dismisses the dialog.
+ * @param onConfirmReturn Callback invoked with return payload when confirmed.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReturnDialog(
@@ -226,11 +238,11 @@ fun ReturnDialog(
                                                 border = BorderStroke(0.5.dp, if (currentQty > 0.0) SaffronPrimary else Color.LightGray),
                                                 modifier = Modifier.clickable(!isProcessing) {
                                                     editingItem = item
-                                                    editingQuantityText = if (currentQty == 0.0) "" else if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "$currentQty"
+                                                    editingQuantityText = if (currentQty == 0.0) "" else if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else java.math.BigDecimal.valueOf(currentQty).toPlainString()
                                                 }
                                             ) {
                                                 Text(
-                                                    text = if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "%.2f".format(currentQty).trimEnd('0').trimEnd('.'),
+                                                    text = if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "%.2f".format(java.util.Locale.US, currentQty).trimEnd('0').trimEnd('.'),
                                                     fontWeight = FontWeight.Black,
                                                     fontSize = 13.sp,
                                                     color = if (currentQty > 0.0) SaffronDark else TextNearBlack,
@@ -469,7 +481,7 @@ fun ReturnDialog(
                         },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
-                        label = { Text("Return Quantity (${targetItem.unit})") },
+                        label = { Text(strings.returnQuantityLabel(targetItem.unit)) },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -478,16 +490,18 @@ fun ReturnDialog(
                 TextButton(
                     onClick = {
                         val parsed = editingQuantityText.toDoubleOrNull() ?: 0.0
-                        selectedQuantities[targetItem.id] = parsed.coerceIn(0.0, remaining)
+                        val rounded = Math.round(parsed * 100.0) / 100.0
+                        val maxRoundedRemaining = kotlin.math.floor(remaining * 100.0) / 100.0
+                        selectedQuantities[targetItem.id] = rounded.coerceIn(0.0, maxRoundedRemaining)
                         editingItem = null
                     }
                 ) {
-                    Text("OK", color = SaffronPrimary, fontWeight = FontWeight.Bold)
+                    Text(strings.commonOkay, color = SaffronPrimary, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { editingItem = null }) {
-                    Text("Cancel", color = TextMediumGray)
+                    Text(strings.cancel, color = TextMediumGray)
                 }
             }
         )

@@ -3,6 +3,7 @@ package com.sevenzenlabs.zenmart
 import android.content.Context
 import androidx.room.Room
 import com.sevenzenlabs.zenmart.commerce.CommandMetadata
+import com.sevenzenlabs.zenmart.commerce.CommerceValidation
 import com.sevenzenlabs.zenmart.commerce.PaymentMode
 import com.sevenzenlabs.zenmart.commerce.PaymentState
 import com.sevenzenlabs.zenmart.commerce.PlatformActor
@@ -345,6 +346,10 @@ class ReturnPolicyTest {
         assertEquals(-11000L, reversalTx.balanceEffect)
     }
 
+    /**
+     * Verifies that cashier role is authorized to process returns, while commands
+     * exceeding the staleness threshold (>5 minutes) are rejected on non-refunded sales.
+     */
     @Test
     fun cashierCanProcessReturnWhileStaleCommandFails() = runBlocking {
         authenticatedActor = cashierActor
@@ -433,6 +438,11 @@ class ReturnPolicyTest {
         }
     }
 
+    /**
+     * Verifies that returning fractional quantities (e.g. 1.25 kg of 2.5 kg Basmati Rice)
+     * correctly calculates refund amounts in paise, updates payment state, restores stock,
+     * and accurately tracks remaining returnable quantities.
+     */
     @Test
     fun fractionalQuantityReturnCalculatesCorrectRefundAndRestoresStock() = runBlocking {
         authenticatedActor = testActor
