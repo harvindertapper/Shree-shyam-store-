@@ -315,6 +315,8 @@ object RestoreSnapshotValidator {
         }
         val returnIds = snapshot.returns.map { it.id }.toSet()
         val saleItemIds = snapshot.saleItems.map { it.id }.toSet()
+        val returnsById = snapshot.returns.associateBy { it.id }
+        val saleItemsById = snapshot.saleItems.associateBy { it.id }
         snapshot.returns.forEach { ret ->
             if (ret.id <= 0L || ret.returnNumber.isBlank() || ret.saleId !in saleIds ||
                 ret.totalRefundAmount < 0L
@@ -323,10 +325,15 @@ object RestoreSnapshotValidator {
             }
         }
         snapshot.returnItems.forEach { rItem ->
+            val parentReturn = returnsById[rItem.returnId]
+            val saleItem = saleItemsById[rItem.saleItemId]
             if (rItem.id <= 0L || rItem.returnId !in returnIds ||
                 rItem.saleItemId !in saleItemIds ||
                 rItem.productId !in productIds || !rItem.quantityReturned.isFinite() || rItem.quantityReturned <= 0.0 ||
-                rItem.lineRefundTotal < 0L
+                rItem.lineRefundTotal < 0L ||
+                parentReturn == null || saleItem == null ||
+                parentReturn.saleId != saleItem.saleId ||
+                rItem.productId != saleItem.productId
             ) {
                 throw SnapshotReferentialIntegrityException("Invalid return item record ${rItem.globalId}")
             }

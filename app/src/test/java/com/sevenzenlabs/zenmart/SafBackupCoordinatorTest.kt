@@ -7,9 +7,17 @@ import androidx.test.core.app.ApplicationProvider
 import com.sevenzenlabs.zenmart.commerce.TenantScope
 import com.sevenzenlabs.zenmart.data.AppDatabase
 import com.sevenzenlabs.zenmart.data.Category
+import com.sevenzenlabs.zenmart.data.Customer
 import com.sevenzenlabs.zenmart.data.Product
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
+import com.sevenzenlabs.zenmart.data.Sale
+import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.SettingsDataStore
 import com.sevenzenlabs.zenmart.data.ShopRepository
+import com.sevenzenlabs.zenmart.data.StockAdjustment
+import com.sevenzenlabs.zenmart.data.UdhaarTransaction
+import com.sevenzenlabs.zenmart.recovery.BackupEnvelopeMalformedException
 import com.sevenzenlabs.zenmart.recovery.BackupRetentionPolicy
 import com.sevenzenlabs.zenmart.recovery.RecoveryCryptoPolicy
 import com.sevenzenlabs.zenmart.recovery.SafBackupCoordinator
@@ -270,5 +278,192 @@ class SafBackupCoordinatorTest {
         assertEquals("Original Category", restoredCategories.first().name)
         assertEquals(1, restoredProducts.size)
         assertEquals("Original Product", restoredProducts.first().name)
+    }
+
+    @Test
+    fun restoreEncryptedBackupFailsClosedOnCorruptedPayload() = runBlocking {
+        val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
+
+        val cat = Category(id = 1L, globalId = "cat-1", name = "Snacks")
+        database.categoryDao().insert(cat)
+        val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
+        assertTrue(exportResult.success)
+
+        val fileUri = fakeStorage.files.keys.first()
+        val originalContent = fakeStorage.files[fileUri]!!
+        // Tamper with ciphertext
+        fakeStorage.files[fileUri] = originalContent.replace(
+            Regex("\"ciphertextHex\":\"[0-9a-fA-F]{2}"),
+            "\"ciphertextHex\":\"00"
+        )
+
+        assertThrows(Exception::class.java) {
+            runBlocking {
+                coordinator.restoreEncryptedBackup(fileUri, validPhrase, tenant)
+            }
+        }
+        // Ensure local database state was NOT cleared or affected
+        assertEquals(1, repository.allCategories.first().size)
+    }
+
+    @Test
+    fun restoreEncryptedBackupFailsClosedOnUnsupportedEnvelopeVersion() = runBlocking {
+        val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
+
+        val cat = Category(id = 1L, globalId = "cat-1", name = "Snacks")
+        database.categoryDao().insert(cat)
+        val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
+        assertTrue(exportResult.success)
+
+        val fileUri = fakeStorage.files.keys.first()
+        val originalContent = fakeStorage.files[fileUri]!!
+        // Unsupported version 99
+        fakeStorage.files[fileUri] = originalContent.replace("\"version\":1", "\"version\":99")
+
+        assertThrows(BackupEnvelopeMalformedException::class.java) {
+            runBlocking {
+                coordinator.restoreEncryptedBackup(fileUri, validPhrase, tenant)
+            }
+        }
+        assertEquals(1, repository.allCategories.first().size)
+    }
+
+    @Test
+    fun restoreEncryptedBackupCapturesPreRestorePoint() = runBlocking {
+        val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
+
+        val cat = Category(id = 1L, globalId = "cat-1", name = "Snacks")
+        database.categoryDao().insert(cat)
+        val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
+        assertTrue(exportResult.success)
+
+        val fileUri = fakeStorage.files.keys.first()
+
+        // Modify local state
+        database.categoryDao().insert(Category(id = 2L, globalId = "cat-2", name = "Drinks"))
+        assertEquals(2, repository.allCategories.first().size)
+
+        val restoreResult = coordinator.restoreEncryptedBackup(fileUri, validPhrase, tenant)
+        assertTrue(restoreResult.success)
+
+        // Pre-restore point was saved in recoveryPointStore
+        assertTrue(recoveryPointStore.list().isNotEmpty())
+    }
+
+    @Test
+    fun restoreToCleanDeviceRestoresFullBusinessState() = runBlocking {
+        val treeUri = Uri.parse("content://fake.provider/tree/primary%3ABackups")
+
+        // Populate complete business data
+        val cat = Category(id = 1L, globalId = "cat-1", name = "Snacks")
+        database.categoryDao().insert(cat)
+
+        val prod = Product(id = 1L, globalId = "prod-1", name = "Chips", mrp = 2000L, purchasePrice = 1500L, currentStock = 10.0, categoryId = 1L)
+        database.productDao().insert(prod)
+
+        val customer = Customer(id = 1L, globalId = "cust-1", name = "Ramesh", phone = "9876543210")
+        database.customerDao().insertCustomer(customer)
+
+        val sale = Sale(id = 1L, globalId = "sale-1", billNumber = "BILL-001", customerId = 1L, totalAmount = 2000L, paymentMode = "CASH")
+        database.saleDao().insertSale(sale)
+
+        val saleItem = SaleItem(id = 1L, globalId = "item-1", saleId = 1L, productId = 1L, productNameSnapshot = "Chips", quantity = 1.0, unitPrice = 2000L, lineTotal = 2000L)
+        database.saleDao().insertSaleItem(saleItem)
+
+        val udhaar = UdhaarTransaction(id = 1L, globalId = "udh-1", customerId = 1L, saleId = 1L, type = "CREDIT", amount = 2000L, balanceEffect = 2000L)
+        database.udhaarDao().insertTransaction(udhaar)
+
+        val adjustment = StockAdjustment(id = 1L, globalId = "adj-1", productId = 1L, oldStock = 0.0, newStock = 10.0, difference = 10.0, reason = "Initial count")
+        database.stockAdjustmentDao().insertAdjustment(adjustment)
+
+        val ret = Return(id = 1L, globalId = "ret-1", returnNumber = "RET-001", saleId = 1L, originalBillNumber = "BILL-001", customerId = 1L, totalRefundAmount = 2000L, refundMode = "CASH")
+        database.returnDao().insertReturn(ret)
+
+        val returnItem = ReturnItem(id = 1L, globalId = "ret-item-1", returnId = 1L, saleItemId = 1L, productId = 1L, productNameSnapshot = "Chips", quantityReturned = 1.0, unitPrice = 2000L, lineRefundTotal = 2000L)
+        database.returnDao().insertReturnItems(listOf(returnItem))
+
+        val exportResult = coordinator.exportEncryptedBackup(treeUri, validPhrase, tenant)
+        assertTrue(exportResult.success)
+        assertEquals(8, exportResult.tableCounts.size)
+
+        val fileUri = fakeStorage.files.keys.first()
+
+        // Clean second device setup: fresh in-memory Room database and coordinator
+        val context: Context = ApplicationProvider.getApplicationContext()
+        val cleanDatabase = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+        val cleanRepository = ShopRepository(
+            categoryDao = cleanDatabase.categoryDao(),
+            productDao = cleanDatabase.productDao(),
+            saleDao = cleanDatabase.saleDao(),
+            customerDao = cleanDatabase.customerDao(),
+            udhaarDao = cleanDatabase.udhaarDao(),
+            stockAdjustmentDao = cleanDatabase.stockAdjustmentDao(),
+            userDao = cleanDatabase.userDao(),
+            database = cleanDatabase,
+            shopProfileDao = cleanDatabase.shopProfileDao(),
+            returnDao = cleanDatabase.returnDao()
+        )
+        val cleanRecoveryDir = File.createTempFile("clean-device-recovery", "").apply {
+            delete()
+            mkdirs()
+        }
+        val cleanRecoveryStore = LocalRecoveryPointStore(cleanRecoveryDir)
+        val cleanSettingsDataStore = SettingsDataStore(context)
+        val cleanCoordinator = SafBackupCoordinator(
+            safStorage = fakeStorage,
+            settingsDataStore = cleanSettingsDataStore,
+            repository = cleanRepository,
+            recoveryPointStore = cleanRecoveryStore
+        )
+
+        // Verify clean device is initially empty
+        assertEquals(0, cleanRepository.allCategories.first().size)
+        assertEquals(0, cleanRepository.allProducts.first().size)
+        assertEquals(0, cleanRepository.allSales.first().size)
+        assertEquals(0, cleanRepository.allCustomers.first().size)
+        assertEquals(0, cleanRepository.allUdhaarTransactions.first().size)
+        assertEquals(0, cleanRepository.getAllStockAdjustmentsList().size)
+        assertEquals(0, cleanRepository.allReturnsList().size)
+
+        // Restore onto clean device
+        val restoreResult = cleanCoordinator.restoreEncryptedBackup(fileUri, validPhrase, tenant)
+        assertTrue(restoreResult.success)
+
+        // Assert all business domains are restored with full fidelity
+        assertEquals(1, cleanRepository.allCategories.first().size)
+        assertEquals("Snacks", cleanRepository.allCategories.first().first().name)
+
+        assertEquals(1, cleanRepository.allProducts.first().size)
+        val restoredProduct = cleanRepository.allProducts.first().first()
+        assertEquals("Chips", restoredProduct.name)
+        assertEquals(2000L, restoredProduct.mrp)
+
+        assertEquals(1, cleanRepository.allSales.first().size)
+        assertEquals("BILL-001", cleanRepository.allSales.first().first().billNumber)
+
+        val restoredSaleItems = cleanRepository.getAllSaleItems()
+        assertEquals(1, restoredSaleItems.size)
+        assertEquals(1.0, restoredSaleItems.first().quantity, 0.001)
+
+        assertEquals(1, cleanRepository.allCustomers.first().size)
+        assertEquals("Ramesh", cleanRepository.allCustomers.first().first().name)
+
+        assertEquals(1, cleanRepository.allUdhaarTransactions.first().size)
+        assertEquals(2000L, cleanRepository.allUdhaarTransactions.first().first().amount)
+
+        assertEquals(1, cleanRepository.getAllStockAdjustmentsList().size)
+        assertEquals("Initial count", cleanRepository.getAllStockAdjustmentsList().first().reason)
+
+        assertEquals(1, cleanRepository.allReturnsList().size)
+        assertEquals("RET-001", cleanRepository.allReturnsList().first().returnNumber)
+
+        val restoredReturnItems = cleanRepository.getAllReturnItemsList()
+        assertEquals(1, restoredReturnItems.size)
+        assertEquals(2000L, restoredReturnItems.first().lineRefundTotal)
+
+        cleanDatabase.close()
+        cleanRecoveryDir.deleteRecursively()
     }
 }

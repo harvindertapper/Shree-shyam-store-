@@ -91,6 +91,8 @@ object BusinessRelationshipPolicy {
             requireUnique("return_items.globalId", returnItems.map { it.globalId })
             val returnIds = returns.map { it.id }.filter { it > 0L }.toSet()
             val saleItemIds = saleItems.map { it.id }.filter { it > 0L }.toSet()
+            val returnsById = returns.associateBy { it.id }
+            val saleItemsById = saleItems.associateBy { it.id }
             returnItems.forEach { rItem ->
                 require(rItem.returnId > 0L && rItem.returnId in returnIds) {
                     "Return item references a missing return"
@@ -100,6 +102,15 @@ object BusinessRelationshipPolicy {
                 }
                 require(rItem.productId > 0L && rItem.productId in productIds) {
                     "Return item references a missing product"
+                }
+                val parentReturn = returnsById[rItem.returnId]
+                val saleItem = saleItemsById[rItem.saleItemId]
+                require(
+                    parentReturn != null && saleItem != null &&
+                    parentReturn.saleId == saleItem.saleId &&
+                    rItem.productId == saleItem.productId
+                ) {
+                    "Return item does not match parent return sale or sale item product"
                 }
             }
         }
