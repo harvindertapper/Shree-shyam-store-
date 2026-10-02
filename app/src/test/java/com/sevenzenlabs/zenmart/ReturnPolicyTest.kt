@@ -396,19 +396,107 @@ class ReturnPolicyTest {
         )
         assertEquals(PaymentState.REFUNDED, res.updatedPaymentState)
 
-        // Stale command (> 5 min old) must be rejected
+        // Stale command (> 5 min old) must be rejected on a fresh non-refunded sale
+        val staleSaleId = repository.completeBillCheckout(
+            Sale(
+                billNumber = "BILL-STALE-505",
+                totalAmount = 60000L,
+                paymentMode = PaymentMode.CASH.name,
+                receivedAmount = 60000L
+            ),
+            listOf(
+                SaleItem(
+                    saleId = 0L,
+                    productId = productId,
+                    productNameSnapshot = "Ghee 1L",
+                    quantity = 1.0,
+                    unit = "pcs",
+                    unitPrice = 60000L,
+                    lineTotal = 60000L
+                )
+            ),
+            command = command(actor = cashierActor)
+        )
+        val staleSaleItems = repository.getSaleItemsForSaleList(staleSaleId)
         val staleTime = System.currentTimeMillis() - 10 * 60 * 1000L
         try {
             repository.processReturn(
-                saleId = saleId,
-                itemsToReturn = listOf(ItemReturnRequest(saleItems[0].id, 1.0)),
+                saleId = staleSaleId,
+                itemsToReturn = listOf(ItemReturnRequest(staleSaleItems[0].id, 1.0)),
                 refundMode = "CASH",
                 reason = "Stale attempt",
                 command = command(actor = cashierActor, clientCreatedAt = staleTime)
             )
             fail("Expected exception for stale command")
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message!!.contains("stale") || e.message!!.contains("already fully refunded"))
+            assertTrue(e.message!!.contains("stale", ignoreCase = true))
         }
+    }
+
+    @Test
+    fun fractionalQuantityReturnCalculatesCorrectRefundAndRestoresStock() = runBlocking {
+        authenticatedActor = testActor
+        val categoryId = repository.insertCategory(Category(name = "Grains"), command())
+        val productId = repository.insertProductWithOpeningStock(
+            Product(
+                name = "Basmati Rice Loose",
+                categoryId = categoryId,
+                mrp = 10000L,
+                sellingPrice = 9000L,
+                currentStock = 10.0,
+                unit = "kg",
+                trackStock = true
+            ),
+            openingStock = 10.0,
+            command = command()
+        )
+
+        // Checkout 2.5 kg at 90.00 / kg = 225.00 (22500 paise)
+        val lineTotal = CommerceValidation.calculateLineTotal(9000L, 2.5)
+        val saleId = repository.completeBillCheckout(
+            Sale(
+                billNumber = "BILL-FRAC-606",
+                totalAmount = lineTotal,
+                paymentMode = PaymentMode.CASH.name,
+                receivedAmount = lineTotal
+            ),
+            listOf(
+                SaleItem(
+                    saleId = 0L,
+                    productId = productId,
+                    productNameSnapshot = "Basmati Rice Loose",
+                    quantity = 2.5,
+                    unit = "kg",
+                    unitPrice = 9000L,
+                    lineTotal = lineTotal
+                )
+            ),
+            command = command()
+        )
+
+        val prodAfterSale = repository.getProductById(productId)!!
+        assertEquals(7.5, prodAfterSale.currentStock, 0.001)
+
+        val saleItems = repository.getSaleItemsForSaleList(saleId)
+
+        // Partial fractional return: 1.25 kg
+        val returnResult = repository.processReturn(
+            saleId = saleId,
+            itemsToReturn = listOf(ItemReturnRequest(saleItemId = saleItems[0].id, quantityReturned = 1.25)),
+            refundMode = "CASH",
+            reason = "Customer returned 1.25 kg",
+            command = command()
+        )
+
+        val expectedRefund = CommerceValidation.calculateLineTotal(9000L, 1.25)
+        assertEquals(expectedRefund, returnResult.totalRefundAmount)
+        assertEquals(PaymentState.PARTIALLY_REFUNDED, returnResult.updatedPaymentState)
+
+        // Stock restored by 1.25 kg: 7.5 + 1.25 = 8.75 kg
+        val prodAfterReturn = repository.getProductById(productId)!!
+        assertEquals(8.75, prodAfterReturn.currentStock, 0.001)
+
+        val remaining = repository.getRemainingReturnableQuantities(saleId)
+        assertEquals(1.25, remaining[saleItems[0].id]!!, 0.001)
     }
 }

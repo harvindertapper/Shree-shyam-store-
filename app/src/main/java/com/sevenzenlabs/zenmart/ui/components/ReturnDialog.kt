@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -18,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +44,8 @@ fun ReturnDialog(
     onConfirmReturn: (itemsToReturn: List<ItemReturnRequest>, refundMode: String, reason: String, note: String?) -> Unit
 ) {
     val selectedQuantities = remember { mutableStateMapOf<Long, Double>() }
+    var editingItem by remember { mutableStateOf<SaleItem?>(null) }
+    var editingQuantityText by remember { mutableStateOf("") }
     var selectedReason by remember { mutableStateOf(strings.returnReasonCustomerRequest) }
     var reasonDropdownExpanded by remember { mutableStateOf(false) }
     var customNote by remember { mutableStateOf("") }
@@ -216,14 +220,26 @@ fun ReturnDialog(
                                                 )
                                             }
 
-                                            Text(
-                                                text = if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "%.1f".format(currentQty),
-                                                fontWeight = FontWeight.Black,
-                                                fontSize = 13.sp,
-                                                color = if (currentQty > 0.0) SaffronDark else TextNearBlack,
-                                                modifier = Modifier.widthIn(min = 24.dp),
-                                                textAlign = TextAlign.Center
-                                            )
+                                            Surface(
+                                                shape = RoundedCornerShape(6.dp),
+                                                color = if (currentQty > 0.0) Color(0xFFFFF3E0) else Color(0xFFF5F5F5),
+                                                border = BorderStroke(0.5.dp, if (currentQty > 0.0) SaffronPrimary else Color.LightGray),
+                                                modifier = Modifier.clickable(!isProcessing) {
+                                                    editingItem = item
+                                                    editingQuantityText = if (currentQty == 0.0) "" else if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "$currentQty"
+                                                }
+                                            ) {
+                                                Text(
+                                                    text = if (currentQty % 1.0 == 0.0) "${currentQty.toLong()}" else "%.2f".format(currentQty).trimEnd('0').trimEnd('.'),
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 13.sp,
+                                                    color = if (currentQty > 0.0) SaffronDark else TextNearBlack,
+                                                    modifier = Modifier
+                                                        .widthIn(min = 32.dp)
+                                                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                                                    textAlign = TextAlign.Center
+                                                )
+                                            }
 
                                             IconButton(
                                                 onClick = {
@@ -422,5 +438,58 @@ fun ReturnDialog(
                 }
             }
         }
+    }
+
+    if (editingItem != null) {
+        val targetItem = editingItem!!
+        val remaining = remainingReturnables[targetItem.id] ?: 0.0
+        AlertDialog(
+            onDismissRequest = { editingItem = null },
+            title = {
+                Text(
+                    text = targetItem.productNameSnapshot,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = TextNearBlack
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = strings.returnRemainingQuantity(remaining, targetItem.unit),
+                        fontSize = 12.sp,
+                        color = TextMediumGray
+                    )
+                    OutlinedTextField(
+                        value = editingQuantityText,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.matches(Regex("""^\d*(\.\d*)?$"""))) {
+                                editingQuantityText = input
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        label = { Text("Return Quantity (${targetItem.unit})") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val parsed = editingQuantityText.toDoubleOrNull() ?: 0.0
+                        selectedQuantities[targetItem.id] = parsed.coerceIn(0.0, remaining)
+                        editingItem = null
+                    }
+                ) {
+                    Text("OK", color = SaffronPrimary, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingItem = null }) {
+                    Text("Cancel", color = TextMediumGray)
+                }
+            }
+        )
     }
 }
