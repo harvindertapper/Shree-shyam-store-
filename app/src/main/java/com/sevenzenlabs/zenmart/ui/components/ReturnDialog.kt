@@ -490,8 +490,12 @@ fun ReturnDialog(
                 TextButton(
                     onClick = {
                         val parsed = editingQuantityText.toDoubleOrNull() ?: 0.0
-                        val rounded = Math.round(parsed * 100.0) / 100.0
-                        val maxRoundedRemaining = kotlin.math.floor(remaining * 100.0) / 100.0
+                        val rounded = java.math.BigDecimal.valueOf(parsed)
+                            .setScale(2, java.math.RoundingMode.HALF_UP)
+                            .toDouble()
+                        val maxRoundedRemaining = java.math.BigDecimal.valueOf(remaining)
+                            .setScale(2, java.math.RoundingMode.FLOOR)
+                            .toDouble()
                         selectedQuantities[targetItem.id] = rounded.coerceIn(0.0, maxRoundedRemaining)
                         editingItem = null
                     }
