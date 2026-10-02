@@ -504,6 +504,11 @@ interface AppStrings {
     val reportsPaymentModeSplit: String
     val reportsTotal: String
     val reportsWeeklyTrend: String
+    val reportsNetSalesTitle: String
+    val reportsGrossSalesTitle: String
+    val reportsRefundsTitle: String
+    val reportsReturnsCount: (Int) -> String
+    val reportsRefundDeduction: (String) -> String
 
     // Returns & Refunds
     val returnAction: String
@@ -1037,6 +1042,11 @@ object HindiStrings : AppStrings {
     override val reportsPaymentModeSplit = "भुगतान माध्यम वितरण"
     override val reportsTotal = "कुल बिक्री"
     override val reportsWeeklyTrend = "पिछले 7 दिनों की बिक्री"
+    override val reportsNetSalesTitle = "शुद्ध बिक्री (Net Sales)"
+    override val reportsGrossSalesTitle = "सकल बिक्री (Gross Sales)"
+    override val reportsRefundsTitle = "वापसी / रिफंड (Returns)"
+    override val reportsReturnsCount: (Int) -> String = { count -> "$count वापसी दर्ज" }
+    override val reportsRefundDeduction: (String) -> String = { amount -> "-$amount रिफंड" }
 
     // Returns & Refunds
     override val returnAction = "वापसी / रिफंड"
@@ -1570,6 +1580,11 @@ object EnglishStrings : AppStrings {
     override val reportsPaymentModeSplit = "Payment mode split"
     override val reportsTotal = "Total"
     override val reportsWeeklyTrend = "Weekly sales trend"
+    override val reportsNetSalesTitle = "Net sales"
+    override val reportsGrossSalesTitle = "Gross sales"
+    override val reportsRefundsTitle = "Returns & refunds"
+    override val reportsReturnsCount: (Int) -> String = { count -> "$count returns recorded" }
+    override val reportsRefundDeduction: (String) -> String = { amount -> "-$amount refund" }
 
     // Returns & Refunds
     override val returnAction = "Return / Refund"

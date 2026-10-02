@@ -38,6 +38,9 @@ class ReportsViewModel(
     private val _salesHistory = MutableStateFlow<List<Sale>>(emptyList())
     val salesHistory: StateFlow<List<Sale>> = _salesHistory
 
+    private val _returnsHistory = MutableStateFlow<List<Return>>(emptyList())
+    val returnsHistory: StateFlow<List<Return>> = _returnsHistory
+
     private val _isSalesHistoryLoading = MutableStateFlow(true)
     val isSalesHistoryLoading: StateFlow<Boolean> = _isSalesHistoryLoading
 
@@ -55,17 +58,26 @@ class ReportsViewModel(
         _isSalesHistoryLoading.value = true
         _salesHistoryHasError.value = false
         salesHistoryJob = viewModelScope.launch {
-            repository.allSales
-                .catch {
-                    _isSalesHistoryLoading.value = false
-                    _salesHistoryHasError.value = true
-                    emit(emptyList())
-                }
-                .collect { sales ->
-                    _salesHistory.value = sales
-                    _isSalesHistoryLoading.value = false
-                    _salesHistoryHasError.value = false
-                }
+            launch {
+                repository.allSales
+                    .catch {
+                        _isSalesHistoryLoading.value = false
+                        _salesHistoryHasError.value = true
+                        emit(emptyList())
+                    }
+                    .collect { sales ->
+                        _salesHistory.value = sales
+                        _isSalesHistoryLoading.value = false
+                        _salesHistoryHasError.value = false
+                    }
+            }
+            launch {
+                repository.allReturns
+                    .catch { emit(emptyList()) }
+                    .collect { returns ->
+                        _returnsHistory.value = returns
+                    }
+            }
         }
     }
 

@@ -34,6 +34,7 @@ import com.sevenzenlabs.zenmart.commerce.ReportInterval
 import com.sevenzenlabs.zenmart.commerce.ReportPolicy
 import com.sevenzenlabs.zenmart.commerce.ReportRangeError
 import com.sevenzenlabs.zenmart.commerce.ReportRangeResult
+import com.sevenzenlabs.zenmart.data.Return
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.ui.theme.*
 import com.sevenzenlabs.zenmart.utils.AppStrings
@@ -61,6 +62,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
     val sales by reportsViewModel.salesHistory.collectAsState()
+    val returns by reportsViewModel.returnsHistory.collectAsState()
     val customers by viewModel.customers.collectAsState()
 
     var selectedViewSale by remember { mutableStateOf<Sale?>(null) }
@@ -120,7 +122,15 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
     val filteredSales = remember(eligibleSales, validRange) {
         validRange?.let { ReportPolicy.filterSales(eligibleSales, it) } ?: emptyList()
     }
-    val reportSummary = remember(filteredSales) { ReportPolicy.summarize(filteredSales) }
+    val eligibleReturns = remember(returns) {
+        ReportPolicy.filterReturns(returns, ReportDateRange(startInclusiveMillis = null, endExclusiveMillis = null))
+    }
+    val filteredReturns = remember(eligibleReturns, validRange) {
+        validRange?.let { ReportPolicy.filterReturns(eligibleReturns, it) } ?: emptyList()
+    }
+    val reportSummary = remember(filteredSales, filteredReturns) {
+        ReportPolicy.summarize(filteredSales, filteredReturns)
+    }
     val isSalesHistoryLoading by reportsViewModel.isSalesHistoryLoading.collectAsState()
     val salesHistoryHasError by reportsViewModel.salesHistoryHasError.collectAsState()
     val exportMessage = exportResult?.let { result ->
@@ -250,10 +260,10 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                     .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                val salesVolumeTitle = strings.reportsTotalSalesTitle
+                                val salesVolumeTitle = strings.reportsNetSalesTitle
                                 Text(salesVolumeTitle, fontSize = 14.sp, color = TextMutedGray, fontWeight = FontWeight.Bold)
                                 Text(
-                                    text = CurrencyUtils.formatRupees(reportSummary.totalRevenuePaise),
+                                    text = CurrencyUtils.formatRupees(reportSummary.netSalesPaise),
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Black,
                                     color = SaffronDark
@@ -261,6 +271,46 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Spacer(modifier = Modifier.height(4.dp))
                                 val billCountMsg = strings.reportsBillsGenerated(reportSummary.billsCount)
                                 Text(billCountMsg, fontSize = 12.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
+
+                                if (reportSummary.totalRefundsPaise > 0L || reportSummary.returnsCount > 0) {
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    HorizontalDivider(color = BorderSubtle, thickness = 1.dp)
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(horizontalAlignment = Alignment.Start) {
+                                            Text(
+                                                strings.reportsGrossSalesTitle,
+                                                fontSize = 11.sp,
+                                                color = TextMediumGray,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                CurrencyUtils.formatRupees(reportSummary.grossSalesPaise),
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = TextNearBlack
+                                            )
+                                        }
+                                        Column(horizontalAlignment = Alignment.End) {
+                                            Text(
+                                                strings.reportsRefundsTitle,
+                                                fontSize = 11.sp,
+                                                color = TextMediumGray,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                "-${CurrencyUtils.formatRupees(reportSummary.totalRefundsPaise)} (${strings.reportsReturnsCount(reportSummary.returnsCount)})",
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ErrorRed
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -277,11 +327,19 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.cash, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(reportSummary.cashRevenuePaise),
+                                        CurrencyUtils.formatRupees(reportSummary.cashNetPaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = SuccessGreen
                                     )
+                                    if (reportSummary.cashRefundsPaise > 0L) {
+                                        Text(
+                                            strings.reportsRefundDeduction(CurrencyUtils.formatRupees(reportSummary.cashRefundsPaise)),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ErrorRed
+                                        )
+                                    }
                                 }
                             }
 
@@ -294,11 +352,19 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.upiPaytm, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(reportSummary.upiRevenuePaise),
+                                        CurrencyUtils.formatRupees(reportSummary.upiNetPaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = Color(0xFF0E5A94)
                                     )
+                                    if (reportSummary.upiRefundsPaise > 0L) {
+                                        Text(
+                                            strings.reportsRefundDeduction(CurrencyUtils.formatRupees(reportSummary.upiRefundsPaise)),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = ErrorRed
+                                        )
+                                    }
                                 }
                             }
 
@@ -311,11 +377,19 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                     Text(strings.udhaar, fontSize = 11.sp, color = TextMediumGray, fontWeight = FontWeight.Bold)
                                     Text(
-                                        CurrencyUtils.formatRupees(reportSummary.udhaarRevenuePaise),
+                                        CurrencyUtils.formatRupees(reportSummary.udhaarNetPaise),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Black,
                                         color = ErrorRed
                                     )
+                                    if (reportSummary.udhaarRefundsPaise > 0L) {
+                                        Text(
+                                            strings.reportsRefundDeduction(CurrencyUtils.formatRupees(reportSummary.udhaarRefundsPaise)),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = TextMutedGray
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -324,17 +398,18 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                         PaymentDistributionDonutChart(
                             viewModel = viewModel,
-                            cashAmount = reportSummary.cashRevenuePaise,
-                            upiAmount = reportSummary.upiRevenuePaise,
-                            udhaarAmount = reportSummary.udhaarRevenuePaise,
-                            totalAmount = reportSummary.totalRevenuePaise
+                            cashAmount = reportSummary.cashNetPaise.coerceAtLeast(0L),
+                            upiAmount = reportSummary.upiNetPaise.coerceAtLeast(0L),
+                            udhaarAmount = reportSummary.udhaarNetPaise.coerceAtLeast(0L),
+                            totalAmount = reportSummary.netSalesPaise.coerceAtLeast(0L)
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
                         WeeklySalesBarChart(
                             viewModel = viewModel,
-                            salesHistory = eligibleSales
+                            salesHistory = eligibleSales,
+                            returnsHistory = eligibleReturns
                         )
                     }
                 }
@@ -440,6 +515,25 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
                                                 else -> SuccessGreen
                                             }
                                         )
+                                    }
+                                    val paymentState = runCatching { PaymentState.fromWireValue(sale.paymentState) }.getOrNull()
+                                    if (paymentState == PaymentState.PARTIALLY_REFUNDED || paymentState == PaymentState.REFUNDED) {
+                                        Box(
+                                            modifier = Modifier
+                                                .padding(top = 4.dp)
+                                                .background(
+                                                    color = Color(0xFFFEF2F2),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = reportPaymentStateLabel(sale.paymentState, strings),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ErrorRed
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -901,15 +995,16 @@ fun PaymentDistributionDonutChart(
 @Composable
 fun WeeklySalesBarChart(
     viewModel: ShopViewModel,
-    salesHistory: List<Sale>
+    salesHistory: List<Sale>,
+    returnsHistory: List<Return> = emptyList()
 ) {
     val settings by viewModel.storeSettings.collectAsState()
     val strings = remember(settings.appLanguage) { LocaleHelper.getStrings(settings.appLanguage) }
 
-    if (salesHistory.isEmpty()) return
+    if (salesHistory.isEmpty() && returnsHistory.isEmpty()) return
 
     // Get sales over the last 7 days
-    val last7Days = remember(salesHistory) {
+    val last7Days = remember(salesHistory, returnsHistory) {
         val daysList = mutableListOf<String>()
         val dayTotals = mutableListOf<Long>()
         
@@ -932,7 +1027,9 @@ fun WeeklySalesBarChart(
             cal.set(java.util.Calendar.MILLISECOND, 999)
             val endMs = cal.timeInMillis
             
-            val totalForDay = salesHistory.filter { it.createdAt in startMs..endMs }.sumOf { it.totalAmount }
+            val salesForDay = salesHistory.filter { it.createdAt in startMs..endMs }.sumOf { it.totalAmount }
+            val returnsForDay = returnsHistory.filter { !it.isDeleted && it.createdAt in startMs..endMs }.sumOf { it.totalRefundAmount }
+            val totalForDay = (salesForDay - returnsForDay).coerceAtLeast(0L)
             dayTotals.add(totalForDay)
         }
         Pair(daysList, dayTotals)

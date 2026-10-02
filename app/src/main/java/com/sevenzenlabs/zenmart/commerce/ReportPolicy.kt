@@ -1,5 +1,6 @@
 package com.sevenzenlabs.zenmart.commerce
 
+import com.sevenzenlabs.zenmart.data.Return
 import com.sevenzenlabs.zenmart.data.Sale
 import java.util.Calendar
 import java.util.Locale
@@ -81,12 +82,11 @@ sealed interface ReportRangeResult {
 }
 
 /**
- * Report inclusion policy: deleted records and FAILED/REFUNDED payment states
- * are excluded from revenue. PENDING is included because it is a locally saved
- * bill whose payment state is not yet finalized; settlement remains separate.
- * PARTIALLY_REFUNDED is included as gross recorded sales because no refund
- * amount exists on Sale from which a net value could be calculated. Invalid
- * payment-state values are excluded rather than guessed.
+ * Report inclusion policy: deleted records and FAILED payment states are excluded
+ * from revenue. PENDING, RECEIVED, NOT_REQUIRED, PARTIALLY_REFUNDED, and REFUNDED
+ * sales are included as gross recorded sales. Returns and refunds are tracked as
+ * separate event deductions to calculate net sales and avoid double-deducting refunds.
+ * Invalid payment-state values are excluded rather than guessed.
  */
 object ReportPolicy {
     fun resolveRange(
@@ -147,14 +147,49 @@ object ReportPolicy {
             isIncludedSale(sale) && range.contains(sale.createdAt)
         }
 
-    fun summarize(sales: Iterable<Sale>): ReportSummary {
+    fun filterReturns(returns: Iterable<Return>, range: ReportDateRange): List<Return> =
+        returns.filter { ret ->
+            isIncludedReturn(ret) && range.contains(ret.createdAt)
+        }
+
+    fun summarize(
+        sales: Iterable<Sale>,
+        returns: Iterable<Return> = emptyList()
+    ): ReportSummary {
         val includedSales = sales.filter(::isIncludedSale)
+        val includedReturns = returns.filter(::isIncludedReturn)
+
+        val grossSales = includedSales.sumOf { it.totalAmount }
+        val totalRefunds = includedReturns.sumOf { it.totalRefundAmount }
+        val netSales = grossSales - totalRefunds
+
+        val cashGross = includedSales.filter { it.paymentMode.equals("CASH", ignoreCase = true) }.sumOf { it.totalAmount }
+        val cashRefunds = includedReturns.filter { it.refundMode.equals("CASH", ignoreCase = true) }.sumOf { it.totalRefundAmount }
+        val cashNet = cashGross - cashRefunds
+
+        val upiGross = includedSales.filter { it.paymentMode.equals("UPI", ignoreCase = true) }.sumOf { it.totalAmount }
+        val upiRefunds = includedReturns.filter { it.refundMode.equals("UPI", ignoreCase = true) }.sumOf { it.totalRefundAmount }
+        val upiNet = upiGross - upiRefunds
+
+        val udhaarGross = includedSales.filter { it.paymentMode.equals("UDHAAR", ignoreCase = true) }.sumOf { it.totalAmount }
+        val udhaarRefunds = includedReturns.filter { it.refundMode.startsWith("UDHAAR", ignoreCase = true) }.sumOf { it.totalRefundAmount }
+        val udhaarNet = udhaarGross - udhaarRefunds
+
         return ReportSummary(
-            totalRevenuePaise = includedSales.sumOf { it.totalAmount },
-            cashRevenuePaise = includedSales.filter { it.paymentMode == "CASH" }.sumOf { it.totalAmount },
-            upiRevenuePaise = includedSales.filter { it.paymentMode == "UPI" }.sumOf { it.totalAmount },
-            udhaarRevenuePaise = includedSales.filter { it.paymentMode == "UDHAAR" }.sumOf { it.totalAmount },
-            billsCount = includedSales.size
+            grossSalesPaise = grossSales,
+            totalRefundsPaise = totalRefunds,
+            netSalesPaise = netSales,
+            cashGrossPaise = cashGross,
+            cashRefundsPaise = cashRefunds,
+            cashNetPaise = cashNet,
+            upiGrossPaise = upiGross,
+            upiRefundsPaise = upiRefunds,
+            upiNetPaise = upiNet,
+            udhaarGrossPaise = udhaarGross,
+            udhaarRefundsPaise = udhaarRefunds,
+            udhaarNetPaise = udhaarNet,
+            billsCount = includedSales.size,
+            returnsCount = includedReturns.size
         )
     }
 
@@ -162,8 +197,12 @@ object ReportPolicy {
         if (sale.isDeleted || sale.totalAmount <= 0L) return false
         return runCatching { PaymentState.fromWireValue(sale.paymentState) }
             .getOrNull()
-            ?.let { state -> state != PaymentState.FAILED && state != PaymentState.REFUNDED }
+            ?.let { state -> state != PaymentState.FAILED }
             ?: false
+    }
+
+    private fun isIncludedReturn(ret: Return): Boolean {
+        return !ret.isDeleted && ret.totalRefundAmount > 0L
     }
 
     private fun nextDay(date: ReportDate, timeZone: TimeZone): Long =
@@ -208,9 +247,22 @@ object ReportPolicy {
 }
 
 data class ReportSummary(
-    val totalRevenuePaise: Long,
-    val cashRevenuePaise: Long,
-    val upiRevenuePaise: Long,
-    val udhaarRevenuePaise: Long,
-    val billsCount: Int
+    val grossSalesPaise: Long,
+    val totalRefundsPaise: Long,
+    val netSalesPaise: Long,
+    val cashGrossPaise: Long,
+    val cashRefundsPaise: Long,
+    val cashNetPaise: Long,
+    val upiGrossPaise: Long,
+    val upiRefundsPaise: Long,
+    val upiNetPaise: Long,
+    val udhaarGrossPaise: Long,
+    val udhaarRefundsPaise: Long,
+    val udhaarNetPaise: Long,
+    val billsCount: Int,
+    val returnsCount: Int = 0,
+    val totalRevenuePaise: Long = netSalesPaise,
+    val cashRevenuePaise: Long = cashNetPaise,
+    val upiRevenuePaise: Long = upiNetPaise,
+    val udhaarRevenuePaise: Long = udhaarNetPaise
 )
