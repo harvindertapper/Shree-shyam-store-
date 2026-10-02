@@ -274,7 +274,7 @@ fun ReportsScreen(viewModel: ShopViewModel, reportsViewModel: ReportsViewModel) 
 
                                 if (reportSummary.totalRefundsPaise > 0L || reportSummary.returnsCount > 0) {
                                     Spacer(modifier = Modifier.height(10.dp))
-                                    HorizontalDivider(color = BorderSubtle, thickness = 1.dp)
+                                    HorizontalDivider(color = SurfaceCardBorder, thickness = 1.dp)
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
