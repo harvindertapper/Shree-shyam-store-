@@ -6,6 +6,7 @@ import com.sevenzenlabs.zenmart.commerce.CommerceValidation
 import com.sevenzenlabs.zenmart.commerce.InventoryValidation
 import com.sevenzenlabs.zenmart.commerce.LedgerActor
 import com.sevenzenlabs.zenmart.commerce.LedgerAuditPolicy
+import com.sevenzenlabs.zenmart.commerce.PaymentMode
 import com.sevenzenlabs.zenmart.commerce.PaymentState
 import com.sevenzenlabs.zenmart.commerce.PlatformActor
 import com.sevenzenlabs.zenmart.commerce.TenantAuthorizationPolicy
@@ -29,8 +30,12 @@ class ShopRepository(
     private val database: AppDatabase? = null,
     private val shopProfileDao: ShopProfileDao? = null,
     private val settingsDataStore: SettingsDataStore? = null,
-    private val authorizationContextProvider: (suspend () -> Pair<TenantScope, PlatformActor>)? = null
+    private val authorizationContextProvider: (suspend () -> Pair<TenantScope, PlatformActor>)? = null,
+    private val returnDao: ReturnDao? = null
 ) {
+    private val activeReturnDao: ReturnDao
+        get() = returnDao ?: database?.returnDao() ?: error("ReturnDao requires an initialized database or returnDao instance")
+
     fun observeSyncOutboxSummary(): Flow<SyncOutboxSummary> =
         database?.syncOutboxDao()?.observeSummary() ?: flowOf(SyncOutboxSummary())
 
@@ -256,6 +261,228 @@ class ShopRepository(
     }
     suspend fun getSaleItemsForSaleList(saleId: Long): List<SaleItem> = saleDao.getSaleItemsForSaleList(saleId)
     fun getSalesForDateRange(start: Long, end: Long): Flow<List<Sale>> = saleDao.getSalesForDateRange(start, end)
+
+    // Returns & Refunds
+    val allReturns: Flow<List<Return>>
+        get() = activeReturnDao.getAllReturns()
+
+    fun getReturnsForSale(saleId: Long): Flow<List<Return>> =
+        activeReturnDao.getReturnsForSale(saleId)
+
+    suspend fun getReturnsForSaleList(saleId: Long): List<Return> =
+        activeReturnDao.getReturnsForSaleList(saleId)
+
+    fun getReturnItemsForReturn(returnId: Long): Flow<List<ReturnItem>> =
+        activeReturnDao.getReturnItemsForReturn(returnId)
+
+    suspend fun getReturnItemsForReturnList(returnId: Long): List<ReturnItem> =
+        activeReturnDao.getReturnItemsForReturnList(returnId)
+
+    fun getReturnsForDateRange(start: Long, end: Long): Flow<List<Return>> =
+        activeReturnDao.getReturnsForDateRange(start, end)
+
+    fun getTotalRefundsForDateRange(start: Long, end: Long): Flow<Long> =
+        activeReturnDao.getTotalRefundsForDateRange(start, end)
+
+    suspend fun getRemainingReturnableQuantities(saleId: Long): Map<Long, Double> {
+        val items = saleDao.getSaleItemsForSaleList(saleId)
+        val rDao = activeReturnDao
+        return items.associate { item ->
+            val returned = rDao.getReturnedQuantityForSaleItem(item.id)
+            item.id to maxOf(0.0, item.quantity - returned)
+        }
+    }
+
+    /**
+     * Executes atomic return and refund transaction in local Room:
+     * 1. Validates operator authority (RETURN_PROCESSING capability).
+     * 2. Validates sale existence and that requested quantities do not exceed remaining returnable quantities.
+     * 3. Calculates line refund amounts and total refund in integer paise.
+     * 4. Inserts Return and ReturnItem records stamped with audit metadata.
+     * 5. Replenishes Product.currentStock for tracked items and records StockAdjustment audit entries.
+     * 6. Reverses customer debt via UdhaarTransaction (REVERSAL) if the sale was on Udhaar.
+     * 7. Transitions Sale.paymentState to REFUNDED or PARTIALLY_REFUNDED and updates receivedAmount.
+     */
+    suspend fun processReturn(
+        saleId: Long,
+        itemsToReturn: List<ItemReturnRequest>,
+        refundMode: String,
+        reason: String,
+        note: String? = null,
+        command: CommandMetadata
+    ): ReturnResult {
+        val authorizedCommand = authorize(command, TenantCapability.RETURN_PROCESSING)
+        val deviceId = authorizedCommand.actor.deviceId
+        val ledgerActor = authorizedCommand.toLedgerActor()
+
+        require(itemsToReturn.isNotEmpty()) { "Return must contain at least one item" }
+        require(itemsToReturn.map { it.saleItemId }.toSet().size == itemsToReturn.size) {
+            "Duplicate line items in return request"
+        }
+        require(reason.isNotBlank()) { "Return reason is required" }
+        require(refundMode.isNotBlank()) { "Refund mode is required" }
+
+        val operation: suspend () -> ReturnResult = {
+            val sale = saleDao.getSaleById(saleId)
+                ?: throw IllegalArgumentException("Sale not found")
+            require(!sale.isDeleted) { "Cannot process return on a deleted sale" }
+            require(sale.paymentState != PaymentState.REFUNDED.wireValue) {
+                "Sale is already fully refunded"
+            }
+
+            val existingSaleItems = saleDao.getSaleItemsForSaleList(saleId)
+            require(existingSaleItems.isNotEmpty()) { "Sale has no line items" }
+
+            val now = System.currentTimeMillis()
+            val rDao = activeReturnDao
+            var totalRefundPaise = 0L
+            val returnItemsToInsert = mutableListOf<ReturnItem>()
+            val stockRestorations = mutableListOf<Pair<Product, Double>>()
+
+            for (req in itemsToReturn) {
+                require(req.quantityReturned.isFinite() && req.quantityReturned > 0.0) {
+                    "Quantity returned must be positive"
+                }
+                val saleItem = existingSaleItems.find { it.id == req.saleItemId }
+                    ?: throw IllegalArgumentException("Sale item ${req.saleItemId} does not belong to sale $saleId")
+
+                val cumulativeReturned = rDao.getReturnedQuantityForSaleItem(saleItem.id)
+                val remainingReturnable = saleItem.quantity - cumulativeReturned
+                require(req.quantityReturned <= remainingReturnable + 1e-4) {
+                    "Cannot return ${req.quantityReturned} of ${saleItem.productNameSnapshot}: only $remainingReturnable remaining"
+                }
+
+                val lineRefund = CommerceValidation.calculateLineTotal(saleItem.unitPrice, req.quantityReturned)
+                totalRefundPaise += lineRefund
+
+                val item = ReturnItem(
+                    returnId = 0L,
+                    saleItemId = saleItem.id,
+                    productId = saleItem.productId,
+                    productNameSnapshot = saleItem.productNameSnapshot,
+                    quantityReturned = req.quantityReturned,
+                    unit = saleItem.unit,
+                    unitPrice = saleItem.unitPrice,
+                    lineRefundTotal = lineRefund,
+                    updatedAt = now
+                ).stamped(deviceId)
+                returnItemsToInsert.add(item)
+
+                val product = productDao.getProductById(saleItem.productId)
+                if (product != null && product.trackStock) {
+                    stockRestorations.add(product to req.quantityReturned)
+                }
+            }
+
+            require(totalRefundPaise >= 0L) { "Total refund amount cannot be negative" }
+
+            val returnSuffix = java.util.UUID.randomUUID().toString().take(6).uppercase()
+            val returnNumber = "RET-${sale.billNumber}-$returnSuffix"
+            val returnRecord = Return(
+                returnNumber = returnNumber,
+                saleId = sale.id,
+                originalBillNumber = sale.billNumber,
+                customerId = sale.customerId,
+                totalRefundAmount = totalRefundPaise,
+                refundMode = refundMode.trim(),
+                refundState = "RECORDED",
+                reason = reason.trim(),
+                note = note?.trim().orEmpty(),
+                createdAt = now,
+                updatedAt = now
+            ).stamped(deviceId)
+
+            val returnId = rDao.insertReturn(returnRecord)
+            val finalizedItems = returnItemsToInsert.map { it.copy(returnId = returnId) }
+            rDao.insertReturnItems(finalizedItems)
+
+            // Replenish stock for tracked products and log StockAdjustment
+            for ((prod, qtyToRestore) in stockRestorations) {
+                val currentProd = productDao.getProductById(prod.id) ?: prod
+                val oldStock = currentProd.currentStock
+                val newStock = oldStock + qtyToRestore
+                productDao.update(currentProd.copy(currentStock = newStock).stamped(deviceId))
+                stockAdjustmentDao.insertAdjustment(
+                    StockAdjustment(
+                        globalId = SyncIdentity.newGlobalId(),
+                        productId = currentProd.id,
+                        oldStock = oldStock,
+                        newStock = newStock,
+                        difference = qtyToRestore,
+                        reason = "Customer Return (Bill: ${sale.billNumber}, Ret: $returnNumber)",
+                        createdAt = now,
+                        updatedAt = now,
+                        isSynced = false
+                    ).stamped(deviceId)
+                )
+            }
+
+            // If sale was UDHAAR and customer is attached, post UdhaarTransaction REVERSAL
+            if (sale.paymentMode.equals(PaymentMode.UDHAAR.name, ignoreCase = true) && sale.customerId != null) {
+                val customerId = sale.customerId
+                val reversalTx = UdhaarTransaction(
+                    globalId = SyncIdentity.newGlobalId(),
+                    customerId = customerId,
+                    saleId = sale.id,
+                    type = UdhaarTransactionType.REVERSAL.name,
+                    amount = totalRefundPaise,
+                    balanceEffect = -totalRefundPaise,
+                    note = "Return Reversal: $returnNumber (Bill: ${sale.billNumber})",
+                    correctionReason = reason.trim(),
+                    actorUid = ledgerActor.actorUid,
+                    actorName = ledgerActor.actorName,
+                    actorRole = ledgerActor.actorRole,
+                    actorDeviceId = ledgerActor.actorDeviceId,
+                    mutationVersion = now,
+                    mutationDeviceId = ledgerActor.actorDeviceId,
+                    isSynced = false,
+                    createdAt = now,
+                    updatedAt = now
+                )
+                udhaarDao.insertTransaction(reversalTx)
+                customerDao.touchCustomer(customerId, now, ledgerActor.actorDeviceId)
+            }
+
+            // Determine if bill is now fully or partially returned
+            var isEntireBillReturned = true
+            for (lineItem in existingSaleItems) {
+                val cumulativeReturnedForItem = rDao.getReturnedQuantityForSaleItem(lineItem.id)
+                if (cumulativeReturnedForItem < lineItem.quantity - 1e-4) {
+                    isEntireBillReturned = false
+                    break
+                }
+            }
+
+            val updatedPaymentState = if (isEntireBillReturned) {
+                PaymentState.REFUNDED
+            } else {
+                PaymentState.PARTIALLY_REFUNDED
+            }
+
+            val newReceived = sale.receivedAmount?.let { prevReceived ->
+                maxOf(0L, prevReceived - totalRefundPaise)
+            }
+
+            val updatedRows = saleDao.updatePaymentStateIfActive(
+                saleId = sale.id,
+                paymentState = updatedPaymentState.wireValue,
+                receivedAmount = newReceived,
+                updatedAt = now,
+                mutationDeviceId = deviceId
+            )
+            check(updatedRows == 1) { "Failed to update sale payment state for sale ${sale.id}" }
+
+            ReturnResult(
+                returnId = returnId,
+                returnNumber = returnNumber,
+                totalRefundAmount = totalRefundPaise,
+                updatedPaymentState = updatedPaymentState,
+                returnItemCount = finalizedItems.size
+            )
+        }
+
+        return if (database != null) database.withTransaction { operation() } else operation()
+    }
 
     /**
      * Executes atomic bill checkout transaction in Room:
@@ -601,6 +828,30 @@ class ShopRepository(
         )
     }
 
+    private fun Return.stamped(deviceId: String, isDeleted: Boolean = this.isDeleted): Return {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isDeleted = isDeleted,
+            isSynced = false
+        )
+    }
+
+    private fun ReturnItem.stamped(deviceId: String, isDeleted: Boolean = this.isDeleted): ReturnItem {
+        val now = maxOf(System.currentTimeMillis(), mutationVersion + 1L)
+        return copy(
+            globalId = globalId.ifBlank { SyncIdentity.newGlobalId() },
+            updatedAt = now,
+            mutationVersion = now,
+            mutationDeviceId = deviceId,
+            isDeleted = isDeleted,
+            isSynced = false
+        )
+    }
+
     // Stock Adjustments
     val allStockAdjustments: Flow<List<StockAdjustment>> = stockAdjustmentDao.getAllAdjustments()
     
@@ -716,6 +967,11 @@ class ShopRepository(
     suspend fun getUnsyncedUsers(): List<User> = userDao.getUnsyncedUsers()
     suspend fun markUsersSynced(ids: List<Long>) = userDao.markUsersSynced(ids)
 
+    suspend fun getUnsyncedReturns(): List<Return> = activeReturnDao.getUnsyncedReturns()
+    suspend fun markReturnsSynced(ids: List<Long>) = activeReturnDao.markReturnsSynced(ids)
+    suspend fun getUnsyncedReturnItems(): List<ReturnItem> = activeReturnDao.getUnsyncedReturnItems()
+    suspend fun markReturnItemsSynced(ids: List<Long>) = activeReturnDao.markReturnItemsSynced(ids)
+
     /**
      * Atomically replaces cloud-owned business tables during a restore.
      * Device-local identity/session records and the shop profile are preserved.
@@ -750,6 +1006,10 @@ class ShopRepository(
             productDao.clearAllProducts()
             saleDao.clearAllSales()
             saleDao.clearAllSaleItems()
+            if (returnDao != null || database != null) {
+                activeReturnDao.clearAllReturns()
+                activeReturnDao.clearAllReturnItems()
+            }
             customerDao.clearAllCustomers()
             udhaarDao.clearAllTransactions()
             stockAdjustmentDao.clearAllAdjustments()
@@ -833,6 +1093,33 @@ class ShopRepository(
         isSynced = true
     )
 
+    private fun Return.normalizeForRestore(tableName: String): Return = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
+    private fun ReturnItem.normalizeForRestore(tableName: String): ReturnItem = copy(
+        globalId = globalId.ifBlank { SyncIdentity.legacyGlobalId(tableName, id) },
+        mutationVersion = if (mutationVersion > 0L) mutationVersion else updatedAt,
+        mutationDeviceId = mutationDeviceId.ifBlank { SyncIdentity.LEGACY_DEVICE_ID },
+        isSynced = true
+    )
+
     suspend fun getAllSaleItems(): List<SaleItem> = saleDao.getAllSaleItemsList()
 }
+
+data class ItemReturnRequest(
+    val saleItemId: Long,
+    val quantityReturned: Double
+)
+
+data class ReturnResult(
+    val returnId: Long,
+    val returnNumber: String,
+    val totalRefundAmount: Long,
+    val updatedPaymentState: PaymentState,
+    val returnItemCount: Int
+)
 

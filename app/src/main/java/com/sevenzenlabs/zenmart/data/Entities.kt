@@ -244,3 +244,72 @@ data class User(
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
 )
+
+@Entity(
+    tableName = "returns",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["returnNumber"], unique = true),
+        Index(value = ["saleId"]),
+        Index(value = ["customerId"])
+    ]
+)
+data class Return(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
+    val returnNumber: String,
+    val saleId: Long,
+    val originalBillNumber: String,
+    val customerId: Long? = null,
+    /** Total refund amount in integer paise. */
+    val totalRefundAmount: Long,
+    /** "CASH", "UPI", "UDHAAR_CREDIT" */
+    val refundMode: String,
+    /** "RECORDED" */
+    val refundState: String = "RECORDED",
+    val reason: String = "CUSTOMER_RETURN",
+    val note: String? = null,
+    val isSynced: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
+)
+
+@Entity(
+    tableName = "return_items",
+    indices = [
+        Index(value = ["globalId"], unique = true),
+        Index(value = ["returnId"]),
+        Index(value = ["saleItemId"]),
+        Index(value = ["productId"])
+    ]
+)
+data class ReturnItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(defaultValue = "''") val globalId: String = "",
+    val returnId: Long,
+    val saleItemId: Long,
+    val productId: Long,
+    val productNameSnapshot: String,
+    val quantityReturned: Double,
+    val unit: String = "pcs",
+    /** Unit price in integer paise. */
+    val unitPrice: Long,
+    /** Line refund total in integer paise. */
+    val lineRefundTotal: Long,
+    val isSynced: Boolean = false,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val isDeleted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val mutationVersion: Long = updatedAt,
+    @ColumnInfo(defaultValue = "'legacy-device'") val mutationDeviceId: String = "legacy-device"
+) {
+    fun getFormattedQuantity(): String {
+        return if (quantityReturned % 1.0 == 0.0) {
+            "${quantityReturned.toLong()} $unit"
+        } else {
+            "%.2f %s".format(quantityReturned, unit)
+        }
+    }
+}

@@ -15,6 +15,7 @@ enum class OperatorAction(
     LEDGER_RECORD(TenantCapability.LEDGER_RECORD),
     LEDGER_CORRECTION(TenantCapability.LEDGER_CORRECTION),
     INVENTORY_ADJUSTMENT(TenantCapability.INVENTORY_ADJUSTMENT),
+    RETURN_PROCESSING(TenantCapability.RETURN_PROCESSING),
     CLOUD_BACKUP(capability = null, requiresFirebase = true),
     CLOUD_RESTORE(capability = null, requiresFirebase = true)
 }

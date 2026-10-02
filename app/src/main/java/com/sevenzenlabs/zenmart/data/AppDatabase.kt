@@ -18,9 +18,11 @@ import java.util.UUID
         UdhaarTransaction::class,
         StockAdjustment::class,
         User::class,
-        SyncOutbox::class
+        SyncOutbox::class,
+        Return::class,
+        ReturnItem::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -37,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun stockAdjustmentDao(): StockAdjustmentDao
     abstract fun userDao(): UserDao
     abstract fun syncOutboxDao(): SyncOutboxDao
+    abstract fun returnDao(): ReturnDao
 
     companion object {
         private const val DATABASE_NAME = "shree_shyam_store_db"
@@ -354,6 +357,64 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_11_12 = object : androidx.room.migration.Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS returns (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        globalId TEXT NOT NULL DEFAULT '',
+                        returnNumber TEXT NOT NULL,
+                        saleId INTEGER NOT NULL,
+                        originalBillNumber TEXT NOT NULL,
+                        customerId INTEGER,
+                        totalRefundAmount INTEGER NOT NULL,
+                        refundMode TEXT NOT NULL,
+                        refundState TEXT NOT NULL,
+                        reason TEXT NOT NULL,
+                        note TEXT,
+                        isSynced INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL,
+                        mutationVersion INTEGER NOT NULL DEFAULT 0,
+                        mutationDeviceId TEXT NOT NULL DEFAULT 'legacy-device'
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_returns_globalId ON returns (globalId)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_returns_returnNumber ON returns (returnNumber)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_returns_saleId ON returns (saleId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_returns_customerId ON returns (customerId)")
+
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS return_items (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        globalId TEXT NOT NULL DEFAULT '',
+                        returnId INTEGER NOT NULL,
+                        saleItemId INTEGER NOT NULL,
+                        productId INTEGER NOT NULL,
+                        productNameSnapshot TEXT NOT NULL,
+                        quantityReturned REAL NOT NULL,
+                        unit TEXT NOT NULL,
+                        unitPrice INTEGER NOT NULL,
+                        lineRefundTotal INTEGER NOT NULL,
+                        isSynced INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL,
+                        isDeleted INTEGER NOT NULL,
+                        mutationVersion INTEGER NOT NULL DEFAULT 0,
+                        mutationDeviceId TEXT NOT NULL DEFAULT 'legacy-device'
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_return_items_globalId ON return_items (globalId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_return_items_returnId ON return_items (returnId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_return_items_saleItemId ON return_items (saleItemId)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_return_items_productId ON return_items (productId)")
+            }
+        }
+
         internal val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 val businessTables = listOf(
@@ -411,7 +472,8 @@ abstract class AppDatabase : RoomDatabase() {
                         MIGRATION_7_8,
                         MIGRATION_8_9,
                         MIGRATION_9_10,
-                        MIGRATION_10_11
+                        MIGRATION_10_11,
+                        MIGRATION_11_12
                     )
                     .addCallback(seedCategoriesCallback())
                     .build()
