@@ -1,5 +1,6 @@
 package com.sevenzenlabs.zenmart.ui.screens
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -24,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import com.sevenzenlabs.zenmart.recovery.RecoveryCryptoPolicy
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,6 +71,15 @@ fun SettingsScreen(viewModel: ShopViewModel) {
     var hasUnsavedChanges by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var showDisableLockConfirm by remember { mutableStateOf(false) }
+    var showSafPhraseSetupDialog by remember { mutableStateOf(false) }
+    var setupPhraseWords by remember { mutableStateOf<List<String>>(emptyList()) }
+    var setupPhraseEnteredText by remember { mutableStateOf("") }
+    var showSafExportPromptDialog by remember { mutableStateOf(false) }
+    var exportPhraseEnteredText by remember { mutableStateOf("") }
+    var showSafRestorePromptDialog by remember { mutableStateOf(false) }
+    var restoreSelectedUri by remember { mutableStateOf<Uri?>(null) }
+    var restorePhraseEnteredText by remember { mutableStateOf("") }
+    var sessionRecoveryPhrase by remember { mutableStateOf<List<String>?>(null) }
 
     val mutationStatus by viewModel.mutationStatus.collectAsState()
     val mutationInFlight by viewModel.mutationInFlight.collectAsState()
@@ -100,6 +111,27 @@ fun SettingsScreen(viewModel: ShopViewModel) {
             hasUnsavedChanges = true
             settingsNotice = strings.settingsSaveHint
             settingsNoticeIsError = false
+        }
+    }
+
+    val safFolderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            viewModel.verifyAndPersistSafFolder(uri) { success, msg ->
+                settingsNotice = msg
+                settingsNoticeIsError = !success
+            }
+        }
+    }
+
+    val safRestorePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            restoreSelectedUri = uri
+            restorePhraseEnteredText = ""
+            showSafRestorePromptDialog = true
         }
     }
 
@@ -1101,6 +1133,230 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                 }
             }
 
+            // Card 5: Independent Encrypted SAF Backup & Clean-Device Recovery
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.5.dp, BorderStrong),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                modifier = Modifier.fillMaxWidth().testTag("saf_backup_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFFE8F5E9), RoundedCornerShape(8.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Security, null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
+                        }
+                        Column {
+                            Text(
+                                text = strings.settingsSafBackupTitle,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black,
+                                color = SaffronDark
+                            )
+                            Text(
+                                text = strings.settingsSafBackupHint,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMutedGray
+                            )
+                        }
+                    }
+
+                    HorizontalDivider(color = BorderStrong)
+
+                    // Folder configuration row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strings.settingsSafFolderLabel,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMediumGray
+                            )
+                            val folderDisplay = if (settings.safBackupFolderUri.isBlank()) {
+                                strings.settingsSafFolderNotSelected
+                            } else {
+                                settings.safBackupProviderName.ifBlank { strings.settingsSafFolderLabel }
+                            }
+                            Text(
+                                text = folderDisplay,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (settings.safBackupFolderUri.isBlank()) TextMutedGray else SaffronDark,
+                                modifier = Modifier.testTag("settings_saf_folder_text")
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = { safFolderPickerLauncher.launch(null) },
+                            enabled = !mutationInFlight,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("settings_saf_select_folder_button")
+                        ) {
+                            Text(
+                                text = if (settings.safBackupFolderUri.isBlank()) {
+                                    strings.settingsSafFolderSelect
+                                } else {
+                                    strings.settingsSafFolderChange
+                                },
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Recovery phrase configuration row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strings.settingsSafRecoveryPhraseTitle,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMediumGray
+                            )
+                            Text(
+                                text = if (settings.recoveryPhraseConfigured) {
+                                    strings.settingsSafRecoveryPhraseConfigured
+                                } else {
+                                    strings.settingsSafRecoveryPhraseSetup
+                                },
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = if (settings.recoveryPhraseConfigured) SuccessGreen else Color(0xFFE65100),
+                                modifier = Modifier.testTag("settings_saf_phrase_status_text")
+                            )
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                setupPhraseWords = viewModel.generateRecoveryPhrase()
+                                setupPhraseEnteredText = ""
+                                showSafPhraseSetupDialog = true
+                            },
+                            enabled = !mutationInFlight,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("settings_saf_setup_phrase_button")
+                        ) {
+                            Text(
+                                text = strings.settingsSafRecoveryPhraseSetup,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    // Last export status
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = strings.settingsSafLastVerifiedExport,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMediumGray
+                            )
+                            val lastExportDisplay = if (settings.safLastExportTime.isBlank()) {
+                                strings.settingsLastAttemptUnavailable
+                            } else {
+                                settings.safLastExportTime
+                            }
+                            Text(
+                                text = lastExportDisplay,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = SaffronDark,
+                                modifier = Modifier.testTag("settings_saf_last_export_text")
+                            )
+                            val statusText = when (settings.safLastExportStatus) {
+                                "SUCCESS", "VERIFIED" -> strings.settingsSafStatusVerified
+                                "FAILED" -> strings.settingsSafStatusFailed
+                                else -> strings.settingsSafStatusNeeded
+                            }
+                            Text(
+                                text = statusText,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = when (settings.safLastExportStatus) {
+                                    "SUCCESS", "VERIFIED" -> SuccessGreen
+                                    "FAILED" -> Color(0xFFB3261E)
+                                    else -> TextMediumGray
+                                },
+                                modifier = Modifier.testTag("settings_saf_export_status_text")
+                            )
+                        }
+                    }
+
+                    // Action buttons: Export to Folder & Restore from File
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val cached = sessionRecoveryPhrase
+                                if (cached != null && RecoveryCryptoPolicy.computePhraseFingerprint(cached) == settings.recoveryPhraseFingerprint) {
+                                    viewModel.exportSafBackup(cached) { success, msg ->
+                                        settingsNotice = msg
+                                        settingsNoticeIsError = !success
+                                    }
+                                } else {
+                                    exportPhraseEnteredText = ""
+                                    showSafExportPromptDialog = true
+                                }
+                            },
+                            enabled = !mutationInFlight && settings.safBackupFolderUri.isNotBlank() && settings.recoveryPhraseConfigured,
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .testTag("settings_saf_export_button")
+                        ) {
+                            Icon(Icons.Default.Upload, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(strings.settingsSafExportNow, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                safRestorePickerLauncher.launch(arrayOf("*/*"))
+                            },
+                            enabled = !mutationInFlight,
+                            colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 48.dp)
+                                .testTag("settings_saf_restore_button")
+                        ) {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(strings.settingsSafRestoreFromFile, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             SettingsSectionHeading(strings.settingsDataPrivacySection)
             SettingsInfoCard(
                 title = strings.settingsDataPrivacySection,
@@ -1228,6 +1484,241 @@ fun SettingsScreen(viewModel: ShopViewModel) {
                             modifier = Modifier.testTag("settings_keep_lock_button")
                         ) {
                             Text(strings.settingsKeepLock, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                        }
+                    }
+                )
+            }
+
+            if (showSafPhraseSetupDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSafPhraseSetupDialog = false },
+                    title = {
+                        Text(
+                            text = strings.settingsSafRecoveryPhraseDialogTitle,
+                            fontWeight = FontWeight.Black,
+                            color = SaffronDark
+                        )
+                    },
+                    text = {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = strings.settingsSafRecoveryPhraseDialogWarning,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = ErrorRed,
+                                lineHeight = 18.sp
+                            )
+                            Surface(
+                                color = SaffronLight.copy(alpha = 0.3f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, BorderStrong),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    setupPhraseWords.mapIndexed { index, word -> index to word }.chunked(3).forEach { rowWords ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            rowWords.forEach { (index, word) ->
+                                                Text(
+                                                    text = "${index + 1}. $word",
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = SaffronDark
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text(
+                                text = strings.settingsSafRecoveryPhraseConfirmPrompt,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextNearBlack
+                            )
+
+                            OutlinedTextField(
+                                value = setupPhraseEnteredText,
+                                onValueChange = { setupPhraseEnteredText = it },
+                                placeholder = { Text(strings.settingsSafEnterPhrasePrompt, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth().testTag("settings_saf_phrase_confirm_field"),
+                                maxLines = 3
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val enteredWords = setupPhraseEnteredText.trim().lowercase().split(Regex("\\s+"))
+                                if (enteredWords == setupPhraseWords) {
+                                    viewModel.confirmRecoveryPhrase(enteredWords) { success, msg ->
+                                        if (success) {
+                                            sessionRecoveryPhrase = enteredWords
+                                        }
+                                        settingsNotice = msg
+                                        settingsNoticeIsError = !success
+                                    }
+                                    showSafPhraseSetupDialog = false
+                                } else {
+                                    settingsNotice = strings.settingsSafPhraseMismatch
+                                    settingsNoticeIsError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SaffronPrimary),
+                            modifier = Modifier.testTag("settings_saf_phrase_verify_button")
+                        ) {
+                            Text(strings.settingsSafVerifyAndSave, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showSafPhraseSetupDialog = false },
+                            modifier = Modifier.testTag("settings_saf_phrase_cancel_button")
+                        ) {
+                            Text(strings.cancel, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                        }
+                    }
+                )
+            }
+
+            if (showSafExportPromptDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSafExportPromptDialog = false },
+                    title = {
+                        Text(
+                            text = strings.settingsSafEnterPhraseTitle,
+                            fontWeight = FontWeight.Black,
+                            color = SaffronDark
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = strings.settingsSafEnterPhrasePrompt,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextNearBlack
+                            )
+                            OutlinedTextField(
+                                value = exportPhraseEnteredText,
+                                onValueChange = { exportPhraseEnteredText = it },
+                                placeholder = { Text(strings.settingsSafEnterPhrasePrompt, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth().testTag("settings_saf_export_phrase_field"),
+                                maxLines = 3
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val words = exportPhraseEnteredText.trim().lowercase().split(Regex("\\s+"))
+                                val fingerprint = RecoveryCryptoPolicy.computePhraseFingerprint(words)
+                                if (fingerprint == settings.recoveryPhraseFingerprint) {
+                                    sessionRecoveryPhrase = words
+                                    showSafExportPromptDialog = false
+                                    viewModel.exportSafBackup(words) { success, msg ->
+                                        settingsNotice = msg
+                                        settingsNoticeIsError = !success
+                                    }
+                                } else {
+                                    settingsNotice = strings.settingsSafPhraseMismatch
+                                    settingsNoticeIsError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
+                            modifier = Modifier.testTag("settings_saf_export_confirm_button")
+                        ) {
+                            Text(strings.settingsSafExportNow, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = { showSafExportPromptDialog = false },
+                            modifier = Modifier.testTag("settings_saf_export_cancel_button")
+                        ) {
+                            Text(strings.cancel, fontWeight = FontWeight.Bold, color = TextMediumGray)
+                        }
+                    }
+                )
+            }
+
+            if (showSafRestorePromptDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showSafRestorePromptDialog = false
+                        restoreSelectedUri = null
+                    },
+                    title = {
+                        Text(
+                            text = strings.settingsSafRestoreFromFile,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFB3261E)
+                        )
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = strings.settingsSafRestoreConfirmMsg,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ErrorRed
+                            )
+                            Text(
+                                text = strings.settingsSafEnterPhrasePrompt,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = TextNearBlack
+                            )
+                            OutlinedTextField(
+                                value = restorePhraseEnteredText,
+                                onValueChange = { restorePhraseEnteredText = it },
+                                placeholder = { Text(strings.settingsSafEnterPhrasePrompt, fontSize = 12.sp) },
+                                modifier = Modifier.fillMaxWidth().testTag("settings_saf_restore_phrase_field"),
+                                maxLines = 3
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                val uri = restoreSelectedUri
+                                val words = restorePhraseEnteredText.trim().lowercase().split(Regex("\\s+"))
+                                if (uri != null && words.size == 12) {
+                                    showSafRestorePromptDialog = false
+                                    restoreSelectedUri = null
+                                    viewModel.restoreSafBackup(uri, words) { success, msg ->
+                                        if (success) {
+                                            sessionRecoveryPhrase = words
+                                        }
+                                        settingsNotice = msg
+                                        settingsNoticeIsError = !success
+                                    }
+                                } else {
+                                    settingsNotice = strings.settingsSafPhraseMismatch
+                                    settingsNoticeIsError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)),
+                            modifier = Modifier.testTag("settings_saf_restore_confirm_button")
+                        ) {
+                            Text(strings.settingsRestoreConfirmAction, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(
+                            onClick = {
+                                showSafRestorePromptDialog = false
+                                restoreSelectedUri = null
+                            },
+                            modifier = Modifier.testTag("settings_saf_restore_cancel_button")
+                        ) {
+                            Text(strings.cancel, fontWeight = FontWeight.Bold, color = TextMediumGray)
                         }
                     }
                 )

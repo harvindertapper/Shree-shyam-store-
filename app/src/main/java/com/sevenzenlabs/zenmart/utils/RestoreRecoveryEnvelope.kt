@@ -5,6 +5,8 @@ import com.sevenzenlabs.zenmart.commerce.TenantScope
 import com.sevenzenlabs.zenmart.data.Category
 import com.sevenzenlabs.zenmart.data.Customer
 import com.sevenzenlabs.zenmart.data.Product
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.StockAdjustment
@@ -43,11 +45,13 @@ data class CloudRestorableSnapshot(
     val saleItems: List<SaleItem>,
     val customers: List<Customer>,
     val udhaarTransactions: List<UdhaarTransaction>,
-    val stockAdjustments: List<StockAdjustment>
+    val stockAdjustments: List<StockAdjustment>,
+    val returns: List<Return> = emptyList(),
+    val returnItems: List<ReturnItem> = emptyList()
 ) {
     fun isEmpty(): Boolean = categories.isEmpty() && products.isEmpty() && sales.isEmpty() &&
         saleItems.isEmpty() && customers.isEmpty() && udhaarTransactions.isEmpty() &&
-        stockAdjustments.isEmpty()
+        stockAdjustments.isEmpty() && returns.isEmpty() && returnItems.isEmpty()
 }
 
 data class SnapshotTableCounts(
@@ -57,17 +61,23 @@ data class SnapshotTableCounts(
     val saleItems: Int,
     val customers: Int,
     val udhaarTransactions: Int,
-    val stockAdjustments: Int
+    val stockAdjustments: Int,
+    val returns: Int = 0,
+    val returnItems: Int = 0
 ) {
-    fun asMap(): Map<String, Int> = linkedMapOf(
-        "categories" to categories,
-        "products" to products,
-        "sales" to sales,
-        "sale_items" to saleItems,
-        "customers" to customers,
-        "udhaar_transactions" to udhaarTransactions,
-        "stock_adjustments" to stockAdjustments
-    )
+    fun asMap(): Map<String, Int> = linkedMapOf<String, Int>().apply {
+        put("categories", categories)
+        put("products", products)
+        put("sales", sales)
+        put("sale_items", saleItems)
+        put("customers", customers)
+        put("udhaar_transactions", udhaarTransactions)
+        put("stock_adjustments", stockAdjustments)
+        if (returns > 0 || returnItems > 0) {
+            put("returns", returns)
+            put("return_items", returnItems)
+        }
+    }
 
     companion object {
         fun from(snapshot: CloudRestorableSnapshot): SnapshotTableCounts = SnapshotTableCounts(
@@ -77,7 +87,9 @@ data class SnapshotTableCounts(
             saleItems = snapshot.saleItems.size,
             customers = snapshot.customers.size,
             udhaarTransactions = snapshot.udhaarTransactions.size,
-            stockAdjustments = snapshot.stockAdjustments.size
+            stockAdjustments = snapshot.stockAdjustments.size,
+            returns = snapshot.returns.size,
+            returnItems = snapshot.returnItems.size
         )
     }
 }
@@ -132,6 +144,7 @@ object RestoreSnapshotPolicy {
         "udhaar_transactions",
         "stock_adjustments"
     )
+    val ALLOWED_TABLES: Set<String> = REQUIRED_TABLES + setOf("returns", "return_items")
 }
 
 object RestoreSnapshotValidator {
@@ -163,7 +176,9 @@ object RestoreSnapshotValidator {
         if (envelope.sourceDeviceId.isBlank() || envelope.sourceAppInstallationId.isBlank()) {
             throw SnapshotIntegrityException("Restore snapshot source metadata is incomplete")
         }
-        if (envelope.tableCounts.keys != RestoreSnapshotPolicy.REQUIRED_TABLES) {
+        if (!envelope.tableCounts.keys.containsAll(RestoreSnapshotPolicy.REQUIRED_TABLES) ||
+            !RestoreSnapshotPolicy.ALLOWED_TABLES.containsAll(envelope.tableCounts.keys)
+        ) {
             throw SnapshotIncompleteException("Restore snapshot table set is incomplete")
         }
 
@@ -186,6 +201,12 @@ object RestoreSnapshotValidator {
         validateUniqueIdentity("customers", snapshot.customers.map { it.globalId })
         validateUniqueIdentity("udhaar_transactions", snapshot.udhaarTransactions.map { it.globalId })
         validateUniqueIdentity("stock_adjustments", snapshot.stockAdjustments.map { it.globalId })
+        if (snapshot.returns.isNotEmpty()) {
+            validateUniqueIdentity("returns", snapshot.returns.map { it.globalId })
+        }
+        if (snapshot.returnItems.isNotEmpty()) {
+            validateUniqueIdentity("return_items", snapshot.returnItems.map { it.globalId })
+        }
 
         validateRows(snapshot)
         BusinessRelationshipPolicy.validateRestoreGraph(
@@ -195,7 +216,9 @@ object RestoreSnapshotValidator {
             saleItems = snapshot.saleItems,
             customers = snapshot.customers,
             udhaarTransactions = snapshot.udhaarTransactions,
-            stockAdjustments = snapshot.stockAdjustments
+            stockAdjustments = snapshot.stockAdjustments,
+            returns = snapshot.returns,
+            returnItems = snapshot.returnItems
         )
         return snapshot
     }
@@ -211,6 +234,12 @@ object RestoreSnapshotValidator {
         },
         stockAdjustments = snapshot.stockAdjustments.map {
             it.copy(globalId = stableId("stock_adjustments", it.id, it.globalId))
+        },
+        returns = snapshot.returns.map {
+            it.copy(globalId = stableId("returns", it.id, it.globalId))
+        },
+        returnItems = snapshot.returnItems.map {
+            it.copy(globalId = stableId("return_items", it.id, it.globalId))
         }
     )
 
@@ -284,6 +313,31 @@ object RestoreSnapshotValidator {
                 throw SnapshotReferentialIntegrityException("Invalid stock adjustment ${adjustment.globalId}")
             }
         }
+        val returnIds = snapshot.returns.map { it.id }.toSet()
+        val saleItemIds = snapshot.saleItems.map { it.id }.toSet()
+        val returnsById = snapshot.returns.associateBy { it.id }
+        val saleItemsById = snapshot.saleItems.associateBy { it.id }
+        snapshot.returns.forEach { ret ->
+            if (ret.id <= 0L || ret.returnNumber.isBlank() || ret.saleId !in saleIds ||
+                ret.totalRefundAmount < 0L
+            ) {
+                throw SnapshotReferentialIntegrityException("Invalid return record ${ret.globalId}")
+            }
+        }
+        snapshot.returnItems.forEach { rItem ->
+            val parentReturn = returnsById[rItem.returnId]
+            val saleItem = saleItemsById[rItem.saleItemId]
+            if (rItem.id <= 0L || rItem.returnId !in returnIds ||
+                rItem.saleItemId !in saleItemIds ||
+                rItem.productId !in productIds || !rItem.quantityReturned.isFinite() || rItem.quantityReturned <= 0.0 ||
+                rItem.lineRefundTotal < 0L ||
+                parentReturn == null || saleItem == null ||
+                parentReturn.saleId != saleItem.saleId ||
+                rItem.productId != saleItem.productId
+            ) {
+                throw SnapshotReferentialIntegrityException("Invalid return item record ${rItem.globalId}")
+            }
+        }
     }
 }
 
@@ -311,6 +365,12 @@ object RestoreSnapshotCodec {
     private val adjustmentAdapter = moshi.adapter<List<StockAdjustment>>(
         Types.newParameterizedType(List::class.java, StockAdjustment::class.java)
     )
+    private val returnAdapter = moshi.adapter<List<Return>>(
+        Types.newParameterizedType(List::class.java, Return::class.java)
+    )
+    private val returnItemAdapter = moshi.adapter<List<ReturnItem>>(
+        Types.newParameterizedType(List::class.java, ReturnItem::class.java)
+    )
 
     fun encode(envelope: SnapshotEnvelope): String = envelopeAdapter.serializeNulls().toJson(envelope)
 
@@ -331,6 +391,10 @@ object RestoreSnapshotCodec {
             append("customers=").append(customerAdapter.toJson(snapshot.customers)).append('\n')
             append("udhaar_transactions=").append(udhaarAdapter.toJson(snapshot.udhaarTransactions)).append('\n')
             append("stock_adjustments=").append(adjustmentAdapter.toJson(snapshot.stockAdjustments))
+            if (snapshot.returns.isNotEmpty() || snapshot.returnItems.isNotEmpty()) {
+                append('\n').append("returns=").append(returnAdapter.toJson(snapshot.returns)).append('\n')
+                append("return_items=").append(returnItemAdapter.toJson(snapshot.returnItems))
+            }
         }
         return MessageDigest.getInstance("SHA-256")
             .digest(canonical.toByteArray(Charsets.UTF_8))

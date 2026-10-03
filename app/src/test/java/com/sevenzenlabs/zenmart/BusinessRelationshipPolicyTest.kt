@@ -3,6 +3,8 @@ package com.sevenzenlabs.zenmart
 import com.sevenzenlabs.zenmart.data.Category
 import com.sevenzenlabs.zenmart.data.Customer
 import com.sevenzenlabs.zenmart.data.Product
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.StockAdjustment
@@ -97,6 +99,153 @@ class BusinessRelationshipPolicyTest {
                     reason = "Opening stock",
                     updatedAt = 1L,
                     mutationVersion = 1L
+                )
+            )
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun returnItemWithMismatchedSaleIsRejected() {
+        BusinessRelationshipPolicy.validateRestoreGraph(
+            categories = listOf(Category(id = 1L, globalId = "category-1", name = "Grocery")),
+            products = listOf(product()),
+            sales = listOf(
+                sale(id = 1L, billNumber = "BILL-1"),
+                sale(id = 2L, billNumber = "BILL-2")
+            ),
+            saleItems = listOf(
+                SaleItem(
+                    id = 1L,
+                    globalId = "item-1",
+                    saleId = 2L,
+                    productId = 1L,
+                    productNameSnapshot = "Rice",
+                    unitPrice = 100L,
+                    lineTotal = 100L
+                )
+            ),
+            customers = emptyList(),
+            udhaarTransactions = emptyList(),
+            stockAdjustments = emptyList(),
+            returns = listOf(
+                Return(
+                    id = 1L,
+                    globalId = "return-1",
+                    returnNumber = "RET-1",
+                    saleId = 1L,
+                    originalBillNumber = "BILL-1",
+                    totalRefundAmount = 100L,
+                    refundMode = "CASH"
+                )
+            ),
+            returnItems = listOf(
+                ReturnItem(
+                    id = 1L,
+                    globalId = "return-item-1",
+                    returnId = 1L,
+                    saleItemId = 1L,
+                    productId = 1L,
+                    productNameSnapshot = "Rice",
+                    quantityReturned = 1.0,
+                    unitPrice = 100L,
+                    lineRefundTotal = 100L
+                )
+            )
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun returnItemWithMismatchedProductIsRejected() {
+        BusinessRelationshipPolicy.validateRestoreGraph(
+            categories = listOf(Category(id = 1L, globalId = "category-1", name = "Grocery")),
+            products = listOf(
+                product(globalId = "prod-1", categoryId = 1L).copy(id = 1L),
+                product(globalId = "prod-2", categoryId = 1L).copy(id = 2L)
+            ),
+            sales = listOf(sale(id = 1L)),
+            saleItems = listOf(
+                SaleItem(
+                    id = 1L,
+                    globalId = "item-1",
+                    saleId = 1L,
+                    productId = 1L,
+                    productNameSnapshot = "Rice",
+                    unitPrice = 100L,
+                    lineTotal = 100L
+                )
+            ),
+            customers = emptyList(),
+            udhaarTransactions = emptyList(),
+            stockAdjustments = emptyList(),
+            returns = listOf(
+                Return(
+                    id = 1L,
+                    globalId = "return-1",
+                    returnNumber = "RET-1",
+                    saleId = 1L,
+                    originalBillNumber = "BILL-1",
+                    totalRefundAmount = 100L,
+                    refundMode = "CASH"
+                )
+            ),
+            returnItems = listOf(
+                ReturnItem(
+                    id = 1L,
+                    globalId = "return-item-1",
+                    returnId = 1L,
+                    saleItemId = 1L,
+                    productId = 2L,
+                    productNameSnapshot = "Wheat",
+                    quantityReturned = 1.0,
+                    unitPrice = 100L,
+                    lineRefundTotal = 100L
+                )
+            )
+        )
+    }
+
+    @Test
+    fun validGraphPassesWithReturnAndReturnItems() {
+        BusinessRelationshipPolicy.validateRestoreGraph(
+            categories = listOf(Category(id = 1L, globalId = "category-1", name = "Grocery")),
+            products = listOf(product()),
+            sales = listOf(sale(id = 1L)),
+            saleItems = listOf(
+                SaleItem(
+                    id = 1L,
+                    globalId = "item-1",
+                    saleId = 1L,
+                    productId = 1L,
+                    productNameSnapshot = "Rice",
+                    unitPrice = 100L,
+                    lineTotal = 100L
+                )
+            ),
+            customers = emptyList(),
+            udhaarTransactions = emptyList(),
+            stockAdjustments = emptyList(),
+            returns = listOf(
+                Return(
+                    id = 1L,
+                    globalId = "return-1",
+                    returnNumber = "RET-1",
+                    saleId = 1L,
+                    originalBillNumber = "BILL-1",
+                    totalRefundAmount = 100L,
+                    refundMode = "CASH"
+                )
+            ),
+            returnItems = listOf(
+                ReturnItem(
+                    id = 1L,
+                    globalId = "return-item-1",
+                    returnId = 1L,
+                    saleItemId = 1L,
+                    productId = 1L,
+                    productNameSnapshot = "Rice",
+                    quantityReturned = 1.0,
+                    unitPrice = 100L,
+                    lineRefundTotal = 100L
                 )
             )
         )

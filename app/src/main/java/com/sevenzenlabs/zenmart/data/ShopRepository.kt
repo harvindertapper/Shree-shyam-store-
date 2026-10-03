@@ -971,6 +971,10 @@ class ShopRepository(
     suspend fun markReturnsSynced(ids: List<Long>) = activeReturnDao.markReturnsSynced(ids)
     suspend fun getUnsyncedReturnItems(): List<ReturnItem> = activeReturnDao.getUnsyncedReturnItems()
     suspend fun markReturnItemsSynced(ids: List<Long>) = activeReturnDao.markReturnItemsSynced(ids)
+    suspend fun allReturnsList(): List<Return> =
+        if (returnDao != null || database != null) activeReturnDao.getAllReturnsList() else emptyList()
+    suspend fun getAllReturnItemsList(): List<ReturnItem> =
+        if (returnDao != null || database != null) activeReturnDao.getAllReturnItemsList() else emptyList()
 
     /**
      * Atomically replaces cloud-owned business tables during a restore.
@@ -983,7 +987,9 @@ class ShopRepository(
         saleItemsList: List<SaleItem>,
         customersList: List<Customer>,
         udhaarTxsList: List<UdhaarTransaction>,
-        adjustmentsList: List<StockAdjustment>
+        adjustmentsList: List<StockAdjustment>,
+        returnsList: List<Return> = emptyList(),
+        returnItemsList: List<ReturnItem> = emptyList()
     ) {
         val normalizedCategories = categoriesList.map { it.normalizeForRestore("categories") }
         val normalizedProducts = productsList.map { it.normalizeForRestore("products") }
@@ -992,6 +998,8 @@ class ShopRepository(
         val normalizedCustomers = customersList.map { it.normalizeForRestore("customers") }
         val normalizedUdhaar = udhaarTxsList.map { it.normalizeForRestore("udhaar_transactions") }
         val normalizedAdjustments = adjustmentsList.map { it.normalizeForRestore("stock_adjustments") }
+        val normalizedReturns = returnsList.map { it.normalizeForRestore("returns") }
+        val normalizedReturnItems = returnItemsList.map { it.normalizeForRestore("return_items") }
         BusinessRelationshipPolicy.validateRestoreGraph(
             categories = normalizedCategories,
             products = normalizedProducts,
@@ -999,7 +1007,9 @@ class ShopRepository(
             saleItems = normalizedSaleItems,
             customers = normalizedCustomers,
             udhaarTransactions = normalizedUdhaar,
-            stockAdjustments = normalizedAdjustments
+            stockAdjustments = normalizedAdjustments,
+            returns = normalizedReturns,
+            returnItems = normalizedReturnItems
         )
         val operation: suspend () -> Unit = {
             categoryDao.clearAllCategories()
@@ -1022,6 +1032,12 @@ class ShopRepository(
             if (normalizedCustomers.isNotEmpty()) customerDao.insertAllForRestore(normalizedCustomers)
             if (normalizedUdhaar.isNotEmpty()) udhaarDao.insertAllForRestore(normalizedUdhaar)
             if (normalizedAdjustments.isNotEmpty()) stockAdjustmentDao.insertAllForRestore(normalizedAdjustments)
+            if (normalizedReturns.isNotEmpty() && (returnDao != null || database != null)) {
+                activeReturnDao.insertAllReturnsForRestore(normalizedReturns)
+            }
+            if (normalizedReturnItems.isNotEmpty() && (returnDao != null || database != null)) {
+                activeReturnDao.insertAllReturnItemsForRestore(normalizedReturnItems)
+            }
         }
         if (database != null) database.withTransaction { operation() } else operation()
     }

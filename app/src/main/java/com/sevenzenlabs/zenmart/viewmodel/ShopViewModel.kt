@@ -1,17 +1,22 @@
 package com.sevenzenlabs.zenmart.viewmodel
 
 import android.content.Context
+import android.net.Uri
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.sevenzenlabs.zenmart.BuildConfig
+import com.sevenzenlabs.zenmart.recovery.AndroidSafStorageClient
+import com.sevenzenlabs.zenmart.recovery.RecoveryCryptoPolicy
+import com.sevenzenlabs.zenmart.recovery.SafBackupCoordinator
 import com.sevenzenlabs.zenmart.commerce.CommandMetadata
 import com.sevenzenlabs.zenmart.commerce.CommerceValidation
 import com.sevenzenlabs.zenmart.commerce.InventoryValidation
 import com.sevenzenlabs.zenmart.commerce.PaymentState
 import com.sevenzenlabs.zenmart.commerce.PlatformActor
+import com.sevenzenlabs.zenmart.commerce.TenantScope
 import com.sevenzenlabs.zenmart.data.*
 import com.sevenzenlabs.zenmart.utils.AppLockPolicy
 import com.sevenzenlabs.zenmart.utils.AuthenticatedBackupTableClient
@@ -45,6 +50,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.io.File
+import java.io.IOException
 import java.net.URI
 import java.util.Date
 import java.util.Locale
@@ -1386,7 +1392,9 @@ class ShopViewModel(
         saleItems = repository.getAllSaleItems(),
         customers = repository.allCustomers.first(),
         udhaarTransactions = repository.allUdhaarTransactions.first(),
-        stockAdjustments = repository.getAllStockAdjustmentsList()
+        stockAdjustments = repository.getAllStockAdjustmentsList(),
+        returns = repository.allReturnsList(),
+        returnItems = repository.getAllReturnItemsList()
     )
 
     private fun recoveryPointStore(): LocalRecoveryPointStore? =
@@ -1433,7 +1441,9 @@ class ShopViewModel(
                 saleItemsList = restored.saleItems,
                 customersList = restored.customers,
                 udhaarTxsList = restored.udhaarTransactions,
-                adjustmentsList = restored.stockAdjustments
+                adjustmentsList = restored.stockAdjustments,
+                returnsList = restored.returns,
+                returnItemsList = restored.returnItems
             )
         }.replaceWithRollback(snapshot, tenant, recoveryEnvelope)
     }
@@ -1607,6 +1617,170 @@ class ShopViewModel(
                 val message = restoreFailureMessage(error)
                 markMutationFailure(error, message)
                 onResult(false, message)
+            }
+        }
+    }
+
+    fun verifyAndPersistSafFolder(treeUri: Uri, onResult: (Boolean, String) -> Unit) {
+        val ctx = context ?: run {
+            onResult(false, "Context unavailable")
+            return
+        }
+        viewModelScope.launch {
+            val storage = AndroidSafStorageClient(ctx)
+            val verification = storage.verifyAndPersistFolder(treeUri)
+            if (verification.isVerified) {
+                settingsDataStore.updateSafFolder(treeUri.toString(), verification.providerName)
+                onResult(true, verification.providerName)
+            } else {
+                onResult(false, verification.errorMessage ?: "Verification failed")
+            }
+        }
+    }
+
+    fun generateRecoveryPhrase(): List<String> = RecoveryCryptoPolicy.generateMnemonic()
+
+    fun confirmRecoveryPhrase(words: List<String>, onResult: (Boolean, String) -> Unit) {
+        if (!RecoveryCryptoPolicy.validateMnemonic(words)) {
+            onResult(false, "Invalid recovery phrase")
+            return
+        }
+        viewModelScope.launch {
+            val fingerprint = RecoveryCryptoPolicy.computePhraseFingerprint(words)
+            settingsDataStore.configureRecoveryPhrase(fingerprint)
+            onResult(true, "Recovery phrase configured successfully")
+        }
+    }
+
+    fun exportSafBackup(phraseWords: List<String>, onResult: (Boolean, String) -> Unit) {
+        val ctx = context ?: run {
+            onResult(false, "Context unavailable")
+            return
+        }
+        if (!beginMutation { exportSafBackup(phraseWords, onResult) }) return
+        val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
+        viewModelScope.launch {
+            try {
+                val settings = settingsDataStore.settingsFlow.first()
+                val folderUriStr = settings.safBackupFolderUri
+                if (folderUriStr.isBlank()) {
+                    val msg = "Please select a backup folder first"
+                    markMutationFailure(IllegalArgumentException(msg), msg)
+                    onResult(false, msg)
+                    return@launch
+                }
+                val treeUri = Uri.parse(folderUriStr)
+                val identitySession = reconcileIdentitySession()
+                val tenant = if (identitySession != null) {
+                    settingsDataStore.getOrCreateTenantDeviceContext(identitySession).toTenantScope()
+                } else {
+                    TenantScope(
+                        organizationId = settings.organizationId.ifBlank { "local_org" },
+                        storeId = settings.storeId.ifBlank { "local_store" },
+                        membershipId = settings.membershipId.ifBlank { "local_member" },
+                        deviceId = settings.deviceId.ifBlank { "local_device" },
+                        appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
+                    )
+                }
+
+                _syncInProgress.value = true
+                _syncMessage.value = strings.statusSyncing
+                _mutationStatus.value = MutationStatus(MutationStage.SYNCING)
+
+                val storage = AndroidSafStorageClient(ctx)
+                val recoveryStore = LocalRecoveryPointStore(File(ctx.filesDir, "restore-recovery"))
+                val coordinator = SafBackupCoordinator(storage, settingsDataStore, repository, recoveryStore)
+
+                val result = coordinator.exportEncryptedBackup(
+                    treeUri = treeUri,
+                    phraseWords = phraseWords,
+                    tenant = tenant
+                )
+
+                if (result.success) {
+                    _syncMessage.value = strings.statusSuccess
+                    markMutationSuccess(result.message)
+                    onResult(true, result.message)
+                } else {
+                    val msg = result.message
+                    markMutationFailure(IOException(msg), msg)
+                    onResult(false, msg)
+                }
+            } catch (error: Exception) {
+                val msg = error.message ?: "Export failed"
+                markMutationFailure(error, msg)
+                onResult(false, msg)
+            } finally {
+                _syncInProgress.value = false
+                _syncMessage.value = null
+            }
+        }
+    }
+
+    fun restoreSafBackup(fileUri: Uri, phraseWords: List<String>, onResult: (Boolean, String) -> Unit) {
+        val ctx = context ?: run {
+            onResult(false, "Context unavailable")
+            return
+        }
+        if (!beginMutation { restoreSafBackup(fileUri, phraseWords, onResult) }) return
+        val strings = com.sevenzenlabs.zenmart.utils.LocaleHelper
+            .getStrings(storeSettings.value.appLanguage)
+        viewModelScope.launch {
+            try {
+                val settings = settingsDataStore.settingsFlow.first()
+                val identitySession = reconcileIdentitySession()
+                val expectedTenant = identitySession?.let {
+                    settingsDataStore.getOrCreateTenantDeviceContext(it).toTenantScope()
+                } ?: run {
+                    val hasExistingTenant = settings.organizationId.isNotBlank() &&
+                        settings.storeId.isNotBlank() &&
+                        settings.membershipId.isNotBlank()
+                    if (hasExistingTenant) {
+                        TenantScope(
+                            organizationId = settings.organizationId,
+                            storeId = settings.storeId,
+                            membershipId = settings.membershipId,
+                            deviceId = settings.deviceId.ifBlank { "local_device" },
+                            appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
+                        )
+                    } else {
+                        null
+                    }
+                }
+
+                _syncInProgress.value = true
+                _syncMessage.value = strings.statusValidating
+                _mutationStatus.value = MutationStatus(MutationStage.VALIDATING)
+
+                val storage = AndroidSafStorageClient(ctx)
+                val recoveryStore = LocalRecoveryPointStore(File(ctx.filesDir, "restore-recovery"))
+                val coordinator = SafBackupCoordinator(storage, settingsDataStore, repository, recoveryStore)
+
+                val result = coordinator.restoreEncryptedBackup(
+                    fileUri = fileUri,
+                    phraseWords = phraseWords,
+                    expectedTenant = expectedTenant,
+                    deviceId = settings.deviceId.ifBlank { "local_device" },
+                    appInstallationId = settings.appInstallationId.ifBlank { "local_install" }
+                )
+
+                if (result.success) {
+                    _syncMessage.value = strings.statusSuccess
+                    markMutationSuccess(result.message)
+                    onResult(true, result.message)
+                } else {
+                    val msg = result.message
+                    markMutationFailure(IOException(msg), msg)
+                    onResult(false, msg)
+                }
+            } catch (error: Exception) {
+                val msg = error.message ?: "Restore failed"
+                markMutationFailure(error, msg)
+                onResult(false, msg)
+            } finally {
+                _syncInProgress.value = false
+                _syncMessage.value = null
             }
         }
     }

@@ -3,13 +3,15 @@ package com.sevenzenlabs.zenmart.utils
 import com.sevenzenlabs.zenmart.data.Category
 import com.sevenzenlabs.zenmart.data.Customer
 import com.sevenzenlabs.zenmart.data.Product
+import com.sevenzenlabs.zenmart.data.Return
+import com.sevenzenlabs.zenmart.data.ReturnItem
 import com.sevenzenlabs.zenmart.data.Sale
 import com.sevenzenlabs.zenmart.data.SaleItem
 import com.sevenzenlabs.zenmart.data.StockAdjustment
 import com.sevenzenlabs.zenmart.data.UdhaarTransaction
 
 /**
- * Application-boundary integrity checks for the seven cloud-restorable tables.
+ * Application-boundary integrity checks for the cloud-restorable tables.
  *
  * The database already contains legacy installations that may have orphaned
  * rows, so this slice adds relationship indexes and rejects invalid complete
@@ -23,7 +25,9 @@ object BusinessRelationshipPolicy {
         saleItems: List<SaleItem>,
         customers: List<Customer>,
         udhaarTransactions: List<UdhaarTransaction>,
-        stockAdjustments: List<StockAdjustment>
+        stockAdjustments: List<StockAdjustment>,
+        returns: List<Return> = emptyList(),
+        returnItems: List<ReturnItem> = emptyList()
     ) {
         requireUnique("categories.globalId", categories.map { it.globalId })
         requireUnique("products.globalId", products.map { it.globalId })
@@ -72,6 +76,42 @@ object BusinessRelationshipPolicy {
         stockAdjustments.forEach { adjustment ->
             require(adjustment.productId > 0L && adjustment.productId in productIds) {
                 "Stock adjustment references a missing product"
+            }
+        }
+        if (returns.isNotEmpty()) {
+            requireUnique("returns.globalId", returns.map { it.globalId })
+            requireUnique("returns.returnNumber", returns.map { it.returnNumber })
+            returns.forEach { ret ->
+                require(ret.saleId > 0L && ret.saleId in saleIds) {
+                    "Return references a missing sale"
+                }
+            }
+        }
+        if (returnItems.isNotEmpty()) {
+            requireUnique("return_items.globalId", returnItems.map { it.globalId })
+            val returnIds = returns.map { it.id }.filter { it > 0L }.toSet()
+            val saleItemIds = saleItems.map { it.id }.filter { it > 0L }.toSet()
+            val returnsById = returns.associateBy { it.id }
+            val saleItemsById = saleItems.associateBy { it.id }
+            returnItems.forEach { rItem ->
+                require(rItem.returnId > 0L && rItem.returnId in returnIds) {
+                    "Return item references a missing return"
+                }
+                require(rItem.saleItemId > 0L && rItem.saleItemId in saleItemIds) {
+                    "Return item references a missing sale item"
+                }
+                require(rItem.productId > 0L && rItem.productId in productIds) {
+                    "Return item references a missing product"
+                }
+                val parentReturn = returnsById[rItem.returnId]
+                val saleItem = saleItemsById[rItem.saleItemId]
+                require(
+                    parentReturn != null && saleItem != null &&
+                    parentReturn.saleId == saleItem.saleId &&
+                    rItem.productId == saleItem.productId
+                ) {
+                    "Return item does not match parent return sale or sale item product"
+                }
             }
         }
     }
